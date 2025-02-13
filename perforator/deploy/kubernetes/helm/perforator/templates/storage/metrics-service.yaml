@@ -1,4 +1,4 @@
-{{- if .Values.storage.metrics.enabled }}
+{{- if and .Values.storage.enabled .Values.storage.metrics.enabled }}
 apiVersion: v1
 kind: Service
 metadata:

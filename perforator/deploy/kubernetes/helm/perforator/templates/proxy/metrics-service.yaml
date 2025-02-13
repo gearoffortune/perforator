@@ -1,4 +1,4 @@
-{{- if .Values.proxy.metrics.enabled }}
+{{- if and .Values.proxy.enabled .Values.proxy.metrics.enabled }}
 apiVersion: v1
 kind: Service
 metadata:

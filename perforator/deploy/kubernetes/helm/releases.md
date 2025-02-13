@@ -26,8 +26,12 @@ Internal changes:
 
 Enhancements:
 + Add perforator-dev subchart, that allows to deploy postgresql, clickhouse, minio databases
++ Allow enabling/disabling certain perforator microservices
++ Allow to deploy extra objects
 
 Fixes:
++ Fix storage service declaration
++ Fix priority class setting placement
 + Fix password secretes were deployed after the migration jobs, which in some cases caused chart installation failure
 
 # 0.2.5

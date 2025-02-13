@@ -1,3 +1,4 @@
+{{- if .Values.storage.enabled -}}
 apiVersion: v1
 kind: Service
 metadata:
@@ -6,7 +7,7 @@ metadata:
     {{- include "perforator.selectorLabels" . | nindent 4 }}
     {{- include "perforator.storage.selectorLabels" . | nindent 4 }}
   namespace: {{ .Release.Namespace }}
-  {{- with .Values.proxy.service.annotations }}
+  {{- with .Values.storage.service.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
@@ -14,8 +15,8 @@ spec:
   selector:
     {{- include "perforator.selectorLabels" . | nindent 4 }}
     {{- include "perforator.storage.selectorLabels" . | nindent 4 }}
-  type: {{ .Values.proxy.service.type }}
-  {{- with .Values.proxy.service.loadBalancerIP }}
+  type: {{ .Values.storage.service.type }}
+  {{- with .Values.storage.service.loadBalancerIP }}
   loadBalancerIP: {{ . }}
   {{- end }}
   ports:
@@ -28,4 +29,5 @@ spec:
   {{- range .Values.storage.service.ipFamilies }}
   ipFamilies:
     - {{ . }}
-  {{- end}}
+  {{- end }}
+{{- end }}

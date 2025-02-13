@@ -71,9 +71,6 @@ spec:
         {{- if .Values.agent.useHostNetwork }}
         hostNetwork: true
         {{- end }}
-        {{- with .Values.agent.priorityClassName }}
-        priorityClassName: {{ . }}
-        {{- end }}
         ports:
         - containerPort: {{ .Values.agent.containerPorts.metrics }}
           name: metrics
@@ -105,6 +102,9 @@ spec:
       # it may be desirable to set a high priority class to ensure that a DaemonSet Pod
       # preempts running Pods
       # priorityClassName: important
+      {{- with .Values.agent.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
       terminationGracePeriodSeconds: 30
       volumes:
       - name: sys

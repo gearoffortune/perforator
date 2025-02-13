@@ -3,6 +3,7 @@
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
+extraDeploy: []
 
 # TODO: it might be better to use separate fields for database credentials for each perforator component.
 
@@ -262,6 +263,7 @@ agent:
     metrics: 9156
       
 storage:
+  enabled: true
   config:
     # Create a new user provided config for the storage.
     useCustom: false
@@ -390,6 +392,7 @@ storage:
   hostname: ""
 
 proxy:
+  enabled: true
   config:
     # Create a new user provided config for the proxy.
     useCustom: false
@@ -697,6 +700,7 @@ ingress:
     #      - example.com
 
 gc:
+  enabled: true
   config:
     # Create a new user provided config for the gc.
     useCustom: false
@@ -808,6 +812,7 @@ gc:
     metrics: 85
 
 offlineprocessing:
+  enabled: true
   config:
     #Create a new user provided config for the offlineprocessing.
     useCustom: false

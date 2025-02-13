@@ -1,3 +1,4 @@
+{{- if .Values.gc.enabled -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -8,4 +9,5 @@ data:
   config.yaml: |- {{- tpl .Values.gc.config.custom . | nindent 4 }}
 {{- else }}
   config.yaml: |- {{- tpl (.Files.Get "config/gc.yaml") . | nindent 4 }}
+{{- end }}
 {{- end }}

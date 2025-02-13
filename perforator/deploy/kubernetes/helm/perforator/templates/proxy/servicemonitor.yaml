@@ -1,4 +1,4 @@
-{{- if and (.Values.proxy.metrics.enabled) (.Values.proxy.metrics.serviceMonitor.enabled) }}
+{{- if and .Values.proxy.enabled (and (.Values.proxy.metrics.enabled) (.Values.proxy.metrics.serviceMonitor.enabled)) }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
