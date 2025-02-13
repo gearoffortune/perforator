@@ -3,7 +3,6 @@ package client
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -73,10 +72,6 @@ func NewClient(c *Config, l xlog.Logger) (*Client, error) {
 		}
 		c.URL = endpoint.url
 		c.Insecure = !endpoint.secure
-	}
-
-	if !c.Insecure && c.Token == "" {
-		return nil, errors.New("no OAuth token found")
 	}
 
 	transportDialOption, err := newTransportCredentialsDialOption(!c.Insecure)
