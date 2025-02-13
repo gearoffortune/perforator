@@ -100,7 +100,7 @@ func NewClient(c *Config, l xlog.Logger) (*Client, error) {
 				AccessToken: c.Token,
 			}),
 		}))
-	} else {
+	} else if !c.Insecure {
 		l.Warn(context.Background(), "No OAuth token found")
 	}
 
