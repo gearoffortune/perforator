@@ -261,7 +261,8 @@ Return the path to the CA cert file signing the perforator storage cert.
 */}}
 
 {{- define "perforator.storage.host" -}}
-{{ .Values.storage.hostname | default (printf "%s:%v" (include "perforator.storage.service.name" .) .Values.storage.service.ports.grpc.port) }}
+{{- $hostNameOverride := coalesce .Values.agent.config.storageHostnameOverride .Values.storage.hostname  -}}
+{{ $hostNameOverride | default (printf "%s:%v" (include "perforator.storage.service.name" .) .Values.storage.service.ports.grpc.port) }}
 {{- end }}
 
 {{- define "perforator.storage.service.name" -}}
@@ -273,11 +274,13 @@ Return the path to the CA cert file signing the perforator storage cert.
 */}}
 
 {{- define "perforator.proxy.host.http" -}}
-{{ .Values.proxy.hostname | default (printf "%s:%v" (include "perforator.proxy.service.name" .) .Values.proxy.service.ports.http.port) }}
+{{- $hostNameOverride := coalesce .Values.web.config.HTTPProxyHostnameOverride .Values.proxy.hostname  -}}
+{{ $hostNameOverride | default (printf "%s:%v" (include "perforator.proxy.service.name" .) .Values.proxy.service.ports.http.port) }}
 {{- end }}
 
 {{- define "perforator.proxy.host.grpc" -}}
-{{ .Values.proxy.hostname | default (printf "%s:%v" (include "perforator.proxy.service.name" .) .Values.proxy.service.ports.grpc.port) }}
+{{- $hostNameOverride := coalesce .Values.web.config.GRPCProxyHostnameOverride .Values.proxy.hostname  -}}
+{{ $hostNameOverride | default (printf "%s:%v" (include "perforator.proxy.service.name" .) .Values.proxy.service.ports.grpc.port) }}
 {{- end }}
 
 {{- define "perforator.proxy.service.name" -}}

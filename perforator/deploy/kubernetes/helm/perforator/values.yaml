@@ -157,6 +157,8 @@ agent:
     useCustom: false
     # Custom config content. This is passed into tpl function which allows templating from values.
     custom: ''
+    # Overrides storage hostname, might be useful if storage is in a separate release.
+    storageHostnameOverride: ""
     # Label used to describe nodes topology.
     topologyLableKey: "topology.kubernetes.io/zone"
 
@@ -389,6 +391,7 @@ storage:
     metrics: 85
 
   # Overrides storage hostname inside kubernetes cluster.
+  # DEPRECATED: use agent.config.storageHostnameOverride instead.
   hostname: ""
 
 proxy:
@@ -525,7 +528,9 @@ proxy:
     http: 80
     grpc: 81
     metrics: 85
+
   # Overrides proxy hostname inside kubernetes cluster.
+  # DEPRECATED: use web.config.HTTPProxyHostnameOverride and web.config.GRPCProxyHostnameOverride instead.
   hostname: ""
 
 web:
@@ -536,6 +541,10 @@ web:
     useCustom: false
     #Custom config content. This is passed into tpl function which allows templating from values.
     custom: ''
+    # Overrides proxy http hostname, might be useful if proxy is in a separate release.
+    HTTPProxyHostnameOverride: ""
+    # Overrides proxy grpc hostname, might be useful if proxy is in a separate release.
+    GRPCProxyHostnameOverride: ""
 
   # Number of pods to deploy.
   replicas: 1
