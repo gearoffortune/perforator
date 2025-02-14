@@ -3,6 +3,7 @@ name: perforator
 description: Perforator cluster-wide continuous profiling system (https://github.com/yandex/perforator)
 dependencies:
 - condition: testing.enableTestingDatabases
+  repository: https://helm.perforator.tech
   name: perforator-dev
   alias: testing
   version: 0.x.x
