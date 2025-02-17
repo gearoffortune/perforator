@@ -22,12 +22,13 @@ Internal changes:
 1: If you are sending patch to GitHub, specify PR. Otherwise (if you are sending patch to internal monorepo), leave unset and then specify Git commit.
 -->
 
-# Unreleased
+# 0.2.6
 
 Enhancements:
 + Add perforator-dev subchart, that allows to deploy postgresql, clickhouse, minio databases (78ff60b)
 + Allow enabling/disabling certain perforator microservices (#36)
 + Allow to deploy extra objects (#36)
++ Upgrade perforator to [v0.0.4](https://github.com/yandex/perforator/releases/tag/v0.0.4)
 
 Fixes:
 + Fix storage service declaration (#36)
