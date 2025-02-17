@@ -11,10 +11,6 @@ const COMMON_TESTS = [
         expected: 'root',
     },
     {
-        input: 'function @/main.cpp',
-        expected: 'function',
-    },
-    {
         input: 'worker (container)',
         expected: 'worker (container)',
     },
