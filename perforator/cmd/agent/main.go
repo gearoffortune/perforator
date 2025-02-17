@@ -20,8 +20,6 @@ import (
 	logzap "github.com/yandex/perforator/library/go/core/log/zap"
 	"github.com/yandex/perforator/library/go/core/log/zap/asynczap"
 	"github.com/yandex/perforator/library/go/core/log/zap/encoders"
-	"github.com/yandex/perforator/library/go/core/metrics/collect/policy/inflight"
-	"github.com/yandex/perforator/library/go/core/metrics/prometheus"
 	"github.com/yandex/perforator/perforator/agent/collector/pkg/config"
 	"github.com/yandex/perforator/perforator/agent/collector/pkg/profiler"
 	"github.com/yandex/perforator/perforator/internal/buildinfo/cobrabuildinfo"
@@ -29,6 +27,7 @@ import (
 	"github.com/yandex/perforator/perforator/internal/xmetrics"
 	"github.com/yandex/perforator/perforator/pkg/maxprocs"
 	"github.com/yandex/perforator/perforator/pkg/must"
+	"github.com/yandex/perforator/perforator/pkg/xlog"
 )
 
 var (
@@ -116,13 +115,9 @@ func run() error {
 	}
 	defer stop()
 
-	r := prometheus.NewRegistry(prometheus.NewRegistryOpts().
-		SetStreamFormat(prometheus.StreamText).
-		SetNameSanitizer(sanitizePrometheusMetricName).
-		AddCollectors(context.Background(),
-			inflight.NewCollectorPolicy(),
-			xmetrics.GetCollectFuncs()...,
-		),
+	r := xmetrics.NewRegistry(
+		xmetrics.WithAddCollectors(xmetrics.GetCollectFuncs()...),
+		xmetrics.WithFormat(xmetrics.FormatText),
 	)
 
 	c := &config.Config{}
@@ -211,14 +206,7 @@ func run() error {
 	}()
 
 	// Setup http puller server
-	http.HandleFunc("/metrics", func(res http.ResponseWriter, req *http.Request) {
-		res.WriteHeader(http.StatusOK)
-		res.Header().Add("Content-Type", string(prometheus.StreamCompact))
-		_, err := r.Stream(req.Context(), res)
-		if err != nil {
-			l.Error("Failed to stream prometheus metrics", log.Error(err))
-		}
-	})
+	http.Handle("/metrics", r.HTTPHandler(ctx, xlog.New(l)))
 
 	// Run pprof server
 	go func() {
