@@ -25,25 +25,25 @@ Internal changes:
 # Unreleased
 
 Enhancements:
-+ Add perforator-dev subchart, that allows to deploy postgresql, clickhouse, minio databases
-+ Allow enabling/disabling certain perforator microservices
-+ Allow to deploy extra objects
++ Add perforator-dev subchart, that allows to deploy postgresql, clickhouse, minio databases (78ff60b)
++ Allow enabling/disabling certain perforator microservices (#36)
++ Allow to deploy extra objects (#36)
 
 Fixes:
-+ Fix storage service declaration
-+ Fix priority class setting placement
-+ Fix password secretes were deployed after the migration jobs, which in some cases caused chart installation failure
++ Fix storage service declaration (#36)
++ Fix priority class setting placement (#36)
++ Fix password secretes were deployed after the migration jobs, which in some cases caused chart installation failure (972f4a1)
 
 # 0.2.5
 
 Enhancements:
-+ Allow customizing environment variables for all components
-+ Upgrade perforator to [v0.0.3](https://github.com/yandex/perforator/releases/tag/v0.0.3)
++ Allow customizing environment variables for all components (a9e002e)
++ Upgrade perforator to [v0.0.3](https://github.com/yandex/perforator/releases/tag/v0.0.3) (21e0f8a)
 
 # 0.2.4
 
 Fixes:
-+ Fix mount extra volumes (#30)
++ Fix mount extra volumes (#30) (#30)
 
 Enhancements:
 + Add default images for all components (677ca2b)
