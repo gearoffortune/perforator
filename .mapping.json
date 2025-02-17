@@ -77,6 +77,7 @@
   "perforator/ui-union/ya.make":"perforator/ui-union/ya.make.external",
   "perforator/ui/app/package.json":"perforator/ui/app/external/package.json",
   "perforator/ui/app/pnpm-lock.yaml":"perforator/ui/app/external/pnpm-lock.yaml",
+  "perforator/ui/app/pnpm-workspace.yaml":"perforator/ui/app/external/pnpm-workspace.yaml",
   "perforator/ui/app/src/vite/setup.ts":"perforator/ui/app/src/vite/setup.external.ts",
   "perforator/ui/package.json":"perforator/ui/external/package.json",
   "perforator/ui/pnpm-lock.yaml":"perforator/ui/external/pnpm-lock.yaml",
