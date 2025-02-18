@@ -69,6 +69,7 @@
   "docs/en/reference/querylang.md":"perforator/docs/opensource/en/reference/querylang.md",
   "docs/en/reference/system-requirements.md":"perforator/docs/opensource/en/reference/system-requirements.md",
   "docs/en/toc.yaml":"perforator/docs/opensource/en/toc.yaml",
+  "docs/en/tutorials/helm-chart.md":"perforator/docs/opensource/en/tutorials/helm-chart.md",
   "docs/en/tutorials/native-profiling.md":"perforator/docs/opensource/en/tutorials/native-profiling.md",
   "docs/en/tutorials/python-profiling.md":"perforator/docs/opensource/en/tutorials/python-profiling.md",
   "docs/en/tutorials/ui.md":"perforator/docs/opensource/en/tutorials/ui.md",

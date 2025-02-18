@@ -11,6 +11,8 @@ items:
       href: tutorials/native-profiling.md
     - name: Optimizing Python applications
       href: tutorials/python-profiling.md
+    - name: Setup Perforator test deployment in Kubernetes via Helm
+      href: tutorials/helm-chart.md
     - name: Building your first profile with UI
       href: tutorials/ui.md
   - name: Explanation
