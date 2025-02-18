@@ -2,6 +2,7 @@ GO_LIBRARY()
 
 SRCS(
     client.go
+    endpoint.go
     tls.go
     useragent.go
 )
@@ -16,6 +17,10 @@ ELSE()
     )
 ENDIF()
 
-
+GO_TEST_SRCS(endpoint_test.go)
 
 END()
+
+RECURSE(
+    gotest
+)

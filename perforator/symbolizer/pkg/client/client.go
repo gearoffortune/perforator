@@ -56,7 +56,8 @@ type Client struct {
 }
 
 type endpoint struct {
-	url    string
+	host   string
+	port   uint16
 	secure bool
 }
 
@@ -70,7 +71,7 @@ func NewClient(c *Config, l xlog.Logger) (*Client, error) {
 		if err != nil {
 			return nil, fmt.Errorf("no perforator endpoint found: %w", err)
 		}
-		c.URL = endpoint.url
+		c.URL = fmt.Sprintf("%s:%d", endpoint.host, endpoint.port)
 		c.Insecure = !endpoint.secure
 	}
 
