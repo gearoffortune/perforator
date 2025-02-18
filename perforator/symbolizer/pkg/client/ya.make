@@ -2,18 +2,15 @@ GO_LIBRARY()
 
 SRCS(
     client.go
+    default_endpoint.go
     endpoint.go
     tls.go
     useragent.go
 )
 
-IF (OPENSOURCE)
+IF (NOT OPENSOURCE)
     SRCS(
-        default_endpoint.go
-    )
-ELSE()
-    SRCS(
-        default_endpoint_yandex.go
+        yandex_specific.go
     )
 ENDIF()
 

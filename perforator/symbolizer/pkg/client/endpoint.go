@@ -19,9 +19,14 @@ func getScheme(ep string) string {
 	return ""
 }
 
+// If you are patching Perforator, you can initialize this in a `func init()`
+var (
+	defaultHost string = ""
+)
+
 const (
-	defaultSecurePort   = 7618
-	defaultInsecurePort = 7617
+	defaultSecurePort   uint16 = 7618
+	defaultInsecurePort uint16 = 7617
 )
 
 func parseEndpoint(ep string, secure *bool) (endpoint, error) {

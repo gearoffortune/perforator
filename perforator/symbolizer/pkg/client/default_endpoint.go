@@ -13,7 +13,11 @@ func getDefaultPerforatorEndpoint() (endpoint, error) {
 	var ep string
 	ep, ok := os.LookupEnv(perforatorEndpointEnv)
 	if !ok {
-		return endpoint{}, fmt.Errorf("environment variable %s is not set", perforatorEndpointEnv)
+		if defaultHost != "" {
+			ep = defaultHost
+		} else {
+			return endpoint{}, fmt.Errorf("environment variable %s is not set", perforatorEndpointEnv)
+		}
 	}
 
 	if level, ok := os.LookupEnv(perforatorSecurityLevelEnv); ok {

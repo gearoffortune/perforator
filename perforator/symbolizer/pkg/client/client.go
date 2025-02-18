@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -65,6 +66,9 @@ const (
 	MaxMessageSize = 256 * 1024 * 1024
 )
 
+// If you are patching Perforator, you can initialize this in a `func init()`
+var requireToken bool = false
+
 func NewClient(c *Config, l xlog.Logger) (*Client, error) {
 	if c.URL == "" && c.EndpointSet.ID == "" {
 		endpoint, err := getDefaultPerforatorEndpoint()
@@ -73,6 +77,10 @@ func NewClient(c *Config, l xlog.Logger) (*Client, error) {
 		}
 		c.URL = fmt.Sprintf("%s:%d", endpoint.host, endpoint.port)
 		c.Insecure = !endpoint.secure
+	}
+
+	if requireToken && c.Token == "" && os.Getenv("PERFORATOR_FORCE_DISABLE_TOKEN") != "yes" {
+		return nil, fmt.Errorf("no OAuth token found")
 	}
 
 	transportDialOption, err := newTransportCredentialsDialOption(!c.Insecure)
