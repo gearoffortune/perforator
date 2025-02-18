@@ -22,6 +22,11 @@ Internal changes:
 1: If you are sending patch to GitHub, specify PR. Otherwise (if you are sending patch to internal monorepo), leave unset and then specify Git commit.
 -->
 
+# 0.2.7
+
+Fixes:
++ Fix perforator chart not properly importing perforator-dev dependency.
+
 # 0.2.6
 
 Enhancements:
