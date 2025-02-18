@@ -31,6 +31,7 @@ var (
 	logLevel                          string
 	clusterName                       string
 	profileSamplingModulo             uint32
+	profileSamplingModuloByEvent      map[string]int64
 	maxBuildIDCacheEntries            uint64
 	pushProfileTimeout                time.Duration
 	writeReplicaPushBinaryProbability uint32
@@ -71,6 +72,12 @@ var (
 				conf.MetricsPort = metricsPort
 			}
 
+			// pflag does not support StringToUInt64Var, so we need to cast modulos.
+			samplingModuloByEvent := make(map[string]uint64)
+			for event, modulo := range profileSamplingModuloByEvent {
+				samplingModuloByEvent[event] = uint64(modulo)
+			}
+
 			server, err := storageserver.NewStorageServer(
 				conf,
 				logger,
@@ -80,6 +87,7 @@ var (
 					MaxBuildIDCacheEntries: maxBuildIDCacheEntries,
 					PushProfileTimeout:     pushProfileTimeout,
 					SamplingModulo:         uint64(profileSamplingModulo),
+					SamplingModuloByEvent:  samplingModuloByEvent,
 					PushBinaryWriteAbility: calcProbableOutcome(uint32(writeReplicaPushBinaryProbability)),
 				},
 			)
@@ -102,6 +110,12 @@ func init() {
 		"profile-sampling-modulo",
 		1,
 		"Determines how many profiles will be dropped, e.g. 1 - 0%, 2 - 50%, 10 - 90%, 100 - 99%",
+	)
+	storageCmd.Flags().StringToInt64Var(
+		&profileSamplingModuloByEvent,
+		"profile-sampling-modulo-by-event",
+		make(map[string]int64),
+		"Allows to override profile-sampling-modulo based on profile event type",
 	)
 	storageCmd.Flags().Uint32Var(
 		&writeReplicaPushBinaryProbability,

@@ -4,10 +4,6 @@ import (
 	"sync/atomic"
 )
 
-type Sampler interface {
-	Sample() bool
-}
-
 type ModuloSampler struct {
 	counter atomic.Uint64
 	modulo  uint64
@@ -18,7 +14,7 @@ func (s *ModuloSampler) Sample() bool {
 	return newValue%s.modulo == 0
 }
 
-func NewModuloSampler(modulo uint64) Sampler {
+func NewModuloSampler(modulo uint64) *ModuloSampler {
 	if modulo == 0 {
 		modulo = 1
 	}

@@ -45,7 +45,9 @@ const (
 )
 
 type storageMetrics struct {
+	receivedProfiles     metrics.Counter
 	droppedProfiles      metrics.Counter
+	sampledProfiles      metrics.Counter
 	microscopedProfiles  metrics.Counter
 	storedProfiles       metrics.Counter
 	storedProfilesErrors metrics.Counter
@@ -74,6 +76,7 @@ type storageMetrics struct {
 type StorageOptions struct {
 	ClusterName            string
 	SamplingModulo         uint64
+	SamplingModuloByEvent  map[string]uint64
 	MaxBuildIDCacheEntries uint64
 	PushProfileTimeout     time.Duration
 	PushBinaryWriteAbility bool
@@ -87,8 +90,9 @@ type StorageServer struct {
 	metrics    *storageMetrics
 	logger     xlog.Logger
 
-	binaryUploadLimiter *semaphore.Weighted
-	profileSampler      Sampler
+	binaryUploadLimiter   *semaphore.Weighted
+	defaultProfileSampler *ModuloSampler
+	profileSamplerByEvent map[string]*ModuloSampler
 
 	profileStorage profilestorage.Storage
 	binaryStorage  binarystorage.Storage
@@ -220,16 +224,20 @@ const (
 	PassedMicroscopes
 )
 
-func (s *StorageServer) admitPushProfile(meta *profilemeta.ProfileMetadata) (PushProfileAdmitResult, error) {
-	if s.profileSampler.Sample() {
-		return PassedSampling, nil
+func (s *StorageServer) sampleProfile(meta *profilemeta.ProfileMetadata) (PushProfileAdmitResult, uint64) {
+	sampler := s.profileSamplerByEvent[meta.MainEventType]
+	if sampler == nil {
+		sampler = s.defaultProfileSampler
+	}
+	if sampler.Sample() {
+		return PassedSampling, sampler.modulo
 	}
 
 	if s.microscopeFilter != nil && s.microscopeFilter.Filter(meta) {
-		return PassedMicroscopes, nil
+		return PassedMicroscopes, 1
 	}
 
-	return NotAllowed, nil
+	return NotAllowed, 0
 }
 
 func fixupEventTypes(eventTypes []string) []string {
@@ -258,6 +266,7 @@ func (s *StorageServer) PushProfile(ctx context.Context, req *perforatorstorage.
 	defer func() {
 		s.metrics.pushProfileInProgress.Add(-1)
 	}()
+	s.metrics.receivedProfiles.Inc()
 
 	l := s.logger.With(log.Any("labels", req.Labels))
 
@@ -281,26 +290,13 @@ func (s *StorageServer) PushProfile(ctx context.Context, req *perforatorstorage.
 	}
 	s.fixupMissingMetadataFields(meta)
 
-	admitResult, err := s.admitPushProfile(meta)
-	if err != nil {
-		return nil, err
-	}
+	eventTypes := fixupEventTypes(req.EventTypes)
+	metas := createMetasWithEventType(meta, eventTypes)
 
-	var profileWeight uint64
-	switch admitResult {
-	case PassedMicroscopes:
-		l.Debug(ctx, "Passed microscope")
-		profileWeight = 1
-	case PassedSampling:
-		l.Debug(ctx, "Passed sampling")
-		profileWeight = s.opts.SamplingModulo
-	case NotAllowed:
-		l.Debug(ctx, "Dropped profile")
-		s.metrics.droppedProfiles.Inc()
+	metas = s.sampleProfiles(ctx, l, metas)
+	if len(metas) == 0 {
 		return &perforatorstorage.PushProfileResponse{ID: ""}, nil
 	}
-
-	meta.Attributes[profilequerylang.WeightLabel] = fmt.Sprintf("%d", profileWeight)
 
 	defer func() {
 		if err == nil {
@@ -316,9 +312,6 @@ func (s *StorageServer) PushProfile(ctx context.Context, req *perforatorstorage.
 		storeProfileCtx, cancel = context.WithTimeout(ctx, s.opts.PushProfileTimeout)
 		defer cancel()
 	}
-
-	eventTypes := fixupEventTypes(req.EventTypes)
-	metas := createMetasWithEventType(meta, eventTypes)
 
 	var profileID string
 	profileID, err = s.profileStorage.StoreProfile(
@@ -336,9 +329,6 @@ func (s *StorageServer) PushProfile(ctx context.Context, req *perforatorstorage.
 		return nil, err
 	}
 
-	if admitResult == PassedMicroscopes {
-		s.metrics.microscopedProfiles.Inc()
-	}
 	s.metrics.profilesBytesCount.Add(int64(len(body)))
 	s.metrics.profilesBytesSizes.RecordValue(float64(len(body)))
 	l.Info(ctx,
@@ -349,6 +339,37 @@ func (s *StorageServer) PushProfile(ctx context.Context, req *perforatorstorage.
 	)
 
 	return &perforatorstorage.PushProfileResponse{ID: profileID}, nil
+}
+
+func (s *StorageServer) sampleProfiles(
+	ctx context.Context,
+	l xlog.Logger,
+	metas []*profilemeta.ProfileMetadata,
+) []*profilemeta.ProfileMetadata {
+	count := 0
+	for _, meta := range metas {
+		admitResult, profileWeight := s.sampleProfile(meta)
+
+		switch admitResult {
+		case PassedMicroscopes:
+			l.Debug(ctx, "Passed microscope")
+			s.metrics.microscopedProfiles.Inc()
+		case PassedSampling:
+			l.Debug(ctx, "Passed sampling")
+			s.metrics.sampledProfiles.Inc()
+		case NotAllowed:
+			l.Debug(ctx, "Dropped profile")
+			s.metrics.droppedProfiles.Inc()
+			continue
+		}
+
+		meta.Attributes[profilequerylang.WeightLabel] = fmt.Sprintf("%d", profileWeight)
+
+		metas[count] = meta
+		count++
+	}
+
+	return metas[:count]
 }
 
 func (s *StorageServer) doAnnounceBinaries(
@@ -671,7 +692,9 @@ func NewStorageServer(
 			pushProfileInProgress:   registry.IntGauge("push_profile.in_progress.gauge"),
 			successPushProfileTimer: registry.WithTags(map[string]string{"kind": "success"}).Timer("push_profile.timer"),
 			failPushProfileTimer:    registry.WithTags(map[string]string{"kind": "fail"}).Timer("push_profile.timer"),
+			receivedProfiles:        registry.Counter("profiles.received.count"),
 			droppedProfiles:         registry.WithTags(map[string]string{"kind": "dropped"}).Counter("profiles.count"),
+			sampledProfiles:         registry.WithTags(map[string]string{"kind": "sampled"}).Counter("profiles.count"),
 			storedProfiles:          registry.WithTags(map[string]string{"kind": "stored"}).Counter("profiles.count"),
 			microscopedProfiles:     registry.WithTags(map[string]string{"kind": "microscoped"}).Counter("profiles.count"),
 			storedProfilesErrors:    registry.WithTags(map[string]string{"kind": "failed_store"}).Counter("profiles.count"),
@@ -692,13 +715,18 @@ func NewStorageServer(
 			announceBinariesCacheHit:    registry.WithTags(map[string]string{"kind": "hit"}).Counter("announce_binaries.count"),
 			announceBinariesCacheMiss:   registry.WithTags(map[string]string{"kind": "miss"}).Counter("announce_binaries.count"),
 		},
-		profileSampler:           NewModuloSampler(opts.SamplingModulo),
+		defaultProfileSampler:    NewModuloSampler(opts.SamplingModulo),
+		profileSamplerByEvent:    make(map[string]*ModuloSampler),
 		binaryUploadLimiter:      semaphore.NewWeighted(1),
 		profileStorage:           storageBundle.ProfileStorage,
 		binaryStorage:            storageBundle.BinaryStorage.Binary(),
 		microscopeFilter:         microscopeFilter,
 		buildIDCache:             cache,
 		profileCommentProcessors: make(map[string]func(string, *profilemeta.ProfileMetadata) error),
+	}
+
+	for typ, modulo := range opts.SamplingModuloByEvent {
+		server.profileSamplerByEvent[typ] = NewModuloSampler(modulo)
 	}
 
 	creds, err := credentials.NewServerTLSFromFile(
