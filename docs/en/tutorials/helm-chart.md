@@ -1,4 +1,4 @@
-# Perforator Helm Chart
+# Setup Perforator test deployment in Kubernetes via Helm
 In this tutorial we will deploy Perforator on a Kubernetes cluster via the Helm package manager without additional database setup.
 
 {% note warning %}
@@ -13,6 +13,15 @@ Please do not use it in production environments.
 
 - Kubernetes cluster
 - Helm 3+
+
+{% note info %}
+
+To run Kubernetes locally you can isntall kind (kubernetes in docker).
+
+See official instalation instruction https://kind.sigs.k8s.io/docs/user/quick-start/#installation
+
+
+{% endnote %}
 
 ## Adding Helm Repository
 
