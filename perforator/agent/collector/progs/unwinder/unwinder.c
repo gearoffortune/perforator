@@ -113,6 +113,12 @@ struct profiler_config {
     _Static_assert(SIGRTMIN < signal_mask_bits, "Unsupported signal set size");
 };
 
+struct thread_key {
+    u32 pid;
+    u32 tid;
+    u64 starttime;
+};
+
 // Heap. BPF stack is limited (512 bytes).
 BPF_MAP(profiler_state, BPF_MAP_TYPE_PERCPU_ARRAY, u32, struct profiler_state, 1);
 BPF_MAP(profiler_config, BPF_MAP_TYPE_ARRAY, u32, struct profiler_config, 1);
@@ -120,7 +126,7 @@ BPF_MAP(process_info, BPF_MAP_TYPE_HASH, u32, struct process_info, PROCESS_MAP_S
 BPF_MAP(default_process_info, BPF_MAP_TYPE_ARRAY, u32, struct process_info, 1);
 BPF_MAP(process_discovery, BPF_MAP_TYPE_LRU_HASH, u32, u8, PROCESS_MAP_SIZE);
 BPF_MAP(perf_event_values, BPF_MAP_TYPE_HASH, u64, struct bpf_perf_event_value, 4096);
-BPF_MAP(thread_last_sample_time, BPF_MAP_TYPE_LRU_HASH, u32, u64, 1024 * 1024);
+BPF_MAP(thread_last_sample_time, BPF_MAP_TYPE_LRU_HASH, struct thread_key, u64, 256 * 1024);
 BPF_MAP(percpu_user_regs, BPF_MAP_TYPE_PERCPU_ARRAY, u32, struct user_regs, 1);
 
 static ALWAYS_INLINE void* map_lookup_zero(void* map) {
@@ -301,7 +307,13 @@ static ALWAYS_INLINE void record_thread_walltime(struct profiler_config* config,
         return;
     }
 
-    u64* last = bpf_map_lookup_elem(&thread_last_sample_time, &state->sample.tid);
+    struct thread_key key = {
+        .pid = state->sample.pid,
+        .tid = state->sample.tid,
+        .starttime = state->sample.starttime,
+    };
+
+    u64* last = bpf_map_lookup_elem(&thread_last_sample_time, &key);
     if (last) {
         i64 delta = (i64)state->prog_starttime - (i64)*last;
         BPF_TRACE("calculated thread %d timedelta: %lld ns\n", state->sample.tid, delta);
@@ -317,7 +329,7 @@ static ALWAYS_INLINE void record_thread_walltime(struct profiler_config* config,
         state->sample.timedelta *= config->sched_sample_modulo;
     }
 
-    int err = bpf_map_update_elem(&thread_last_sample_time, &state->sample.tid, &state->prog_starttime, 0);
+    int err = bpf_map_update_elem(&thread_last_sample_time, &key, &state->prog_starttime, 0);
     if (err != 0) {
         BPF_TRACE("failed to set thread %d sample time: %d\n", state->sample.tid, err);
     }
