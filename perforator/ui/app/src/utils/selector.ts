@@ -54,6 +54,10 @@ export const makeSelector = (query: ProfileTaskQuery): string => {
     if (query.profileId) {
         conditions.push({ field: 'id', value: query.profileId });
     }
+    if (query.cluster) {
+        conditions.push({ field: 'cluster', value: query.cluster });
+    }
+
     return makeSelectorFromConditions(conditions);
 };
 

@@ -20,6 +20,7 @@ export interface ProfileTaskQuery {
     service?: string;
     profileId?: string;
     rawProfile?: 'true' | 'false';
+    cluster?: string;
 }
 
 
