@@ -30,9 +30,6 @@ func (m *BPFManager) Add(id uint64, conf *pythonpreprocessing.PythonConfig) erro
 	}
 
 	pythonUnwindConfig := python_agent.ParsePythonUnwinderConfig(conf)
-	if pythonUnwindConfig == nil {
-		return nil
-	}
 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()

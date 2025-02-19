@@ -605,6 +605,23 @@ func (a *processAnalyzer) registerMapping(m *dso.Mapping) {
 	a.exemappings = append(a.exemappings, m)
 }
 
+func (a *processAnalyzer) findInterpreterBinary(mappings []*dso.Mapping) (binary unwinder.InterpreterBinary, baseAddress uint64) {
+	for _, m := range mappings {
+		if m.DSO == nil {
+			continue
+		}
+
+		if m.DSO.InterpreterType != unwinder.InterpreterTypeNone {
+			return unwinder.InterpreterBinary{
+				Id:   unwinder.BinaryId(m.DSO.ID),
+				Type: m.DSO.InterpreterType,
+			}, m.BaseAddress
+		}
+	}
+
+	return unwinder.InterpreterBinary{}, 0
+}
+
 func (a *processAnalyzer) storeBPFMaps(ctx context.Context) error {
 	sort.Slice(a.exemappings, func(i, j int) bool {
 		return a.exemappings[i].Begin < a.exemappings[j].Begin
@@ -620,6 +637,7 @@ func (a *processAnalyzer) storeBPFMaps(ctx context.Context) error {
 	} else {
 		pi.MainBinaryId = unwinder.BinaryId(math.MaxUint64)
 	}
+	pi.InterpreterBinary, pi.InterpreterBinaryStartAddress = a.findInterpreterBinary(a.exemappings)
 
 	a.log.Debug(ctx, "Put process info", log.Any("info", pi))
 	err := a.reg.bpf.AddProcess(a.proc.id, &pi)

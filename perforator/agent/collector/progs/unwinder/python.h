@@ -406,10 +406,14 @@ static ALWAYS_INLINE void python_collect_stack(
         return;
     }
 
-    // TODO(@pashaguskov): support libpython.so
-    binary_id id = proc_info->main_binary_id;
+    if (proc_info->interpreter_binary.type != INTERPRETER_TYPE_PYTHON) {
+        return;
+    }
+
+    binary_id id = proc_info->interpreter_binary.id;
     struct python_config* config = bpf_map_lookup_elem(&python_storage, &id);
     if (config == NULL) {
+        // sanity check, should be not NULL because of previous check for python interpreter type
         return;
     }
 
@@ -417,18 +421,18 @@ static ALWAYS_INLINE void python_collect_stack(
 
     void* py_thread_state_addr = python_get_thread_state_and_update_cache(
         config->py_thread_state_tls_offset,
-        config->py_runtime_relative_address,
+        proc_info->interpreter_binary_start_address + config->py_runtime_relative_address,
         &config->offsets.py_runtime_state_offsets,
         &config->offsets.py_interpreter_state_offsets,
         &config->offsets.py_thread_state_offsets
     );
     if (py_thread_state_addr == NULL) {
         metric_increment(METRIC_PYTHON_TLS_THREAD_STATE_NULL);
-        BPF_TRACE("python: read NULL *Pythread_state");
+        BPF_TRACE("python: read NULL *PyThreadState");
         return;
     }
 
-    BPF_TRACE("python: Successfully extracted Pythread_state addr %p", py_thread_state_addr);
+    BPF_TRACE("python: Successfully extracted PyThreadState addr %p", py_thread_state_addr);
 
     void* py_interpreter_frame = python_read_current_frame_from_thread_state(config, py_thread_state_addr);
     if (py_interpreter_frame == NULL) {

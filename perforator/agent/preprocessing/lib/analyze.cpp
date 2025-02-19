@@ -43,16 +43,14 @@ NPerforator::NBinaryProcessing::NPython::PythonConfig BuildPythonConfig(llvm::ob
     conf.MutableVersion()->SetMicro(version->Version.MicroVersion);
 
     auto threadStateTLSOffset = analyzer.ParseTLSPyThreadState();
-    if (!threadStateTLSOffset) {
-        return conf;
+    if (threadStateTLSOffset) {
+        conf.SetPyThreadStateTLSOffset(*threadStateTLSOffset);
     }
-    conf.SetPyThreadStateTLSOffset(*threadStateTLSOffset);
 
     auto pyRuntimeAddress = analyzer.ParsePyRuntimeAddress();
-    if (!pyRuntimeAddress) {
-        return conf;
+    if (pyRuntimeAddress) {
+        conf.SetRelativePyRuntimeAddress(*pyRuntimeAddress);
     }
-    conf.SetRelativePyRuntimeAddress(*pyRuntimeAddress);
 
     return conf;
 }

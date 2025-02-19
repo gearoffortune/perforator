@@ -86,17 +86,10 @@ struct pid_namespace {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-struct mm_struct {
-    unsigned long start_code;
-};
-
-////////////////////////////////////////////////////////////////////////////////
-
 struct task_struct {
     void* stack;
     unsigned int flags;
     struct task_struct* group_leader;
-    struct mm_struct* mm;
     u64 real_start_time;
     char comm[TASK_COMM_LEN];
     struct css_set* cgroups;

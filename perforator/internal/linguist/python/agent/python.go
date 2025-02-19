@@ -53,6 +53,10 @@ func PythonInternalsOffsetsByVersion(version *python.PythonVersion) (*unwinder.P
 }
 
 func IsVersionSupported(version *python.PythonVersion) bool {
+	if version == nil {
+		return false
+	}
+
 	return version.Major == 3 && (version.Minor == 12 || version.Minor == 13)
 }
 
@@ -60,16 +64,13 @@ func encodeVersion(version *python.PythonVersion) uint32 {
 	return version.Micro + (version.Minor << 8) + (version.Major)<<16
 }
 
+// Only supported python version config must be passed here.
 func ParsePythonUnwinderConfig(conf *python.PythonConfig) *unwinder.PythonConfig {
-	if conf != nil && conf.PyThreadStateTLSOffset < 0 && conf.Version != nil && IsVersionSupported(conf.Version) {
-		offsets, _ := PythonInternalsOffsetsByVersion(conf.Version)
-		return &unwinder.PythonConfig{
-			Version:                  encodeVersion(conf.Version),
-			PyThreadStateTlsOffset:   uint64(-conf.PyThreadStateTLSOffset),
-			PyRuntimeRelativeAddress: conf.RelativePyRuntimeAddress,
-			Offsets:                  *offsets,
-		}
+	offsets, _ := PythonInternalsOffsetsByVersion(conf.Version)
+	return &unwinder.PythonConfig{
+		Version:                  encodeVersion(conf.Version),
+		PyThreadStateTlsOffset:   uint64(-conf.PyThreadStateTLSOffset),
+		PyRuntimeRelativeAddress: conf.RelativePyRuntimeAddress,
+		Offsets:                  *offsets,
 	}
-
-	return nil
 }
