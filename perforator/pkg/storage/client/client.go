@@ -336,7 +336,7 @@ func (c *Client) PushBinary(ctx context.Context, buildID string) (io.WriteCloser
 	var pushBinaryClient perforatorstorage.PerforatorStorage_PushBinaryClient
 	pushBinaryClient, err = c.client.PushBinary(ctx)
 	if err != nil {
-		l.Error(ctx, "failed push binary start client")
+		l.Error(ctx, "Failed to initialize binary upload")
 		return nil, nil, err
 	}
 
@@ -350,7 +350,7 @@ func (c *Client) PushBinary(ctx context.Context, buildID string) (io.WriteCloser
 		},
 	)
 	if err != nil {
-		l.Error(ctx, "failed push binary send buildid chunk")
+		l.Error(ctx, "Failed to send binary upload header", log.Error(err))
 		return nil, nil, err
 	}
 

@@ -123,7 +123,7 @@ func (s *MonitoringService) gatherServicesMetrics(ctx context.Context, logger lo
 		return err
 	}
 
-	logger.Debug("number of services", log.Int("number of services", len(services)))
+	logger.Debug("Number of services", log.Int("number of services", len(services)))
 
 	var wg sync.WaitGroup
 	servicesCh := make(chan *proto.ServiceMeta)

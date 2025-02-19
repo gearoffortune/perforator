@@ -44,7 +44,7 @@ func main() {
 			MetricsPort: *metricsPort,
 		})
 	if err != nil {
-		logger.Error("service is stoping with error", log.Error(err))
+		logger.Error("Service is stopping", log.Error(err))
 	}
 }
 

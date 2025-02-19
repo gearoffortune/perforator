@@ -103,10 +103,10 @@ func NewRegistry(l xlog.Logger, m metrics.Registry, manager *bpf.BPFBinaryManage
 // Preconditions: d.usagemu is locked.
 func (d *Registry) updateResourceUsageMetrics(ctx context.Context) {
 	if d.cachedPages < 0 {
-		d.l.Error(ctx, "cachedPages underflow")
+		d.l.Error(ctx, "Malformed unwind page table stats: cachedPages underflow")
 	}
 	if d.usedPages < 0 {
-		d.l.Error(ctx, "usedPages underflow")
+		d.l.Error(ctx, "Malformed unwind page table stats: usedPages underflow")
 	}
 	d.metrics.cachedPages.Set(float64(d.cachedPages))
 	d.metrics.usedPages.Set(float64(d.usedPages))
