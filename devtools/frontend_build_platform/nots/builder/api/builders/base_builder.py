@@ -16,12 +16,64 @@ from build.plugins.lib.nots.package_manager import (
 )
 from build.plugins.lib.nots.typescript import TsConfig
 from devtools.frontend_build_platform.libraries.logging import timeit
-from ..models import BuildError, CommonBuildersOptions
-from ..utils import copy_if_not_exists, extract_peer_tars, popen, resolve_bin
+from ..models import BaseOptions, BuildError, CommonBuildersOptions
+from ..utils import recursive_copy, extract_peer_tars, popen, resolve_bin
+
+
+class BaseBuilderFileManager(object):
+    """
+    Re-usaable basic functionality for managing src files.
+    One do not need to inherit it in builders - inherit BaseBuilder instead and customize the functions.
+    """
+
+    def __init__(self, options: BaseOptions, ts_config_path: str = "", output_dirs: list[str] = []):
+        self.options = options
+        self.ts_config_path = ts_config_path
+        self.output_dirs = output_dirs
+
+    @timeit
+    def _get_copy_ignore_list(self) -> set[str]:
+        return {
+            # IDE's
+            ".idea",
+            ".vscode",
+            # Output dirs
+            "dist",
+            pm_constants.BUILD_DIRNAME,
+            pm_constants.BUNDLE_DIRNAME,
+            # Dependencies
+            pm_constants.NODE_MODULES_DIRNAME,
+            pm_constants.PNPM_LOCKFILE_FILENAME,
+            # ya-make artefacts
+            pm_constants.NODE_MODULES_WORKSPACE_BUNDLE_FILENAME,
+            "output.tar",  # TODO FBP-1978
+            pm_constants.OUTPUT_TAR_UUID_FILENAME,
+            # Other
+            ".traces",
+            "a.yaml",
+            self.ts_config_path,  # Will be generated inside the builder (merged all the `extends`)
+        }.union(self.output_dirs)
+
+    @timeit
+    def _copy_src_files_to_bindir(self):
+        ignore_list = self._get_copy_ignore_list()
+        for entry in os.scandir(self.options.curdir):
+            if entry.name in ignore_list:
+                continue
+
+            dst = os.path.normpath(os.path.join(self.options.bindir, entry.name))
+            recursive_copy(entry.path, dst)
+
+    @timeit
+    def _copy_package_json(self):
+        shutil.copyfile(
+            pm_utils.build_pj_path(self.options.curdir),
+            pm_utils.build_pj_path(self.options.bindir),
+        )
 
 
 @add_metaclass(ABCMeta)
-class BaseBuilder(object):
+class BaseBuilder(BaseBuilderFileManager):
     @staticmethod
     @timeit
     def load_ts_config(ts_config_file: str, sources_path: str) -> TsConfig:
@@ -70,9 +122,7 @@ class BaseBuilder(object):
         :param external_dependencies: external dependencies which will be linked to node_modules/ (mapping name -> path)
         :type external_dependencies: dict
         """
-        self.options = options
-        self.output_dirs = output_dirs
-        self.ts_config_path = ts_config_path
+        super(BaseBuilder, self).__init__(options=options, ts_config_path=ts_config_path, output_dirs=output_dirs)
         self.copy_package_json = copy_package_json
         self.external_dependencies = external_dependencies
 
@@ -93,56 +143,13 @@ class BaseBuilder(object):
 
     @timeit
     def build(self):
-        self._copy_package_json()
+        if self.copy_package_json:
+            self._copy_package_json()
         self._prepare_dependencies()
         self._copy_src_files_to_bindir()
 
         self._build()
         self._run_javascript_after_build()
-
-    @timeit
-    def _get_copy_ignore_list(self) -> set[str]:
-        return {
-            # IDE's
-            ".idea",
-            ".vscode",
-            # Output dirs
-            "dist",
-            pm_constants.BUILD_DIRNAME,
-            pm_constants.BUNDLE_DIRNAME,
-            # Dependencies
-            pm_constants.NODE_MODULES_DIRNAME,
-            pm_constants.PNPM_LOCKFILE_FILENAME,
-            # ya-make artefacts
-            pm_constants.NODE_MODULES_WORKSPACE_BUNDLE_FILENAME,
-            "output.tar",  # TODO FBP-1978
-            pm_constants.OUTPUT_TAR_UUID_FILENAME,
-            # Other
-            ".traces",
-            "a.yaml",
-            self.ts_config_path,  # Will be generated inside the builder (merged all the `extends`)
-        }.union(self.output_dirs)
-
-    @timeit
-    def _copy_src_files_to_bindir(self):
-        ignore_list = self._get_copy_ignore_list()
-
-        for entry in os.scandir(self.options.curdir):
-            if entry.name in ignore_list:
-                continue
-
-            dst = os.path.normpath(os.path.join(self.options.bindir, entry.name))
-            copy_if_not_exists(entry.path, dst)
-
-    @timeit
-    def _copy_package_json(self):
-        if not self.copy_package_json:
-            return
-
-        shutil.copyfile(
-            pm_utils.build_pj_path(self.options.curdir),
-            pm_utils.build_pj_path(self.options.bindir),
-        )
 
     @timeit
     def __extract_peer_tars(self, *args, **kwargs):

@@ -2,6 +2,7 @@ import os
 import shutil
 import stat
 import subprocess
+import sys
 
 import library.python.archive as archive
 
@@ -11,6 +12,10 @@ from build.plugins.lib.nots.package_manager import (
     utils as pm_utils,
 )
 from devtools.frontend_build_platform.libraries.logging import timeit
+
+
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
 
 @timeit
@@ -66,16 +71,26 @@ def _extract_output_tar(moddir_abs: str):
 
 
 @timeit
-def __copy_file_with_write_permissions(src, dst):
-    os.makedirs(os.path.dirname(dst), exist_ok=True)
+def __add_write_permissions(path):
+    if not os.path.exists(path):
+        eprint(f"Directory not exists: {path}")
+        return
 
-    shutil.copy(src, dst)
-
-    dst_stat = os.stat(dst)
+    dst_stat = os.stat(path)
     dst_mode = stat.S_IMODE(dst_stat.st_mode)
     upd_mode = dst_mode | stat.S_IWUSR | stat.S_IWGRP
     if dst_mode != upd_mode:
-        os.chmod(dst, upd_mode)
+        try:
+            os.chmod(path, upd_mode)
+        except PermissionError:
+            eprint(f"Can't update permissions for {path}")
+
+
+@timeit
+def __copy_file_with_write_permissions(src, dst):
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    shutil.copy(src, dst)
+    __add_write_permissions(dst)
 
 
 @timeit
@@ -89,6 +104,21 @@ def copy_if_not_exists(src: str, dst: str):
 
     if os.path.isfile(src):
         __copy_file_with_write_permissions(src, dst)
+
+
+@timeit
+def recursive_copy(src, dest, overwrite=False):
+    __add_write_permissions(os.path.dirname(dest))
+
+    if os.path.isdir(src):
+        os.makedirs(dest, exist_ok=True)
+        files = os.listdir(src)
+        for f in files:
+            recursive_copy(os.path.join(src, f), os.path.join(dest, f), overwrite)
+
+    if os.path.isfile(src):
+        if not os.path.exists(dest) or overwrite:
+            __copy_file_with_write_permissions(src, dest)
 
 
 @timeit

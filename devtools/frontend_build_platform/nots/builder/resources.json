@@ -1,24 +1,24 @@
 {
   "info": {
-    "created": "2025-02-03T06:37:39.820Z",
+    "created": "2025-02-17T19:39:00.113Z",
     "pr": {
-      "id": 7786036,
-      "author": "zaverden",
-      "summary": "feat(conf+builder): RUN_JAVASCRIPT_AFTER_BUILD"
+      "id": 7920090,
+      "author": "vturov",
+      "summary": "FBP-2079: Add COPY CMD in TS_FILES only for TS_PACKAGE"
     }
   },
   "by_platform": {
     "darwin": {
-      "uri": "sbr:7957514369"
+      "uri": "sbr:8067392225"
     },
     "darwin-arm64": {
-      "uri": "sbr:7957513860"
+      "uri": "sbr:8067390844"
     },
     "linux": {
-      "uri": "sbr:7957515156"
+      "uri": "sbr:8067394227"
     },
     "linux-aarch64": {
-      "uri": "sbr:7957514773"
+      "uri": "sbr:8067393420"
     }
   }
 }
