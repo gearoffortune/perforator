@@ -8,7 +8,7 @@ PEERDIR(
 )
 
 RUN_PROGRAM(
-    perforator/agent/collector/cmd/btf2go
+    perforator/ebpf/tools/btf2go
     -elf
     perforator/agent/collector/progs/unwinder.debug.elf
     -package

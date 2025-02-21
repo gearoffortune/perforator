@@ -7,7 +7,7 @@ PEERDIR(
 )
 
 RUN_PROGRAM(
-    perforator/agent/collector/cmd/btf2go
+    perforator/ebpf/tools/btf2go
     -elf
     perforator/ebpf/examples/02-array-of-maps/prog/prog.debug.elf
     -package
