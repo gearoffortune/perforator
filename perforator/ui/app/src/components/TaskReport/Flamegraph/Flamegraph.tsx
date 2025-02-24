@@ -40,7 +40,7 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
     }, []);
 
     const search = query.get('flamegraphQuery');
-    const reverse = (query.get('flamegraphReverse') ?? 'true') === 'true';
+    const reverse = (query.get('flamegraphReverse') ?? String(userSettings.reverseFlameByDefault)) === 'true';
 
     const handleReverse = React.useCallback(() => {
         setQuery(q => {

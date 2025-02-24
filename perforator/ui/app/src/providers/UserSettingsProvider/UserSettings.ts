@@ -11,6 +11,7 @@ export interface UserSettings {
     monospace: 'default' | 'system';
     theme: Theme;
     shortenFrameTexts: ShortenMode;
+    reverseFlameByDefault: boolean;
 }
 
 const getUserSettingsFromLocalStorage = (): any => {
@@ -33,6 +34,7 @@ export const initialUserSettings = (): UserSettings => {
     return {
         shortenFrameTexts: 'false',
         monospace: 'default',
+        reverseFlameByDefault: true,
         ...userSettings,
         theme,
     };

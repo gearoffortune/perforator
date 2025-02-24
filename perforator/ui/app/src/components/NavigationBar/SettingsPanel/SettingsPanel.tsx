@@ -46,6 +46,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = () => {
                             onUpdate={checked => setUserSettings({ ...userSettings, monospace: checked ? 'system' : 'default' })}
                         />
                     </Settings.Item>
+                    <Settings.Item title="Show flamegraph in reverse by default">
+                        <Switch
+                            checked={userSettings.reverseFlameByDefault}
+                            onUpdate={checked => setUserSettings({ ...userSettings, reverseFlameByDefault: checked })}
+                        />
+                    </Settings.Item>
                 </Settings.Section>
             </Settings.Page>
         </Settings>
