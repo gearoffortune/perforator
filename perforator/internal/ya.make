@@ -4,6 +4,7 @@ RECURSE(
     buildinfo
     kubeletclient
     linguist
+    logfield
     offline_processing
     symbolizer
     unwinder

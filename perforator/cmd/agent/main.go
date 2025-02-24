@@ -25,6 +25,7 @@ import (
 	"github.com/yandex/perforator/perforator/internal/buildinfo/cobrabuildinfo"
 	"github.com/yandex/perforator/perforator/internal/unwinder"
 	"github.com/yandex/perforator/perforator/internal/xmetrics"
+	"github.com/yandex/perforator/perforator/pkg/linux"
 	"github.com/yandex/perforator/perforator/pkg/maxprocs"
 	"github.com/yandex/perforator/perforator/pkg/must"
 	"github.com/yandex/perforator/perforator/pkg/xlog"
@@ -48,6 +49,7 @@ var (
 	cgroupConfigPath string
 	cgroups          []string
 	pids             []int
+	tids             []int
 	logLevel         string
 )
 
@@ -57,7 +59,8 @@ func init() {
 	rootCmd.Flags().StringVarP(&configPath, "config", "c", "", "path to profiler config")
 	rootCmd.Flags().StringVar(&cgroupConfigPath, "cgroups", "", "path to cgroups config")
 	rootCmd.Flags().StringSliceVarP(&cgroups, "cgroup", "G", nil, "name of cgroup to trace")
-	rootCmd.Flags().IntSliceVarP(&pids, "pid", "p", nil, "id of process to trace")
+	rootCmd.Flags().IntSliceVarP(&pids, "pid", "p", nil, "id of process(es) to trace")
+	rootCmd.Flags().IntSliceVarP(&tids, "tid", "t", nil, "id of thread(s) to trace")
 	rootCmd.Flags().StringVarP(&logLevel, "log-level", "l", "info", "log level (default - `info`, must be one of `debug`, `info`, `warn`, `error`)")
 
 	cobrabuildinfo.Init(rootCmd)
@@ -156,7 +159,7 @@ func run() error {
 		return err
 	}
 
-	err = p.TracePid(os.Getpid(), map[string]string{
+	err = p.TraceSelf(map[string]string{
 		"service": "perforator",
 		"host":    hostname,
 	})
@@ -171,11 +174,21 @@ func run() error {
 
 	for _, pid := range pids {
 		l.Info("Register pid", log.Int("pid", pid))
-		err := p.TracePid(pid, map[string]string{
+		err := p.TracePid(linux.ProcessID(pid), map[string]string{
 			"host": hostname,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to start pid %d tracing: %w", pid, err)
+		}
+	}
+
+	for _, tid := range tids {
+		l.Info("Register tid", log.Int("tid", tid))
+		err := p.TracePid(linux.ProcessID(tid), map[string]string{
+			"host": hostname,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to start pid %d tracing: %w", tid, err)
 		}
 	}
 

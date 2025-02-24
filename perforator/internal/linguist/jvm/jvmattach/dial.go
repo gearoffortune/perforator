@@ -116,7 +116,7 @@ func (d *Dialer) sendAttachRequest(ctx context.Context, target Target) error {
 	return nil
 }
 
-func (d *Dialer) tryConnect(ctx context.Context, chroot string, nspid uint32) (*VirtualMachineConn, error) {
+func (d *Dialer) tryConnect(ctx context.Context, chroot string, nspid linux.ProcessID) (*VirtualMachineConn, error) {
 	d.Logger.Debug(ctx, "Trying to connect")
 	path := getFilePath(chroot, ".java_pid", nspid)
 	raw := net.Dialer{}
@@ -136,6 +136,6 @@ func (d *Dialer) tryConnect(ctx context.Context, chroot string, nspid uint32) (*
 	return &VirtualMachineConn{path: path}, nil
 }
 
-func getFilePath(chroot string, filename string, nspid uint32) string {
-	return fmt.Sprintf("%s/tmp/%s%d", chroot, filename, nspid)
+func getFilePath(chroot string, filename string, nspid linux.ProcessID) string {
+	return fmt.Sprintf("%s/tmp/%s%d", chroot, filename, uint32(nspid))
 }

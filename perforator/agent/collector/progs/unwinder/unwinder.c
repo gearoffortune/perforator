@@ -57,9 +57,9 @@ struct profiler_state {
     struct pt_regs regs;
 
     u64 traced_cgroup;
-    u32 traced_process;
 
     bool skip_sample_recording;
+    bool should_trace_process;
 
     u64 event_count;
     struct perf_event_value sum;
@@ -370,11 +370,14 @@ static NOINLINE int profiler_stage_start(void* ctx, struct profiler_state* state
     return 0;
 }
 
-static ALWAYS_INLINE u32 get_current_traced_process(u32 pid) {
-    if (bpf_map_lookup_elem(&traced_processes, &pid) != NULL) {
-        return pid;
+static ALWAYS_INLINE bool should_trace_process(u32 tgid, u32 pid) {
+    if (bpf_map_lookup_elem(&traced_processes, &tgid) != NULL) {
+        return true;
     }
-    return -1;
+    if (bpf_map_lookup_elem(&traced_processes, &pid) != NULL) {
+        return true;
+    }
+    return false;
 }
 
 static NOINLINE int profiler_stage_locate_traceee(struct profiler_state* state, struct profiler_config* config) {
@@ -396,14 +399,15 @@ static NOINLINE int profiler_stage_locate_traceee(struct profiler_state* state, 
             return -203;
         }
     }
-    state->traced_process = get_current_traced_process(state->sample.pid);
 
     if (config->trace_whole_system) {
         return 0;
     }
 
-    if (state->traced_cgroup == END_OF_CGROUP_LIST && state->traced_process == -1) {
-        // Unknown process & cgroup. Skip it.
+    state->should_trace_process = should_trace_process(state->sample.pid, state->sample.tid);
+
+    if (state->traced_cgroup == END_OF_CGROUP_LIST && !state->should_trace_process) {
+        // Non-traced cgroup & task. Skip it.
         return -202;
     }
 

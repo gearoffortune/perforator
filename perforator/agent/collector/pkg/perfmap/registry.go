@@ -14,6 +14,7 @@ import (
 	"github.com/yandex/perforator/library/go/core/metrics"
 	"github.com/yandex/perforator/perforator/agent/collector/pkg/process"
 	"github.com/yandex/perforator/perforator/internal/linguist/jvm/jvmattach"
+	"github.com/yandex/perforator/perforator/internal/logfield"
 	"github.com/yandex/perforator/perforator/pkg/linux"
 	"github.com/yandex/perforator/perforator/pkg/linux/pidfd"
 	"github.com/yandex/perforator/perforator/pkg/linux/procfs"
@@ -50,7 +51,7 @@ func NewRegistry(logger log.Logger, mReg metrics.Registry, enableJVM bool) *Regi
 	discoveryDurationBuckets := metrics.MakeExponentialDurationBuckets(time.Millisecond, 10, 5)
 	reg := &Registry{
 		logger: logger.WithName("perfmap"),
-		procs:  make(map[uint32]*trackedProcess),
+		procs:  make(map[linux.ProcessID]*trackedProcess),
 		jvmDialer: &jvmattach.Dialer{
 			Logger: xlog.New(logger.WithName("perfmap.jvmattach")),
 		},
@@ -81,7 +82,7 @@ func (r *Registry) addProcessEntry(pid linux.ProcessID) *trackedProcess {
 	defer r.mu.Unlock()
 	_, ok := r.procs[pid]
 	if ok {
-		r.logger.Error("Process already registered", log.UInt32("pid", pid))
+		r.logger.Error("Process already registered", logfield.Pid(pid))
 	}
 	r.procs[pid] = tp
 	return tp
@@ -97,7 +98,7 @@ func (r *Registry) registerImpl(ctx context.Context, tp *trackedProcess, nspid l
 			NamespacedPID: nspid,
 		})
 		if err != nil {
-			r.logger.Info("Failed to connect to JVM", log.UInt32("pid", tp.pid), log.Error(err))
+			r.logger.Info("Failed to connect to JVM", logfield.Pid(tp.pid), log.Error(err))
 			return
 		}
 	}
@@ -115,20 +116,20 @@ func (r *Registry) registerSync(ctx context.Context, tp *trackedProcess) bool {
 	// Otherwise we can be sure that all discovery read consistent data.
 	pfd, err := pidfd.Open(tp.pid)
 	if err != nil {
-		r.logger.Info("Failed to open pidfd", log.UInt32("pid", tp.pid), log.Error(err))
+		r.logger.Info("Failed to open pidfd", logfield.Pid(tp.pid), log.Error(err))
 		return false
 	}
 	defer func() {
 		closeErr := pfd.Close()
 		if closeErr != nil {
-			r.logger.Warn("Failed to close pidfd", log.UInt32("pid", tp.pid), log.Error(closeErr))
+			r.logger.Warn("Failed to close pidfd", logfield.Pid(tp.pid), log.Error(closeErr))
 		}
 	}()
 	process := procfs.FS().Process(tp.pid)
 
 	env, err := process.ListEnvs()
 	if err != nil {
-		r.logger.Info("Failed to read process environment, skipping process", log.UInt32("pid", tp.pid), log.Error(err))
+		r.logger.Info("Failed to read process environment, skipping process", logfield.Pid(tp.pid), log.Error(err))
 		r.processIgnoredEnvParseError.Inc()
 		return false
 	}
@@ -139,14 +140,14 @@ func (r *Registry) registerSync(ctx context.Context, tp *trackedProcess) bool {
 		perfMapConf, errs = parseProcessConfig(perfMapRawConf)
 		r.logger.Debug(
 			"Process enables perfmap",
-			log.UInt32("pid", tp.pid),
+			logfield.Pid(tp.pid),
 			log.Any("config", perfMapConf),
 			log.Errors("errors", errs),
 		)
 	}
 	if perfMapConf == nil {
 		// We can't log environment, it is sensitive
-		r.logger.Info("Process does not allow perfmap collection, skipping process (late check)", log.UInt32("pid", tp.pid))
+		r.logger.Info("Process does not allow perfmap collection, skipping process (late check)", logfield.Pid(tp.pid))
 		r.processIgnoredNotEnabled.Inc()
 		return false
 	}
@@ -159,10 +160,10 @@ func (r *Registry) registerSync(ctx context.Context, tp *trackedProcess) bool {
 
 	nspid, err := process.GetNamespacedPID()
 	if err != nil {
-		r.logger.Warn("Failed to get namespaced pid", log.UInt32("pid", tp.pid), log.Error(err))
+		r.logger.Warn("Failed to get namespaced pid", logfield.Pid(tp.pid), log.Error(err))
 		nspid = tp.pid
 	} else {
-		r.logger.Info("Resolved pid in innermost pid_ns", log.UInt32("pid", tp.pid), log.UInt32("nspid", nspid))
+		r.logger.Info("Resolved pid in innermost pid_ns", logfield.Pid(tp.pid), log.UInt32("nspid", uint32(nspid)))
 	}
 
 	r.registerImpl(ctx, tp, nspid, perfMapConf.java, pfd)
@@ -198,12 +199,12 @@ func (r *Registry) runRegisterWorker(ctx context.Context) {
 			if elapsed > singleProcessRegisterWarnThreshold {
 				r.logger.Warn(
 					"Process discovery took too long",
-					log.UInt32("pid", tp.pid),
+					logfield.Pid(tp.pid),
 					log.Duration("elapsed", elapsed),
 					log.Duration("threshold", singleProcessRegisterWarnThreshold),
 				)
 			} else {
-				r.logger.Debug("Process discovery completed", log.UInt32("pid", tp.pid), log.Duration("elapsed", elapsed))
+				r.logger.Debug("Process discovery completed", logfield.Pid(tp.pid), log.Duration("elapsed", elapsed))
 			}
 		}
 	}
@@ -214,7 +215,7 @@ func (r *Registry) OnProcessDiscovery(info process.ProcessInfo) {
 	// TODO: we will still parse environment the second time, because this check happens outside of pidfd protection region
 	_, ok := info.Env()["__PERFORATOR_ENABLE_PERFMAP"]
 	if !ok {
-		r.logger.Debug("Process does not allow perfmap collection, skipping process (early check)", log.UInt32("pid", info.ProcessID()))
+		r.logger.Debug("Process does not allow perfmap collection, skipping process (early check)", logfield.Pid(info.ProcessID()))
 		return
 	}
 
@@ -222,7 +223,7 @@ func (r *Registry) OnProcessDiscovery(info process.ProcessInfo) {
 	select {
 	case r.registerQueue <- tp:
 	default:
-		r.logger.Error("Register queue is full, skipping process", log.UInt32("pid", info.ProcessID()))
+		r.logger.Error("Register queue is full, skipping process", logfield.Pid(info.ProcessID()))
 		r.mu.Lock()
 		defer r.mu.Unlock()
 		delete(r.procs, info.ProcessID())
@@ -276,10 +277,10 @@ func (r *Registry) listRefreshTargets() []*trackedProcess {
 func (r *Registry) dumpJVMPerfMap(ctx context.Context, tp *trackedProcess) {
 	out, err := tp.javaConn.Execute(ctx, [4]string{"jcmd", "Compiler.perfmap"})
 	if err != nil {
-		r.logger.Info("Failed to execute Compiler.perfmap", log.UInt32("pid", tp.pid), log.Error(err))
+		r.logger.Info("Failed to execute Compiler.perfmap", logfield.Pid(tp.pid), log.Error(err))
 		return
 	}
-	r.logger.Debug("Executed Compiler.perfmap", log.UInt32("pid", tp.pid), log.String("output", out))
+	r.logger.Debug("Executed Compiler.perfmap", logfield.Pid(tp.pid), log.String("output", out))
 }
 
 func (r *Registry) runRefresher(ctx context.Context) {
@@ -303,10 +304,10 @@ func (r *Registry) runRefresher(ctx context.Context) {
 			if r.enableJVM && tp.javaConn != nil {
 				r.dumpJVMPerfMap(ctx, tp)
 			}
-			r.logger.Debug("Starting perf map parser", log.UInt32("pid", tp.pid))
+			r.logger.Debug("Starting perf map parser", logfield.Pid(tp.pid))
 			stats, err := tp.perfmap.refresh()
 			if err != nil {
-				r.logger.Info("Failed to refresh perf map", log.UInt32("pid", tp.pid), log.Error(err))
+				r.logger.Info("Failed to refresh perf map", logfield.Pid(tp.pid), log.Error(err))
 				errors++
 				continue
 			}

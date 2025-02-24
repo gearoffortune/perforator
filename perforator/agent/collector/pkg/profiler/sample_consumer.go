@@ -60,17 +60,27 @@ func (c *SampleConsumer) countMetrics(ctx context.Context) {
 	}
 }
 
-func (c *SampleConsumer) getSampleCollector() bool {
+func (c *SampleConsumer) tryInitializeProcessProfileBuilder() bool {
 	c.p.pidsmu.RLock()
 	defer c.p.pidsmu.RUnlock()
+	if trackedProcess := c.p.pids[linux.ProcessID(c.sample.Pid)]; trackedProcess != nil {
+		c.profileBuilder = trackedProcess.builder
+		return true
+	}
+	if trackedProcess := c.p.pids[linux.ProcessID(c.sample.Tid)]; trackedProcess != nil {
+		c.profileBuilder = trackedProcess.builder
+		return true
+	}
+	return false
+}
 
+func (c *SampleConsumer) getSampleCollector() bool {
 	if c.p.wholeSystem != nil {
 		c.profileBuilder = c.p.wholeSystem
 		return true
 	}
 
-	if trackedProcess := c.p.pids[int(c.sample.Pid)]; trackedProcess != nil {
-		c.profileBuilder = trackedProcess.builder
+	if c.tryInitializeProcessProfileBuilder() {
 		return true
 	}
 
@@ -82,6 +92,7 @@ func (c *SampleConsumer) getSampleCollector() bool {
 	c.p.log.Debug(
 		"Failed to find tracked event",
 		log.UInt32("pid", c.sample.Pid),
+		log.UInt32("tid", c.sample.Tid),
 		log.UInt64("cgroupid", c.sample.ParentCgroup),
 		log.String("name", c.p.cgroups.CgroupFullName(c.sample.ParentCgroup)),
 	)
@@ -229,7 +240,7 @@ type formattedEnvVariable struct {
 }
 
 func (c *SampleConsumer) collectEnvironment() {
-	processEnvs := c.p.procs.GetEnvs(c.sample.Pid)
+	processEnvs := c.p.procs.GetEnvs(linux.ProcessID(c.sample.Pid))
 	c.doCollectEnvironment(processEnvs)
 }
 

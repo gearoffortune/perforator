@@ -23,6 +23,7 @@ import (
 	"github.com/yandex/perforator/perforator/agent/collector/pkg/process"
 	"github.com/yandex/perforator/perforator/agent/collector/pkg/storage/client"
 	"github.com/yandex/perforator/perforator/internal/linguist/python/symbolizer"
+	"github.com/yandex/perforator/perforator/internal/logfield"
 	"github.com/yandex/perforator/perforator/internal/unwinder"
 	"github.com/yandex/perforator/perforator/pkg/graceful"
 	"github.com/yandex/perforator/perforator/pkg/linux"
@@ -67,7 +68,7 @@ type Profiler struct {
 	// Profiling targets
 	wholeSystem *multiProfileBuilder
 	cgroups     *cgroups.Tracker
-	pids        map[int]*trackedProcess
+	pids        map[linux.ProcessID]*trackedProcess
 	pidsmu      sync.RWMutex
 
 	profileChan  chan client.LabeledProfile
@@ -151,7 +152,7 @@ func NewProfiler(c *config.Config, l log.Logger, r metrics.Registry, opts ...opt
 		log:          l,
 		mounts:       mountinfo.NewWatcher(l, r),
 		events:       make(map[perfevent.Type]*perfevent.EventBundle),
-		pids:         make(map[int]*trackedProcess),
+		pids:         make(map[linux.ProcessID]*trackedProcess),
 		profileChan:  make(chan client.LabeledProfile, 64),
 		debugmode:    c.Debug,
 		envWhitelist: envWhitelist,
@@ -203,9 +204,9 @@ func (p *Profiler) shouldDiscoverProcess(pid linux.ProcessID) bool {
 		return true
 	}
 
-	p.pidsmu.Lock()
-	_, found := p.pids[int(pid)]
-	p.pidsmu.Unlock()
+	p.pidsmu.RLock()
+	_, found := p.pids[pid]
+	p.pidsmu.RUnlock()
 
 	return found
 }
@@ -570,7 +571,7 @@ func (p *Profiler) Start(ctx context.Context) error {
 		return p.handleWorkerError(ctx, err, "mount info poller")
 	})
 	p.wg.Go(func() error {
-		err := p.procs.RunProcessPoller(ctx)
+		err := p.procs.RunProcessScanner(ctx)
 		return p.handleWorkerError(ctx, err, "process poller")
 	})
 	p.wg.Go(func() error {
@@ -724,7 +725,7 @@ drainloop:
 	}
 
 	for pid, process := range p.pids {
-		p.log.Info("Finishing process profile", log.Int("pid", pid))
+		p.log.Info("Finishing process profile", logfield.Pid(pid))
 		p.trySaveProfiles(ctx, process.builder.RestartProfiles())
 	}
 
@@ -879,15 +880,11 @@ func (p *Profiler) TraceWholeSystem(labels map[string]string) error {
 }
 
 func (p *Profiler) TraceSelf(labels map[string]string) error {
-	return p.TracePid(os.Getpid(), labels)
+	return p.TracePid(linux.ProcessID(os.Getpid()), labels)
 }
 
-func (p *Profiler) TracePid(pid int, labels map[string]string) error {
+func (p *Profiler) TracePid(pid linux.ProcessID, labels map[string]string) error {
 	labels = p.enrichProfileLabels(labels)
-
-	if pid == 0 {
-		pid = os.Getpid()
-	}
 
 	trackedProcess, err := newTrackedProcess(pid, labels, p.bpf)
 	if err != nil {
@@ -898,7 +895,7 @@ func (p *Profiler) TracePid(pid int, labels map[string]string) error {
 	p.pids[pid] = trackedProcess
 	p.pidsmu.Unlock()
 
-	p.log.Info("Registered process", log.Int("pid", pid))
+	p.log.Info("Registered process", logfield.Pid(pid))
 	return nil
 }
 

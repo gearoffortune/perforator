@@ -58,6 +58,7 @@ type storageMetrics struct {
 	mappingsCount  metrics.FuncIntGauge
 }
 
+// NB: Storage operates with userspace processes, not threads.
 type Storage struct {
 	mutex         sync.RWMutex
 	pidToMappings map[linux.ProcessID]*processExecutableMaps

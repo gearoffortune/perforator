@@ -481,6 +481,8 @@ func (b *BPF) PatchConfig(patcher func(conf *unwinder.ProfilerConfig) error) err
 	return b.maps.ProfilerConfig.Update(key, &conf, ebpf.UpdateAny)
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
 func (b *BPF) AddTracedCgroup(cgroup uint64) error {
 	return b.maps.TracedCgroups.Update(cgroup, uint8(0), ebpf.UpdateAny)
 }
@@ -489,6 +491,8 @@ func (b *BPF) RemoveTracedCgroup(cgroup uint64) error {
 	return b.maps.TracedCgroups.Delete(cgroup)
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
 func (b *BPF) AddTracedProcess(pid linux.ProcessID) error {
 	return b.maps.TracedProcesses.Update(pid, uint8(0), ebpf.UpdateAny)
 }
@@ -496,6 +500,8 @@ func (b *BPF) AddTracedProcess(pid linux.ProcessID) error {
 func (b *BPF) RemoveTracedProcess(pid linux.ProcessID) error {
 	return b.maps.TracedProcesses.Delete(pid)
 }
+
+////////////////////////////////////////////////////////////////////////////////
 
 func (b *BPF) UnwindTablePartCount() int {
 	return b.unwindTablePartCount

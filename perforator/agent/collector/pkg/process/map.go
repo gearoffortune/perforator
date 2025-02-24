@@ -21,6 +21,7 @@ import (
 	"github.com/yandex/perforator/perforator/agent/collector/pkg/machine"
 	"github.com/yandex/perforator/perforator/agent/collector/pkg/storage/client"
 	"github.com/yandex/perforator/perforator/agent/collector/pkg/storage/upload"
+	"github.com/yandex/perforator/perforator/internal/logfield"
 	"github.com/yandex/perforator/perforator/internal/unwinder"
 	"github.com/yandex/perforator/perforator/pkg/linux"
 	"github.com/yandex/perforator/perforator/pkg/linux/mountinfo"
@@ -289,7 +290,7 @@ func (r *ProcessRegistry) scanProcesses(ctx context.Context) (stats procScanStat
 	return
 }
 
-func (r *ProcessRegistry) RunProcessPoller(ctx context.Context) error {
+func (r *ProcessRegistry) RunProcessScanner(ctx context.Context) error {
 	_, err := r.scanProcesses(ctx)
 	if err != nil {
 		return err
@@ -692,7 +693,7 @@ func (a *processAnalyzer) syncMaps(ctx context.Context) {
 }
 
 func (r *ProcessRegistry) addBPFMap(ctx context.Context, pi *processInfo, m *dso.Mapping) {
-	l := r.log.With(log.UInt32("pid", pi.id)).WithName("lpm")
+	l := r.log.With(logfield.Pid(pi.id)).WithName("lpm")
 	l.Debug(ctx, "Trying to add eBPF mapping", log.String("buildid", m.BuildInfo.BuildID))
 
 	id := pi.nextmapid.Add(1)
@@ -701,7 +702,7 @@ func (r *ProcessRegistry) addBPFMap(ctx context.Context, pi *processInfo, m *dso
 	err := iterateMappingLPMSegments(m, func(address uint64, prefix uint32) error {
 		return r.bpf.AddMappingLPMSegment(&unwinder.ExecutableMappingTrieKey{
 			Prefixlen:     32 + prefix,
-			Pid:           pi.id,
+			Pid:           uint32(pi.id),
 			AddressPrefix: HostToBigEndian64(address),
 		}, &unwinder.ExecutableMappingInfo{
 			Id: id,
@@ -714,7 +715,7 @@ func (r *ProcessRegistry) addBPFMap(ctx context.Context, pi *processInfo, m *dso
 
 	// Step 2. Add eBPF mapping to the per-process registry.
 	err = r.bpf.AddMapping(&unwinder.ExecutableMappingKey{
-		Pid:           pi.id,
+		Pid:           uint32(pi.id),
 		UnusedPadding: 0,
 		Id:            id,
 	}, &unwinder.ExecutableMapping{
@@ -739,14 +740,14 @@ func HostToBigEndian64(value uint64) uint64 {
 }
 
 func (r *ProcessRegistry) removeBPFMap(ctx context.Context, pi *processInfo, m processMap) {
-	l := r.log.With(log.UInt32("pid", pi.id)).WithName("lpm")
+	l := r.log.With(logfield.Pid(pi.id)).WithName("lpm")
 	l.Debug(ctx, "Trying to remove eBPF mapping", log.String("buildid", m.BuildInfo.BuildID))
 
 	// Step 1. Remove LPM trie
 	err := iterateMappingLPMSegments(m.Mapping, func(address uint64, prefix uint32) error {
 		return r.bpf.RemoveMappingLPMSegment(&unwinder.ExecutableMappingTrieKey{
 			Prefixlen:     32 + prefix,
-			Pid:           pi.id,
+			Pid:           uint32(pi.id),
 			AddressPrefix: HostToBigEndian64(address),
 		})
 	})
@@ -758,7 +759,7 @@ func (r *ProcessRegistry) removeBPFMap(ctx context.Context, pi *processInfo, m p
 	// Step 2. Remove eBPF mapping from the per-process registry.
 	// If this fails, we will retry on the next iteration.
 	err = r.bpf.RemoveMapping(&unwinder.ExecutableMappingKey{
-		Pid: pi.id,
+		Pid: uint32(pi.id),
 		Id:  m.id,
 	})
 	if err != nil {

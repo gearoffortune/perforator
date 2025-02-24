@@ -16,7 +16,7 @@ enum cgroup_consts : u64 {
 
 enum {
     MAX_TRACED_CGROUPS = 16 * 1024,
-    MAX_TRACED_PROCESSES = 1024
+    MAX_TRACED_PROCESSES = 1024,
 };
 
 BPF_MAP(traced_cgroups, BPF_MAP_TYPE_HASH, u64, u8, MAX_TRACED_CGROUPS)

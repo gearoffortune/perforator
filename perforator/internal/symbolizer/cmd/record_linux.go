@@ -34,6 +34,7 @@ import (
 	"github.com/yandex/perforator/perforator/internal/symbolizer/symbolize"
 	"github.com/yandex/perforator/perforator/internal/xmetrics"
 	"github.com/yandex/perforator/perforator/pkg/debuginfod"
+	"github.com/yandex/perforator/perforator/pkg/linux"
 	"github.com/yandex/perforator/perforator/pkg/linux/perfevent"
 	"github.com/yandex/perforator/perforator/pkg/profile/python"
 	"github.com/yandex/perforator/perforator/pkg/sampletype"
@@ -48,6 +49,7 @@ type recordOptions struct {
 	debug    bool
 
 	pids        []int
+	tids        []int
 	cgroups     []string
 	wholeSystem bool
 
@@ -72,7 +74,8 @@ type recordOptions struct {
 
 func (o *recordOptions) Bind(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&o.logLevel, "log-level", "l", "info", "Set log level")
-	cmd.Flags().IntSliceVarP(&o.pids, "pid", "p", nil, "Process id to profile")
+	cmd.Flags().IntSliceVarP(&o.pids, "pid", "p", nil, "Process id(s) to profile")
+	cmd.Flags().IntSliceVarP(&o.tids, "tid", "t", nil, "Thread id(s) to profile")
 	cmd.Flags().StringSliceVarP(&o.cgroups, "cgroup", "G", nil, "Paths of cgroups to profile")
 	cmd.Flags().BoolVarP(&o.wholeSystem, "whole-system", "a", false, "Profile whole system")
 	cmd.Flags().Uint64VarP(&o.freq, "freq", "F", 99, "Profiling frequency")
@@ -99,7 +102,7 @@ func (o *recordOptions) Bind(cmd *cobra.Command) {
 func (o *recordOptions) postprocess(args []string) error {
 	o.profileSinkOptions.postprocess()
 
-	if !o.wholeSystem && len(o.pids) == 0 && len(o.cgroups) == 0 && len(args) == 0 {
+	if !o.wholeSystem && len(o.pids) == 0 && len(o.tids) == 0 && len(o.cgroups) == 0 && len(args) == 0 {
 		return fmt.Errorf("no profiling target defined")
 	}
 
@@ -239,11 +242,19 @@ func runProfiler(ctx context.Context, logger xlog.Logger, opts *recordOptions, a
 	defer prof.Close()
 
 	for _, pid := range opts.pids {
-		err = prof.TracePid(pid, nil)
+		err = prof.TracePid(linux.ProcessID(pid), nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to trace pid %d: %w", pid, err)
 		}
 	}
+
+	for _, tid := range opts.tids {
+		err = prof.TracePid(linux.ProcessID(tid), nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to trace tid %d: %w", tid, err)
+		}
+	}
+
 	for _, cgroup := range opts.cgroups {
 		err = prof.AddCgroup(&profiler.CgroupConfig{
 			Name: cgroup,
@@ -269,7 +280,7 @@ func runProfiler(ctx context.Context, logger xlog.Logger, opts *recordOptions, a
 	if len(args) > 0 {
 		g.Go(func() error {
 			err := runSubProcess(ctx, args, func(pid int) error {
-				return prof.TracePid(pid, map[string]string{"pid": fmt.Sprint(pid)})
+				return prof.TracePid(linux.ProcessID(pid), map[string]string{"pid": fmt.Sprint(pid)})
 			})
 			if err != nil {
 				logger.Error(ctx, "Subprocess failed", log.Error(err))

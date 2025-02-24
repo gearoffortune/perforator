@@ -8,16 +8,16 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 
 type trackedProcess struct {
-	pid     int
+	pid     linux.ProcessID
 	builder *multiProfileBuilder
 }
 
 func newTrackedProcess(
-	pid int,
+	pid linux.ProcessID,
 	labels map[string]string,
 	bpf *machine.BPF,
 ) (*trackedProcess, error) {
-	err := bpf.AddTracedProcess(linux.ProcessID(pid))
+	err := bpf.AddTracedProcess(pid)
 	if err != nil {
 		return nil, err
 	}
