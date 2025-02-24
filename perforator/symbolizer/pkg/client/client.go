@@ -15,6 +15,7 @@ import (
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/oauth"
+	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -69,7 +70,7 @@ const (
 // If you are patching Perforator, you can initialize this in a `func init()`
 var requireToken bool = false
 
-func NewClient(c *Config, l xlog.Logger) (*Client, error) {
+func NewClient(ctx context.Context, c *Config, l xlog.Logger) (*Client, error) {
 	if c.URL == "" && c.EndpointSet.ID == "" {
 		endpoint, err := getDefaultPerforatorEndpoint()
 		if err != nil {
@@ -136,6 +137,29 @@ func NewClient(c *Config, l xlog.Logger) (*Client, error) {
 	conn, err := grpc.Dial(target, opts...)
 	if err != nil {
 		return nil, err
+	}
+
+	l.Debug(ctx, "Running health check on a new API client")
+	healthClient := grpc_health_v1.NewHealthClient(conn)
+	health, err := healthClient.Check(ctx, &grpc_health_v1.HealthCheckRequest{})
+	if err != nil {
+		l.Warn(
+			ctx,
+			"Health check failed when creating API client",
+			log.Error(err),
+			log.String("hint", fmt.Sprintf("API address was deduced as %q, is it right?", target)),
+		)
+	} else if health.Status != grpc_health_v1.HealthCheckResponse_SERVING {
+		l.Warn(
+			ctx,
+			"Health check returned unexpected status when creating API client",
+			log.String("status", health.Status.String()),
+		)
+	} else {
+		l.Debug(
+			ctx,
+			"Health check succeeded",
+		)
 	}
 
 	return &Client{

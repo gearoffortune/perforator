@@ -84,7 +84,7 @@ func New(config *Config) (*App, error) {
 			logger.Debug(ctx, "Using provided OAuth token")
 		}
 
-		rpcClient, err = client.NewClient(config.Client, logger.WithName("client"))
+		rpcClient, err = client.NewClient(ctx, config.Client, logger.WithName("client"))
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize perforator client: %w", err)
 		}
