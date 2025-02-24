@@ -47,7 +47,7 @@ export const TaskFlamegraph: React.FC<TaskFlamegraphProps> = (props) => {
         console.log('Fetched data in', fetchingFinish - fetchingStart, 'ms');
 
         if (props.format === 'JSONFlamegraph') {
-            setNewData(data);
+            setNewData({ rows: data.rows.filter(Boolean), stringTable: data.stringTable });
         } else if (props.format === 'Flamegraph') {
             setNewData(uiFactory()?.parseLegacyFormat?.(data));
         }
