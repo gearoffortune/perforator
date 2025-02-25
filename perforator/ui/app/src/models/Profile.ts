@@ -1,6 +1,8 @@
+type StringTableIndex = number
+
 export interface FormatNode {
     parentIndex: number;
-    textId: number;
+    textId: StringTableIndex;
     sampleCount: number;
     eventCount: number;
     /**
@@ -14,9 +16,9 @@ export interface FormatNode {
     baseEventCount?: number;
     /** only for diff */
     baseSampleCount?: number;
-    frameOrigin?: number;
-    file?: number;
-    kind?: number;
+    frameOrigin?: StringTableIndex;
+    file?: StringTableIndex;
+    kind?: StringTableIndex;
     inlined?: boolean;
 }
 
@@ -24,3 +26,8 @@ export type ProfileData = {
     rows: FormatNode[][];
     stringTable: string[];
 }
+
+type StringifiableFields = 'frameOrigin' | 'file' | 'kind' | 'textId';
+export type StringifiedNode = Omit<FormatNode, StringifiableFields> & {
+    [key in StringifiableFields]: string;
+};

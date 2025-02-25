@@ -12,10 +12,13 @@ import { Hotkey } from 'src/components/Hotkey/Hotkey';
 import type { ProfileData } from 'src/models/Profile';
 import type { UserSettings } from 'src/providers/UserSettingsProvider/UserSettings.ts';
 
+import type { PopupData } from './ContextMenu.tsx';
+import { ContextMenu } from './ContextMenu.tsx';
 import type { GetStateFromQuery } from './query-utils.ts';
 import { getStateFromQueryParams, modifyQuery } from './query-utils.ts';
 import { RegexpDialog } from './RegexpDialog/RegexpDialog.tsx';
-import { renderFlamegraph as newFlame } from './renderer.ts';
+import { FlamegraphOffseter, renderFlamegraph as newFlame } from './renderer.ts';
+import { readNodeStrings } from './utils/read-string.ts';
 
 import './Flamegraph.scss';
 
@@ -28,19 +31,29 @@ export interface FlamegraphProps {
     loading: boolean;
 }
 
-
 export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSettings, newData, loading }) => {
     const flamegraphContainer = React.useRef<HTMLDivElement | null>(null);
+    const canvasRef = React.useRef<HTMLDivElement | null>(null);
     const [query, setQuery] = useSearchParams();
+    const [popupData, setPopupData] = useState<null | PopupData>(null);
     const [showDialog, setShowDialog] = useState(false);
+    const flamegraphOffsets = React.useRef<FlamegraphOffseter | null>(null);
+    const search = query.get('flamegraphQuery');
+    const reverse = (query.get('flamegraphReverse') ?? String(userSettings.reverseFlameByDefault)) === 'true';
 
+    React.useEffect(() => {
+        if (newData) {
+            const getCssVariable = (variable: string) => {
+                return getComputedStyle(flamegraphContainer.current!).getPropertyValue(variable);
+            };
+            const levelHeight = parseInt(getCssVariable('--flamegraph-level-height')!);
+            flamegraphOffsets.current = new FlamegraphOffseter(newData, { reverse, levelHeight });
+        }
+    }, [newData, reverse]);
 
     const handleSearch = React.useCallback(() => {
         setShowDialog(true);
     }, []);
-
-    const search = query.get('flamegraphQuery');
-    const reverse = (query.get('flamegraphReverse') ?? String(userSettings.reverseFlameByDefault)) === 'true';
 
     const handleReverse = React.useCallback(() => {
         setQuery(q => {
@@ -74,7 +87,7 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
 
 
     React.useEffect(() => {
-        if (flamegraphContainer.current && newData) {
+        if (flamegraphContainer.current && newData && flamegraphOffsets.current) {
             flamegraphContainer.current.style.setProperty('--flamegraph-font', userSettings.monospace === 'system' ? 'monospace' : 'var(--g-font-family-monospace)');
 
             const renderOptions = {
@@ -87,12 +100,36 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
                 reverse,
             };
 
-            if (newData) {
-                return newFlame(flamegraphContainer.current, newData, renderOptions);
-            }
+            return newFlame(flamegraphContainer.current, newData, flamegraphOffsets.current, renderOptions);
         }
         return () => {};
     }, [getStateFromQuery, isDiff, newData, reverse, search, theme, updateStateInQuery, userSettings]);
+
+    const handleContextMenu = React.useCallback((event: React.MouseEvent) => {
+        if (!flamegraphContainer.current || !newData || !flamegraphOffsets.current) {
+            return;
+        }
+        event.preventDefault();
+
+        const offsetX = event.nativeEvent.offsetX;
+        const offsetY = event.nativeEvent.offsetY;
+        const coordsClient = flamegraphOffsets.current!.getCoordsByPosition(offsetX, offsetY);
+
+        if (!coordsClient) {
+            return;
+        }
+
+        const stringifiedNode = readNodeStrings(newData, coordsClient);
+        setPopupData({ offset: [offsetX, -offsetY], node: stringifiedNode });
+    }, [newData]);
+
+    const handleOutsideContextMenu: React.MouseEventHandler = React.useCallback((e) => {
+        if (popupData) {
+            setPopupData(null);
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    }, [popupData]);
 
     const handleKeyDown = React.useCallback((event: KeyboardEvent)=> {
         if ((event.ctrlKey || event.metaKey) && event.code === 'KeyF') {
@@ -118,55 +155,62 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
     const framesCount = newData?.rows?.reduce((acc, row) => acc + row.length, 0);
 
     return (
-        <div ref={flamegraphContainer} className="flamegraph">
-            <RegexpDialog
-                showDialog={showDialog}
-                onCloseDialog={() => setShowDialog(false)}
-                onSearchUpdate={handleSearchUpdate}
-                initialSearch={search}
-            />
-            <div className="flamegraph__header">
-                <h3 className="flamegraph__title">Flame Graph</h3>
-                <div className="flamegraph__buttons">
-                    <Button className="flamegraph__button flamegraph__button_reverse" onClick={handleReverse}>
-                        <Icon data={reverse ? BarsDescendingAlignLeftArrowDownIcon : BarsAscendingAlignLeftArrowUpIcon}/> Reverse
-                    </Button>
-                    <Button className="flamegraph__button flamegraph__button_search" onClick={handleSearch}>
-                        <Icon className="regexp-dialog__header-icon" data={MagnifierIcon}/>
+        <>
+            <div ref={flamegraphContainer} className="flamegraph">
+                <RegexpDialog
+                    showDialog={showDialog}
+                    onCloseDialog={() => setShowDialog(false)}
+                    onSearchUpdate={handleSearchUpdate}
+                    initialSearch={search}
+                />
+                <div className="flamegraph__header">
+                    <h3 className="flamegraph__title">Flame Graph</h3>
+                    <div className="flamegraph__buttons">
+                        <Button className="flamegraph__button flamegraph__button_reverse" onClick={handleReverse}>
+                            <Icon data={reverse ? BarsDescendingAlignLeftArrowDownIcon : BarsAscendingAlignLeftArrowUpIcon}/> Reverse
+                        </Button>
+                        <Button className="flamegraph__button flamegraph__button_search" onClick={handleSearch}>
+                            <Icon className="regexp-dialog__header-icon" data={MagnifierIcon}/>
                         Search
-                        <Hotkey value="cmd+F" />
-                    </Button>
+                            <Hotkey value="cmd+F" />
+                        </Button>
+                    </div>
+                    <div className="flamegraph__frames-count">Showing {framesCount} frames</div>
                 </div>
-                <div className="flamegraph__frames-count">Showing {framesCount} frames</div>
-            </div>
 
-            <div className="flamegraph__annotations">
-                <div className="flamegraph__match">
+                <div className="flamegraph__annotations">
+                    <div className="flamegraph__match">
                     Matched: <span className="flamegraph__match-value" />
-                    <Button
-                        className="flamegraph__clear"
-                        view="flat-danger"
-                        title="Clear"
-                        onClick={handleSearchReset}
-                    >
-                        <Icon data={Xmark} size={20} />
-                    </Button>
+                        <Button
+                            className="flamegraph__clear"
+                            view="flat-danger"
+                            title="Clear"
+                            onClick={handleSearchReset}
+                        >
+                            <Icon data={Xmark} size={20} />
+                        </Button>
+                    </div>
+                    <div className="flamegraph__status" />
                 </div>
-                <div className="flamegraph__status" />
-            </div>
 
-            <div id="profile" className="flamegraph__content">
-                <canvas className="flamegraph__canvas" />
-                <template className="flamegraph__label-template">
-                    <div className="flamegraph__label">
+                <div id="profile" className="flamegraph__content">
+                    <div ref={canvasRef} onClickCapture={handleOutsideContextMenu} onContextMenu={handleContextMenu}>
+                        <canvas className="flamegraph__canvas" />
+                    </div>
+                    <template className="flamegraph__label-template">
+                        <div className="flamegraph__label">
+                            <span />
+                        </div>
+                    </template>
+                    <div className="flamegraph__labels-container" />
+                    <div className='flamegraph__highlight'>
                         <span />
                     </div>
-                </template>
-                <div className="flamegraph__labels-container" />
-                <div className='flamegraph__highlight'>
-                    <span />
                 </div>
             </div>
-        </div>
+            {popupData && (
+                <ContextMenu onClosePopup={() => {setPopupData(null);}} popupData={popupData} anchorRef={canvasRef}/>
+            )}
+        </>
     );
 };

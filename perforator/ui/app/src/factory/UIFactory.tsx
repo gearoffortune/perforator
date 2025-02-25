@@ -10,7 +10,7 @@ import { QUERY_INPUTS } from 'src/components/MergeProfilesForm/queryInputs';
 import { Select, type SelectProps } from 'src/components/Select/Select';
 import type { ShareStringBuilder } from 'src/components/ShareButton/utils';
 import { SHARE_FORMATS } from 'src/components/ShareButton/utils';
-import type { ProfileData } from 'src/models/Profile';
+import type { ProfileData, StringifiedNode } from 'src/models/Profile';
 import type { SendError } from 'src/utils/error';
 import { fakeRum, type Rum } from 'src/utils/rum';
 
@@ -65,4 +65,5 @@ export class UIFactory {
 
     sampleSizes = () => [1, 10, 50, 100, 500, 1000];
     defaultSampleSize = () => 100;
+    goToDefenitionHref = (_: StringifiedNode): string => '';
 }

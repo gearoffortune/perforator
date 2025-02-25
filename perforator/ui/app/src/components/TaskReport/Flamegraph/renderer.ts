@@ -27,6 +27,8 @@ const dw = Math.floor(255 * (1 - DARKEN_FACTOR)).toString(16);
 // for dark theme
 const WHITE_TEXT_COLOR = `#${dw}${dw}${dw}`;
 
+const minVisibleWidth = 1e-2;
+
 
 function pct(a: number, b: number) {
     return a >= b ? '100' : (100 * a / b).toFixed(2);
@@ -56,12 +58,207 @@ interface RenderOpts {
 type RenderFlamegraphType = (
     flamegraphContainer: HTMLDivElement,
     profileData: ProfileData,
+    fg: FlamegraphOffseter,
     options: RenderFlamegraphOptions,
 ) => () => void;
+
+export class FlamegraphOffseter {
+    private rows: FormatNode[][];
+
+    /**
+     * `Record<H, I[]>`
+     * keeps rendering borders for each level
+     * uses only pair [left, right]
+     * everything up the subtree is filled before rendering
+     * everything below the subtree is filled during render
+     */
+    private framesWindow: Record<number, [number, number]>;
+    private canvasWidth: number | undefined;
+    private widthRatio: number | undefined;
+    private minVisibleEv: number | undefined;
+    private reverse: boolean;
+    private levelHeight: number;
+
+    constructor(profileData: ProfileData, options: {reverse: boolean; levelHeight: number}) {
+        this.rows = profileData.rows;
+        this.framesWindow = this.fillFramesWindow([0, 0]);
+        this.reverse = options.reverse;
+        this.levelHeight = options.levelHeight;
+    }
+
+    fillFramesWindow([hmax, imax]: [number, number]): Record<number, [number, number]> {
+        const res: Record<number, [number, number]> = [];
+        let nextParentIndex = imax;
+
+        for (let h = Math.min(hmax, this.rows.length - 1); h >= 0; h--) {
+            const row = this.rows[h];
+            res[h] = [nextParentIndex, nextParentIndex];
+            // will be assigned -1 on the last iteration (root)
+            // we do not care about it because it will not be assigned anywhere else
+            nextParentIndex = row[nextParentIndex].parentIndex;
+        }
+
+        return res;
+    }
+    createOffsetKeeper(h: number) {
+        let prevParentIndex: number | null = null;
+        let currentOffset = 0;
+        const row = this.rows[h];
+
+        return (i: number, bigFrame: boolean) => {
+            const node = row[i];
+
+            // can ignore when we know parents
+            // node.parentIndex === null means root
+            if (node.parentIndex !== prevParentIndex && node.parentIndex !== -1) {
+                const parent = this.rows[h - 1][node.parentIndex];
+                prevParentIndex = node.parentIndex;
+                currentOffset = parent.x!;
+            }
+            node.x = currentOffset;
+            if (bigFrame) {
+                const width = this.countWidth(node);
+                currentOffset += width;
+            }
+        };
+    }
+
+    createShouldDrawFrame(h: number) {
+        const currentLevelFramesWindow = this.framesWindow[h];
+        const parentFramesWindow = this.framesWindow[h - 1];
+
+        return (i: number) => {
+            const node = this.rows[h][i];
+
+            if (currentLevelFramesWindow && !(currentLevelFramesWindow[0] <= (i) && currentLevelFramesWindow[1] >= i)) {
+                return false;
+            }
+
+            // parentFramesWindow always undefined for root so null checks can be ignored
+            if (
+                parentFramesWindow && node.parentIndex !== -1 &&
+                !(parentFramesWindow[0] <= (node.parentIndex!) && parentFramesWindow[1] >= node.parentIndex!)
+            ) {
+                return false;
+            }
+            return true;
+        };
+    }
+
+    prerenderOffsets(canvasWidth: number, initialCoordinates: [number, number] = [0, 0]) {
+        this.canvasWidth = canvasWidth;
+        const [initialH, initialI] = initialCoordinates;
+        const widthEv = this.rows[initialH][initialI].eventCount;
+        this.widthRatio = widthEv / canvasWidth!;
+        this.minVisibleEv = minVisibleWidth * this.widthRatio;
+        this.framesWindow = this.fillFramesWindow(initialCoordinates);
+
+        for (let h = 0; h < this.rows.length; h++) {
+            const shouldDrawFrame = this.createShouldDrawFrame(h);
+            const updateOffsets = this.createOffsetKeeper(h);
+            const updateFrameWindows = this.createUpdateWindow(h);
+            for (let i = 0; i < this.rows[h].length; i++) {
+                if (!shouldDrawFrame(i)) {
+                    continue;
+                }
+                updateFrameWindows(i);
+                const isVisible = this.visible(this.rows[h][i].eventCount);
+                updateOffsets(i, isVisible);
+
+            }
+
+            if (!this.framesWindow?.[h]) {
+                break;
+            }
+        }
+    }
+
+    findFrame(frames: FormatNode[], x: number, left = 0, right = frames.length - 1) {
+        if (x < frames[left].x! || x > (frames[right].x! + this.countWidth(frames[right]))) {
+            return null;
+        }
+
+        while (left <= right) {
+            // eslint-disable-next-line no-bitwise
+            const mid = (left + right) >>> 1;
+
+            if (frames[mid].x! > x) {
+                right = mid - 1;
+            } else if (frames[mid].x! + frames[mid].eventCount / this.widthRatio! <= x) {
+                left = mid + 1;
+            } else {
+                return mid;
+            }
+        }
+
+        if (left >= 0 && left < frames.length && frames[left].x && (frames[left].x! - x) < 0.5) { return left; }
+        if (right >= 0 && right < frames.length && frames[right].x && (x - (frames[right].x! + frames[right].eventCount / this.widthRatio!)) < 0.5) { return right; }
+
+        return null;
+    }
+    getCoordsByPositionWithKnownHeight(h: number, x: number) {
+
+        const row = this.rows[h];
+
+        if (!this.framesWindow[h]) {
+            return null;
+        }
+        const [leftIndex, rightIndex] = this.framesWindow[h];
+
+        const i = this.findFrame(row, x, leftIndex, rightIndex);
+
+
+        if (i === null) {
+            return null;
+        }
+
+        return { h, i };
+    }
+
+
+    getTopOffset(offset: number) {
+        return this.reverse ? offset : ((this.rows.length * this.levelHeight) - offset);
+    }
+
+    getCoordsByPosition: (x: number, y: number) => null | {h: number; i: number} = (x, y) => {
+        const topOffset = this.getTopOffset(y);
+        const h = Math.floor(topOffset / this.levelHeight);
+
+        if (h < 0 || h >= this.rows.length) {
+            return null;
+        }
+
+        return this.getCoordsByPositionWithKnownHeight(h, x);
+    };
+
+
+    countWidth(node: FormatNode) {
+        return Math.min(node.eventCount / this.widthRatio!, this.canvasWidth!);
+    }
+    visible(eventCount: number) {
+        return eventCount >= this.minVisibleEv!;
+    }
+
+    keepRendering(h: number) {
+        if (Array.isArray(this.framesWindow?.[h])) {
+            return true;
+        }
+        return false;
+    }
+    private createUpdateWindow = (h: number) => (i: number) => {
+        if (Array.isArray(this.framesWindow?.[h])) {
+            this.framesWindow[h][1] = i;
+        } else {
+            this.framesWindow[h] = [i, i];
+        }
+    };
+
+}
 
 export const renderFlamegraph: RenderFlamegraphType = (
     flamegraphContainer,
     profileData,
+    fg,
     { getState, setState, theme, isDiff, userSettings, searchPattern, reverse },
 ) => {
 
@@ -164,66 +361,14 @@ export const renderFlamegraph: RenderFlamegraphType = (
 
     clearLabels();
 
-    const minVisibleWidth = 1e-2;
     const rows = profileData.rows;
     const root = rows[0][0];
-    const widthEv = root.eventCount;
-    let widthRatio = widthEv / canvasWidth!;
-    let minVisibleEv = minVisibleWidth * widthRatio;
-
-    function countWidth(node: FormatNode) {
-        return Math.min(node.eventCount / widthRatio, canvasWidth!);
-    }
-    function visible(eventCount: number) {
-        return eventCount >= minVisibleEv;
-    }
-
-
-    function findFrame(frames: FormatNode[], x: number, left = 0, right = frames.length - 1) {
-        if (x < frames[left].x! || x > (frames[right].x! + countWidth(frames[right]))) {
-            return null;
-        }
-
-        while (left <= right) {
-            // eslint-disable-next-line no-bitwise
-            const mid = (left + right) >>> 1;
-
-            if (frames[mid].x! > x) {
-                right = mid - 1;
-            } else if (frames[mid].x! + frames[mid].eventCount / widthRatio <= x) {
-                left = mid + 1;
-            } else {
-                return mid;
-            }
-        }
-
-        if (left >= 0 && left < frames.length && frames[left].x && (frames[left].x! - x) < 0.5) { return left; }
-        if (right >= 0 && right < frames.length && frames[right].x && (x - (frames[right].x! + frames[right].eventCount / widthRatio)) < 0.5) { return right; }
-
-        return null;
-    }
-
 
     function renderSearch(matched: number, showReset: boolean) {
         findElement('match-value').textContent = pct(matched, canvasWidth!) + '%';
         findElement('match').style.display = showReset ? 'inherit' : 'none';
     }
 
-
-    function fillFramesWindow([hmax, imax]: [number, number]): Record<number, [number, number]> {
-        const res: Record<number, [number, number]> = [];
-        let nextParentIndex = imax;
-
-        for (let h = Math.min(hmax, rows.length - 1); h >= 0; h--) {
-            const row = rows[h];
-            res[h] = [nextParentIndex, nextParentIndex];
-            // will be assigned -1 on the last iteration (root)
-            // we do not care about it because it will not be assigned anywhere else
-            nextParentIndex = row[nextParentIndex].parentIndex;
-        }
-
-        return res;
-    }
 
     let currentNode: FormatNode | null = null;
 
@@ -299,20 +444,10 @@ export const renderFlamegraph: RenderFlamegraphType = (
     });
 
 
-    /**
-     * `Record<H, I[]>`
-     * keeps rendering borders for each level
-     * uses only pair [left, right]
-     * everything up the subtree is filled before rendering
-     * everything below the subtree is filled during render
-     */
-    let framesWindow: Record<number, [number, number]> = fillFramesWindow([0, 0]);
     function renderImpl(opts?: RenderOpts) {
-        if (opts?.subtree) {
-            c.fillStyle = BACKGROUND;
-            c.fillRect(0, 0, canvasWidth!, canvasHeight!);
-        }
-        clearLabels();
+
+        clearCanvas();
+
 
         if (reverse) {
             annotations.after(content);
@@ -323,15 +458,12 @@ export const renderFlamegraph: RenderFlamegraphType = (
         const newLabels: HTMLDivElement[] = [];
 
         const { initialH = 0, initialI = 0 } = opts?.subtree ?? {};
-        const maxEventCount = rows[initialH][initialI].eventCount;
-        widthRatio = maxEventCount / canvasWidth!;
-        minVisibleEv = minVisibleWidth * widthRatio;
         currentNode = rows[initialH][initialI];
 
         const marked: Record<number | string, number> = {};
 
         function mark(f: FormatNode) {
-            const width = countWidth(f);
+            const width = fg.countWidth(f);
             if (!(marked[f.x!] >= width)) {
                 marked[f.x!] = width;
             }
@@ -357,61 +489,6 @@ export const renderFlamegraph: RenderFlamegraphType = (
         }
 
 
-        framesWindow = fillFramesWindow([initialH, initialI]);
-
-        function createOffsetKeeper(h: number) {
-            let prevParentIndex: number | null = null;
-            let currentOffset = 0;
-            const row = rows[h];
-
-            return function (i: number, bigFrame: boolean) {
-                const node = row[i];
-
-                // can ignore when we know parents
-                // node.parentIndex === null means root
-                if (node.parentIndex !== prevParentIndex && node.parentIndex !== -1) {
-                    const parent = rows[h - 1][node.parentIndex];
-                    prevParentIndex = node.parentIndex;
-                    currentOffset = parent.x!;
-                }
-                node.x = currentOffset;
-                if (bigFrame) {
-                    const width = countWidth(node);
-                    currentOffset += width;
-                }
-            };
-        }
-
-        function createShouldDrawFrame(h: number) {
-            const currentLevelFramesWindow = framesWindow[h];
-            const parentFramesWindow = framesWindow[h - 1];
-
-            return function (i: number) {
-                const node = rows[h][i];
-
-                if (currentLevelFramesWindow && !(currentLevelFramesWindow[0] <= (i) && currentLevelFramesWindow[1] >= i)) {
-                    return false;
-                }
-
-                // parentFramesWindow always undefined for root so null checks can be ignored
-                if (
-                    parentFramesWindow && node.parentIndex !== -1 &&
-                    !(parentFramesWindow[0] <= (node.parentIndex!) && parentFramesWindow[1] >= node.parentIndex!)
-                ) {
-                    return false;
-                }
-                return true;
-            };
-        }
-
-        const createUpdateWindow = (h: number) => (i: number) => {
-            if (Array.isArray(framesWindow?.[h])) {
-                framesWindow[h][1] = i;
-            } else {
-                framesWindow[h] = [i, i];
-            }
-        };
-
         for (let h = 0; h < rows.length; h++) {
             const y = reverse ? h * LEVEL_HEIGHT : canvasHeight! - (h + 1) * LEVEL_HEIGHT;
             const row = rows[h];
@@ -420,7 +497,7 @@ export const renderFlamegraph: RenderFlamegraphType = (
 
             const drawFrame = function (i: number) {
                 const node = row[i];
-                const width = countWidth(node);
+                const width = fg.countWidth(node);
                 const nodeTitle = getNodeTitle(node);
 
                 const isMarked = opts?.pattern?.test(nodeTitle);
@@ -454,18 +531,17 @@ export const renderFlamegraph: RenderFlamegraphType = (
                 }
             };
 
-            const shouldDrawFrame = createShouldDrawFrame(h);
-            const updateOffsets = createOffsetKeeper(h);
-            const updateFrameWindows = createUpdateWindow(h);
+            const shouldDrawFrame = fg.createShouldDrawFrame(h);
 
             const renderNode = function (i: number) {
                 const node = row[i];
-                if (!shouldDrawFrame(i)) {
+                const should = shouldDrawFrame(i);
+                if (!should) {
                     return;
                 }
-                updateFrameWindows(i);
-                const isVisible = visible(node.eventCount);
-                updateOffsets(i, isVisible);
+
+                const isVisible = fg.visible(node.eventCount);
+
 
                 if (!isVisible) {
                     return;
@@ -479,7 +555,7 @@ export const renderFlamegraph: RenderFlamegraphType = (
                 renderNode(i);
             }
 
-            if (!framesWindow?.[h]) {
+            if (!fg.keepRendering(h)) {
                 break;
             }
         }
@@ -491,6 +567,14 @@ export const renderFlamegraph: RenderFlamegraphType = (
     }
 
     let firstRender = true;
+
+    function clearCanvas() {
+        c.fillStyle = BACKGROUND;
+        c.fillRect(0, 0, canvasWidth!, canvasHeight!);
+
+        clearLabels();
+    }
+
     function render(opts: RenderOpts) {
         const start = performance.now();
         const res = renderImpl(opts);
@@ -504,38 +588,12 @@ export const renderFlamegraph: RenderFlamegraphType = (
     }
 
 
-    function getTopOffset(offset: number) {
-        return reverse ? offset : (canvasHeight! - offset);
-    }
-
-    function getCoordsByPosition(x: number, y: number): null | {h: number; i: number} {
-        const topOffset = getTopOffset(y);
-        const h = Math.floor(topOffset / LEVEL_HEIGHT);
-        if (h < 0 || h >= rows.length) {
-            return null;
-        }
-        const row = rows[h];
-
-        if (!framesWindow[h]) {
-            return null;
-        }
-        const [leftIndex, rightIndex] = framesWindow[h];
-
-        const i = findFrame(row, x, leftIndex, rightIndex);
-        if (i === null) {
-            return null;
-        }
-
-        return { h, i };
-    }
-
-
     const handleClick = (e: MouseEvent): void => {
-        const coords = getCoordsByPosition(e.offsetX, e.offsetY);
+        const coords = fg.getCoordsByPosition(e.offsetX, e.offsetY);
         if (!coords) { return; }
 
         const { i, h } = coords;
-        if (!visible(rows[h][i].eventCount)) {
+        if (!fg.visible(rows[h][i].eventCount)) {
             canvas.onmouseout?.(e);
             return;
         }
@@ -544,12 +602,13 @@ export const renderFlamegraph: RenderFlamegraphType = (
             frameDepth: h.toString(),
             framePos: i.toString(),
         });
+        fg.prerenderOffsets(canvasWidth!, [h, i]);
         render({ subtree: { initialH: h, initialI: i }, pattern: searchPattern });
         canvas?.onmousemove?.(e);
     };
 
     canvas.onmousemove = function (event) {
-        const coords = getCoordsByPosition(event.offsetX, event.offsetY);
+        const coords = fg.getCoordsByPosition(event.offsetX, event.offsetY);
 
         if (!coords) {
             canvas.onmouseout?.(event);
@@ -560,11 +619,11 @@ export const renderFlamegraph: RenderFlamegraphType = (
         const node = row[i];
 
 
-        if (!visible(node.eventCount)) {
+        if (!fg.visible(node.eventCount)) {
             canvas.onmouseout?.(event);
             return;
         }
-        const width = countWidth(node);
+        const width = fg.countWidth(node);
 
         const left = node.x! + canvas.offsetLeft;
         const top = ((reverse ? h * LEVEL_HEIGHT : canvasHeight! - (h + 1) * LEVEL_HEIGHT) + canvas.offsetTop);
@@ -606,6 +665,7 @@ export const renderFlamegraph: RenderFlamegraphType = (
     const h = Number(getState('frameDepth', '0'));
     const pos = Number(getState('framePos', '0'));
 
+    fg.prerenderOffsets(canvasWidth!, [h, pos]);
     render({ pattern: searchPattern, subtree: { initialH: h, initialI: pos } });
 
     const onResize = () => requestAnimationFrame(() => {
@@ -615,6 +675,7 @@ export const renderFlamegraph: RenderFlamegraphType = (
         //@ts-ignore
         canvas.style.width = null;
         initCanvas();
+        fg.prerenderOffsets(canvasWidth!, [initialH, initialI]);
         render({ subtree: { initialH, initialI }, pattern: searchPattern });
     });
     window.addEventListener('resize', onResize);
