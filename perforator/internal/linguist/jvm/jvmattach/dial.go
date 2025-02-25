@@ -67,7 +67,19 @@ func (d *Dialer) dialImpl(ctx context.Context, target Target) (*VirtualMachineCo
 		d.Logger.Debug(ctx, "Socket already exists")
 		return conn, nil
 	}
-	err = d.sendAttachRequest(ctx, target)
+	var needsCleanup bool
+	needsCleanup, err = d.sendAttachRequest(ctx, target)
+	// we need to register cleanup before checking for error
+	if needsCleanup {
+		defer func() {
+			attachFilePath := getAttachFilePath(target)
+			d.Logger.Debug(ctx, "Cleaning up attach file", log.String("path", attachFilePath))
+			err := os.Remove(attachFilePath)
+			if err != nil {
+				d.Logger.Warn(ctx, "Failed to cleanup attach file", log.Error(err))
+			}
+		}()
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to send attach request: %w", err)
 	}
@@ -92,28 +104,26 @@ func (d *Dialer) dialImpl(ctx context.Context, target Target) (*VirtualMachineCo
 	}
 }
 
-func (d *Dialer) sendAttachRequest(ctx context.Context, target Target) error {
-	attachFilePath := path.Join(target.CWD, fmt.Sprintf(".attach_pid%d", target.NamespacedPID))
+func getAttachFilePath(target Target) string {
+	return path.Join(target.CWD, fmt.Sprintf(".attach_pid%d", target.NamespacedPID))
+}
+
+func (d *Dialer) sendAttachRequest(ctx context.Context, target Target) (bool, error) {
+	attachFilePath := getAttachFilePath(target)
 	d.Logger.Debug(ctx, "Creating attach file", log.String("path", attachFilePath))
 	err := os.WriteFile(attachFilePath, []byte{}, 0644)
 	if errors.Is(err, os.ErrExist) {
 		d.Logger.Debug(ctx, "Attach file already exists, skipping")
 	} else if err != nil {
-		return fmt.Errorf("failed to create attach file %w", err)
+		return false, fmt.Errorf("failed to create attach file %w", err)
 	}
-	defer func() {
-		err := os.Remove(attachFilePath)
-		if err != nil {
-			d.Logger.Warn(ctx, "Failed to cleanup attach file", log.Error(err))
-		}
-	}()
 
 	d.Logger.Info(ctx, "Sending SIGQUIT signal to JVM")
 	err = target.ProcessFD.SendSignal(syscall.SIGQUIT)
 	if err != nil {
-		return fmt.Errorf("failed to send SIGQUIT: %w", err)
+		return true, fmt.Errorf("failed to send SIGQUIT: %w", err)
 	}
-	return nil
+	return true, nil
 }
 
 func (d *Dialer) tryConnect(ctx context.Context, chroot string, nspid linux.ProcessID) (*VirtualMachineConn, error) {
