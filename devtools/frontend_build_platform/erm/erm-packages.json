@@ -1137,7 +1137,7 @@
     "title": "ESLint",
     "description": "Статический анализатор кода (линтер).\n\nОсуществляет поиск, а иногда и исправление частых ошибок.\nМожет следить за стилем кода, форматированием.\n\nРасширяем плагинами (Typescript, Prettier, Stylelint).\n\n[Подробнее про линтинг в tier-0](https://docs.yandex-team.ru/frontend-in-arcadia/index/quick-start#lint)",
     "type": "NPM_PACKAGE",
-    "default": "9.19.0",
+    "default": "9.20.0",
     "links": {
       "Home": "https://eslint.org",
       "Sources": "https://github.com/eslint/eslint",
@@ -1146,6 +1146,10 @@
     },
     "useDirectly": true,
     "versions": {
+      "9.20.0": {
+        "add_date": "2025-02-25T05:31:35",
+        "resources": []
+      },
       "9.19.0": {
         "add_date": "2025-02-11T05:31:09",
         "resources": []
@@ -1475,7 +1479,7 @@
     "title": "Next.js",
     "description": "Сборщик-бандлер от проекта Next.js\n\nОчень opinionated, но кому-то подходит.\n\nВ tier-0 используется в модуле/макросе [`TS_NEXT()`](https://docs.yandex-team.ru/frontend-in-arcadia/references/TS_NEXT).",
     "type": "NPM_PACKAGE",
-    "default": "15.1.6",
+    "default": "15.1.7",
     "links": {
       "Home": "https://nextjs.org",
       "Sources": "https://github.com/vercel/next.js",
@@ -1484,6 +1488,10 @@
     },
     "useDirectly": true,
     "versions": {
+      "15.1.7": {
+        "add_date": "2025-02-25T05:32:00",
+        "resources": []
+      },
       "15.1.6": {
         "add_date": "2025-02-11T05:31:35",
         "resources": []
@@ -1526,6 +1534,10 @@
       },
       "15.0.0": {
         "add_date": "2024-11-05T05:31:52",
+        "resources": []
+      },
+      "14.2.24": {
+        "add_date": "2025-02-25T05:32:00",
         "resources": []
       },
       "14.2.23": {
