@@ -8,7 +8,7 @@ storage:
       user: {{ .Values.databases.clickhouse.user }}
       password_env: "CLICKHOUSE_PASSWORD"
       insecure: {{ .Values.databases.clickhouse.insecure }}
-      ca_file_path: {{ .Values.databases.clickhouse.ca_cert_path }}
+      ca_cert_path: {{ .Values.databases.clickhouse.ca_cert_path }}
     postgres:
       auth:
         user: {{ .Values.databases.postgresql.user }}
