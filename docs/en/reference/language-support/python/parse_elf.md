@@ -1,5 +1,11 @@
 # ELF Parsing
 
+## Requirements for ELF CPython binary:
+
+* `.dynsym`, `.rodata`, `.text` sections
+* `Py_Version` or `Py_GetVersion` symbol available in `.dynsym`
+* `_PyThreadState_GetCurrent` or `_PyRuntime` symbol available in `.dynsym`
+
 ## Python Version
 
 There are multiple ways to parse the Python version from an ELF file that we utilize in Perforator.
