@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -23,6 +24,7 @@ import (
 	"github.com/yandex/perforator/library/go/core/log"
 	"github.com/yandex/perforator/library/go/core/metrics"
 	"github.com/yandex/perforator/perforator/internal/xmetrics"
+	"github.com/yandex/perforator/perforator/pkg/certifi"
 	"github.com/yandex/perforator/perforator/pkg/grpcutil/grpcmetrics"
 	"github.com/yandex/perforator/perforator/pkg/profilequerylang"
 	"github.com/yandex/perforator/perforator/pkg/sampletype"
@@ -729,38 +731,54 @@ func NewStorageServer(
 		server.profileSamplerByEvent[typ] = NewModuloSampler(modulo)
 	}
 
-	creds, err := credentials.NewServerTLSFromFile(
-		conf.TLSConfig.CertificateFile,
-		conf.TLSConfig.KeyFile,
-	)
-	if err != nil {
-		return nil, err
+	var grpcOpts []grpc.ServerOption
+
+	if conf.TLS.Enabled {
+		cert, err := tls.LoadX509KeyPair(conf.TLS.CertificateFile, conf.TLS.KeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load server key pair: %w", err)
+		}
+		caCertPool, err := certifi.CertPoolFromFile(conf.TLS.ClientCAFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create CA certificate pool: %w", err)
+		}
+
+		tlsConf := &tls.Config{
+			Certificates: []tls.Certificate{cert},
+			ClientCAs:    caCertPool,
+		}
+
+		if conf.TLS.VerifyClient {
+			tlsConf.ClientAuth = tls.RequireAndVerifyClientCert
+		}
+
+		creds := credentials.NewTLS(tlsConf)
+		grpcOpts = append(grpcOpts, grpc.Creds(creds))
+
 	}
+
+	var unaryServerInterceptors []grpc.UnaryServerInterceptor
+	var streamServerInterceptors []grpc.StreamServerInterceptor
 
 	credsInterceptor, err := getInterceptor(conf, logger)
 	if err != nil {
 		return nil, err
 	}
-
-	metricsInterceptor := grpcmetrics.NewMetricsInterceptor(registry)
-
-	unaryServerInterceptors := []grpc.UnaryServerInterceptor{metricsInterceptor.UnaryServer()}
-	streamServerInterceptors := []grpc.StreamServerInterceptor{metricsInterceptor.StreamServer()}
 	if credsInterceptor != nil {
 		unaryServerInterceptors = append(unaryServerInterceptors, credsInterceptor.Unary())
 		streamServerInterceptors = append(streamServerInterceptors, credsInterceptor.Stream())
 	}
 
-	server.grpcServer = grpc.NewServer(
-		grpc.MaxRecvMsgSize(1024*1024*1024 /* 1 GB */),
-		grpc.Creds(creds),
-		grpc.ChainUnaryInterceptor(
-			unaryServerInterceptors...,
-		),
-		grpc.ChainStreamInterceptor(
-			streamServerInterceptors...,
-		),
-	)
+	metricsInterceptor := grpcmetrics.NewMetricsInterceptor(registry)
+	unaryServerInterceptors = append(unaryServerInterceptors, metricsInterceptor.UnaryServer())
+	streamServerInterceptors = append(streamServerInterceptors, metricsInterceptor.StreamServer())
+
+	grpcOpts = append(grpcOpts, grpc.ChainUnaryInterceptor(unaryServerInterceptors...))
+	grpcOpts = append(grpcOpts, grpc.ChainStreamInterceptor(streamServerInterceptors...))
+
+	grpcOpts = append(grpcOpts, grpc.MaxRecvMsgSize(1024*1024*1024 /* 1 GB */))
+
+	server.grpcServer = grpc.NewServer(grpcOpts...)
 	perforatorstorage.RegisterPerforatorStorageServer(server.grpcServer, server)
 	reflection.Register(server.grpcServer)
 

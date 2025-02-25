@@ -79,8 +79,8 @@ spec:
           mountPath: /sys
         - name: config
           mountPath: /etc/perforator
-        {{- if include "perforator.storage.tlsCACert" . }}
-        - name: storage-ca-cert
+        {{- if include "perforator.agent.tlsSecretName" . }}
+        - name: agent-ca-cert
           mountPath: "/etc/perforator/certificates"
         {{- end }}
         {{- if .Values.agent.mounts.varlog }}
@@ -113,10 +113,10 @@ spec:
       - name: config
         configMap:
           name: {{ include "perforator.fullname" . }}-agent-config
-      {{- if include "perforator.storage.tlsCACert" . }}
-      - name: storage-ca-cert
+      {{- if include "perforator.agent.tlsSecretName" . }}
+      - name: agent-ca-cert
         secret:
-          secretName: {{ include "perforator.storage.tlsSecretName" . }}
+          secretName: {{ include "perforator.agent.tlsSecretName" . }}
       {{- end }}
       {{- if .Values.agent.mounts.varlog }}
       - name: varlog

@@ -2,7 +2,7 @@ package client
 
 import (
 	"context"
-	"crypto/x509"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +13,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/yandex/perforator/library/go/core/log"
 	"github.com/yandex/perforator/perforator/pkg/certifi"
@@ -110,6 +111,14 @@ type TvmConfig struct {
 	CacheDir         string `yaml:"cache_dir"`
 }
 
+type TLSConfig struct {
+	Enabled               bool   `yaml:"enabled"`
+	CAFile                string `yaml:"ca_file_path"`
+	ClientCertificateFile string `yaml:"certificate_file_path"`
+	ClientKeyFile         string `yaml:"key_file_path"`
+	ServerNameOverride    string `yaml:"server_name_override,omitempty"`
+}
+
 type GRPCConfig struct {
 	MaxSendMessageSize uint32 `yaml:"max_send_message_size"`
 }
@@ -134,12 +143,11 @@ func (t *Timeouts) fillDefault() {
 
 type Config struct {
 	TvmConfig          *TvmConfig                            `yaml:"tvm"`
+	TLS                TLSConfig                             `yaml:"tls"`
 	GRPCConfig         GRPCConfig                            `yaml:"grpc,omitempty"`
 	EndpointSet        endpointsetresolver.EndpointSetConfig `yaml:"endpoint_set,omitempty"`
 	Host               string                                `yaml:"host,omitempty"`
 	Port               uint32                                `yaml:"port,omitempty"`
-	CertificateName    string                                `yaml:"name,omitempty"`
-	CACertPath         string                                `yaml:"ca_cert_path,omitempty"`
 	ProfileCompression string                                `yaml:"profile_compression,omitempty"`
 	RPCTimeouts        Timeouts                              `yaml:"timeouts"`
 }
@@ -176,37 +184,44 @@ func NewStorageClient(conf *Config, l xlog.Logger) (*Client, error) {
 		maxSendMsgSize = conf.GRPCConfig.MaxSendMessageSize
 	}
 
-	var certPool *x509.CertPool
-	if conf.CACertPath != "" {
-		cert, err := os.ReadFile(conf.CACertPath)
+	var opts []grpc.DialOption
+
+	if conf.TLS.Enabled {
+		caCertPool, err := certifi.CertPoolFromFile(conf.TLS.CAFile)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create CA certificate pool: %w", err)
 		}
 
-		certPool = x509.NewCertPool()
-		if !certPool.AppendCertsFromPEM(cert) {
-			return nil, fmt.Errorf("failed to add server CA's certificate: %s", conf.CACertPath)
+		tlsConf := &tls.Config{
+			RootCAs: caCertPool,
 		}
+
+		if conf.TLS.ClientCertificateFile != "" && conf.TLS.ClientKeyFile != "" {
+			cert, err := tls.LoadX509KeyPair(conf.TLS.ClientCertificateFile, conf.TLS.ClientKeyFile)
+			if err != nil {
+				return nil, fmt.Errorf("failed to load server key pair: %w", err)
+			}
+			tlsConf.Certificates = []tls.Certificate{cert}
+		}
+
+		if conf.TLS.ServerNameOverride != "" {
+			tlsConf.ServerName = conf.TLS.ServerNameOverride
+		}
+
+		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(tlsConf)))
+
 	} else {
-		certPool, err = certifi.NewDefaultCertPool()
-		if err != nil {
-			return nil, err
-		}
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
 
-	opts := []grpc.DialOption{
-		grpc.WithTransportCredentials(
-			credentials.NewClientTLSFromCert(
-				certPool,
-				conf.CertificateName,
-			),
-		),
+	opts = append(opts,
 		grpc.WithDefaultCallOptions(
 			grpc.MaxSendMsgSizeCallOption{
 				MaxSendMsgSize: int(maxSendMsgSize),
 			},
 		),
-	}
+	)
+
 	if creds != nil {
 		opts = append(opts, grpc.WithPerRPCCredentials(creds))
 	}

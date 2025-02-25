@@ -67,8 +67,10 @@ spec:
         - containerPort: {{ .Values.storage.containerPorts.metrics }}
           name: metrics
         volumeMounts:
+        {{- if include "perforator.storage.tlsSecretName" . }}
         - name: storage-tls
           mountPath: "/etc/perforator/certificates"
+        {{- end }}
         - name: storage-s3-keys
           mountPath: "/etc/perforator/s3"
         - name: config
@@ -101,9 +103,11 @@ spec:
           value: {{ .value }}
         {{- end }}
       volumes:
+      {{- if include "perforator.storage.tlsSecretName" . }}
       - name: storage-tls
         secret:
           secretName: {{ include "perforator.storage.tlsSecretName" . }}
+      {{- end }}
       - name: storage-s3-keys
         secret:
           secretName: {{ include "perforator.secretName.s3" . }}

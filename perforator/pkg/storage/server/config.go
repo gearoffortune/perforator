@@ -15,8 +15,11 @@ type TvmAuth struct {
 }
 
 type TLSConfig struct {
-	CertificateFile string `yaml:"certificate_file"`
-	KeyFile         string `yaml:"key_file"`
+	Enabled         bool   `yaml:"enabled"`
+	ClientCAFile    string `yaml:"ca_file_path"`
+	CertificateFile string `yaml:"certificate_file_path"`
+	KeyFile         string `yaml:"key_file_path"`
+	VerifyClient    bool   `yaml:"verify_client"`
 }
 
 type Config struct {
@@ -24,7 +27,7 @@ type Config struct {
 	MetricsPort            uint32         `yaml:"metrics_port"`
 	StorageConfig          bundle.Config  `yaml:"storage"`
 	TvmAuth                *TvmAuth       `yaml:"tvm"`
-	TLSConfig              TLSConfig      `yaml:"tls"`
+	TLS                    TLSConfig      `yaml:"tls"`
 	MicroscopePullerConfig *filter.Config `yaml:"microscope_puller"`
 }
 

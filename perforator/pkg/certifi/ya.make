@@ -1,5 +1,9 @@
 GO_LIBRARY()
 
+SRCS(
+    utils.go
+)
+
 IF (OPENSOURCE)
     SRCS(
         systemcert.go

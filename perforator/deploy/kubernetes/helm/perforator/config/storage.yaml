@@ -8,7 +8,7 @@ storage:
       user: {{ .Values.databases.clickhouse.user }}
       password_env: "CLICKHOUSE_PASSWORD"
       insecure: {{ .Values.databases.clickhouse.insecure }}
-      ca_cert_path: {{ .Values.databases.clickhouse.ca_cert_path }}
+      ca_file_path: {{ .Values.databases.clickhouse.ca_cert_path }}
     postgres:
       auth:
         user: {{ .Values.databases.postgresql.user }}
@@ -35,8 +35,11 @@ storage:
     bucket: {{ .Values.databases.s3.buckets.binaries }}
   microscope: "postgres"
 tls:
-  certificate_file: {{ include "perforator.storage.tlsCert" . }}
-  key_file: {{ include "perforator.storage.tlsCertKey" . }}
+  enabled: {{ .Values.storage.tls.enabled }}
+  ca_file_path: {{ include "perforator.storage.tlsCACert" . }}
+  certificate_file_path: {{ include "perforator.storage.tlsCert" . }}
+  key_file_path: {{ include "perforator.storage.tlsCertKey" . }}
+  verify_client: {{ .Values.storage.tls.verifyClient }}
 microscope_puller:
   pull_interval: "30s"
   pull_batch_size: 1000
