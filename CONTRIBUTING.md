@@ -48,4 +48,4 @@ It is enough to provide us with such notification once.
 
 ## Other questions
 If you have any questions, feel free to discuss them in a discussion or an issue.
-Alternatively, you may send email to the Yandex Open Source team at opensource@yandex-team.ru.
+Alternatively, you may send email to the Yandex Open Source team at opensource-support@yandex-team.ru.
