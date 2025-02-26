@@ -668,7 +668,6 @@ func TestLintMetricTypeInName(t *testing.T) {
 		twoProbTest,
 		genTest("instance_memory_limit_bytes_gauge", "gauge", "gauge"),
 		genTest("request_duration_seconds_summary", "summary", "summary"),
-		genTest("request_duration_seconds_summary", "histogram", "summary"),
 		genTest("request_duration_seconds_histogram", "histogram", "histogram"),
 		genTest("request_duration_seconds_HISTOGRAM", "histogram", "histogram"),
 
@@ -839,4 +838,28 @@ mc_something_total 10
 		cv.problems = prob
 		lintAndVerify(l2, cv)
 	})
+}
+
+func TestLintDuplicateMetric(t *testing.T) {
+	const msg = "metric not unique"
+
+	tests := []test{
+		{
+			name: "metric not unique",
+			in: `
+# HELP not_unique_total the helptext
+# TYPE not_unique_total counter
+not_unique_total{bar="abc", spam="xyz"} 1
+not_unique_total{bar="abc", spam="xyz"} 2
+`,
+			problems: []promlint.Problem{
+				{
+					Metric: "not_unique_total",
+					Text:   msg,
+				},
+			},
+		},
+	}
+
+	runTests(t, tests)
 }

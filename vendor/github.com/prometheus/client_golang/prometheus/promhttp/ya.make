@@ -2,7 +2,7 @@ GO_LIBRARY()
 
 LICENSE(Apache-2.0)
 
-VERSION(v1.18.0)
+VERSION(v1.20.5)
 
 SRCS(
     delegator.go
@@ -13,6 +13,7 @@ SRCS(
 )
 
 GO_TEST_SRCS(
+    delegator_test.go
     http_test.go
     instrument_client_test.go
     instrument_server_test.go

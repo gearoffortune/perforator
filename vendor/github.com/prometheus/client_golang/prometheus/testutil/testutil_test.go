@@ -20,6 +20,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/prometheus/common/expfmt"
+
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -300,26 +302,20 @@ func TestMetricNotFound(t *testing.T) {
 			"label1": "value1",
 		},
 	})
+
 	c.Inc()
 
 	expected := `
 		some_other_metric{label1="value1"} 1
 	`
 
-	expectedError := `
-
-Diff:
---- metric output does not match expectation; want
-+++ got:
-@@ -1,4 +1,4 @@
--(bytes.Buffer) # HELP some_other_metric A value that represents a counter.
--# TYPE some_other_metric counter
--some_other_metric{label1="value1"} 1
-+(bytes.Buffer) # HELP some_total A value that represents a counter.
-+# TYPE some_total counter
-+some_total{label1="value1"} 1
- 
-`
+	expectedError := `-# HELP some_total A value that represents a counter.
+-# TYPE some_total counter
+-some_total{label1="value1"} 1
++# HELP some_other_metric A value that represents a counter.
++# TYPE some_other_metric counter
++some_other_metric{label1="value1"} 1
+ `
 
 	err := CollectAndCompare(c, strings.NewReader(metadata+expected))
 	if err == nil {
@@ -435,5 +431,34 @@ func TestCollectAndCount(t *testing.T) {
 	}
 	if got, want := CollectAndCount(c, "some_other_total"), 0; got != want {
 		t.Errorf("unexpected metric count, got %d, want %d", got, want)
+	}
+}
+
+func TestCollectAndFormat(t *testing.T) {
+	const expected = `# HELP foo_bar A value that represents the number of bars in foo.
+# TYPE foo_bar counter
+foo_bar{fizz="bang"} 1
+`
+	c := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "foo_bar",
+			Help: "A value that represents the number of bars in foo.",
+		},
+		[]string{"fizz"},
+	)
+	c.WithLabelValues("bang").Inc()
+
+	got, err := CollectAndFormat(c, expfmt.TypeTextPlain, "foo_bar")
+	if err != nil {
+		t.Errorf("unexpected error: %s", err.Error())
+	}
+
+	gotS := string(got)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err.Error())
+	}
+
+	if gotS != expected {
+		t.Errorf("unexpected metric output, got %q, expected %q", gotS, expected)
 	}
 }
