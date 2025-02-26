@@ -35,6 +35,7 @@ export default defineConfig(({ command }): UserConfig => {
         resolve: {
             alias: aliases,
         },
+        build: { ...(viteSettings.build || {}) },
         server: {
             host: uiHost,
             port: uiPort,
