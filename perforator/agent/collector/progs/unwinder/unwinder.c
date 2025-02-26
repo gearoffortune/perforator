@@ -457,6 +457,7 @@ static NOINLINE int profiler_stage_collect_python_stack(void* ctx, struct profil
 
     state->python_state.pid = state->sample.pid;
     state->python_state.frame_count = 0;
+    state->python_state.py_runtime_address = 0;
     python_collect_stack(info, &state->python_state);
     return 0;
 }
