@@ -150,6 +150,9 @@ type Config struct {
 	Port               uint32                                `yaml:"port,omitempty"`
 	ProfileCompression string                                `yaml:"profile_compression,omitempty"`
 	RPCTimeouts        Timeouts                              `yaml:"timeouts"`
+
+	CertificateNameDeprecated string `yaml:"name,omitempty"`
+	CACertPathDeprecated      string `yaml:"ca_cert_path,omitempty"`
 }
 
 type Client struct {

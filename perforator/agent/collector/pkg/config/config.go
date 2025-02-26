@@ -215,4 +215,18 @@ func (c *Config) FillDefault() {
 
 	defaultPointer(&c.SampleConsumer.PerfBufferPerCPUSize, 16*1024*1024)
 	defaultPointer(&c.SampleConsumer.PerfBufferWatermark, 100*2048)
+
+	if c.StorageClientConfig != nil {
+		// TLS backward compatibility.
+		// Previously, agent communicated with storage via only TLS, so you need to enable tls if these values ​​are present.
+		if c.StorageClientConfig.CertificateNameDeprecated != "" {
+			c.StorageClientConfig.TLS.Enabled = true
+			c.StorageClientConfig.TLS.ServerNameOverride = c.StorageClientConfig.CertificateNameDeprecated
+		}
+
+		if c.StorageClientConfig.CACertPathDeprecated != "" {
+			c.StorageClientConfig.TLS.Enabled = true
+			c.StorageClientConfig.TLS.CAFile = c.StorageClientConfig.CACertPathDeprecated
+		}
+	}
 }
