@@ -5,7 +5,7 @@ import stat
 import sys
 import textwrap
 from abc import ABCMeta, abstractmethod
-from six import add_metaclass, iteritems
+from six import add_metaclass
 
 import click
 import library.python.archive as archive
@@ -16,22 +16,42 @@ from build.plugins.lib.nots.package_manager import (
 )
 from build.plugins.lib.nots.typescript import TsConfig
 from devtools.frontend_build_platform.libraries.logging import timeit
-from ..models import BaseOptions, BuildError, CommonBuildersOptions
+from ..models import BuildError, CommonBuildersOptions, CommonTsBuildersOptions
 from ..utils import recursive_copy, extract_peer_tars, popen, resolve_bin
 
 
-class BaseBuilderFileManager(object):
-    """
-    Re-usaable basic functionality for managing src files.
-    One do not need to inherit it in builders - inherit BaseBuilder instead and customize the functions.
-    """
+@add_metaclass(ABCMeta)
+class BaseBuilder(object):
+    @staticmethod
+    @timeit
+    def bundle_dirs(output_dirs: list[str], build_path: str, bundle_path: str):
+        if not output_dirs:
+            raise RuntimeError("Please define `output_dirs`")
 
-    def __init__(self, options: BaseOptions, ts_config_path: str = "", output_dirs: list[str] = []):
+        paths_to_pack = {}
+        for output_dir in output_dirs:
+            arcname = os.path.normpath(output_dir)
+            path_to_pack = os.path.normpath(os.path.join(build_path, output_dir))
+            paths_to_pack[path_to_pack] = arcname
+
+        archive.tar(
+            list(paths_to_pack.items()), bundle_path, compression_filter=None, compression_level=None, fixed_mtime=0
+        )
+
+    def __init__(self, options: CommonBuildersOptions, copy_package_json=True):
         self.options = options
-        self.ts_config_path = ts_config_path
-        self.output_dirs = output_dirs
+        self.copy_package_json = copy_package_json
 
     @timeit
+    def build(self):
+        self._prepare_bindir()
+        self._build()
+        self._run_javascript_after_build()
+
+    @abstractmethod
+    def _build(self):
+        pass
+
     def _get_copy_ignore_list(self) -> set[str]:
         return {
             # IDE's
@@ -44,15 +64,15 @@ class BaseBuilderFileManager(object):
             # Dependencies
             pm_constants.NODE_MODULES_DIRNAME,
             pm_constants.PNPM_LOCKFILE_FILENAME,
-            # ya-make artefacts
+            # ya-make artifacts
             pm_constants.NODE_MODULES_WORKSPACE_BUNDLE_FILENAME,
             "output.tar",  # TODO FBP-1978
             pm_constants.OUTPUT_TAR_UUID_FILENAME,
             # Other
             ".traces",
             "a.yaml",
-            self.ts_config_path,  # Will be generated inside the builder (merged all the `extends`)
-        }.union(self.output_dirs)
+            self.options.after_build_outdir,
+        }
 
     @timeit
     def _copy_src_files_to_bindir(self):
@@ -71,9 +91,77 @@ class BaseBuilderFileManager(object):
             pm_utils.build_pj_path(self.options.bindir),
         )
 
+    @timeit
+    def _exec_nodejs_script(self, script_path: str, script_args: list[str], env: dict):
+        args = [self.options.nodejs_bin, script_path] + script_args
+
+        if self.options.verbose:
+            sys.stderr.write("\n")
+            export = click.style("export", fg="green")
+            for key, value in env.items():
+                escaped_value = value.replace('"', '\\"').replace("$", "\\$")
+                sys.stderr.write(f'{export} {key}="{escaped_value}"\n')
+
+            sys.stderr.write(
+                f"cd {click.style(self.options.bindir, fg='cyan')} && {click.style(' '.join(args), fg='magenta')}\n\n"
+            )
+
+        return_code, stdout, stderr = popen(args, env=env, cwd=self.options.bindir)
+
+        if self.options.verbose:
+            if stdout:
+                sys.stderr.write(f"_exec stdout:\n{click.style(stdout, fg='green')}\n")
+            if stderr:
+                sys.stderr.write(f"_exec stderr:\n{click.style(stderr, fg='yellow')}\n")
+
+        if return_code != 0:
+            raise BuildError(self.options.command, return_code, stdout, stderr)
+
+    @timeit
+    def _get_envs(self):
+        env = {}
+
+        # MODDIR is persistent API for users. Do not change without project changes.
+        # Other variables is not persistent and can not be exposed to users application
+        # See contract documentation: https://docs.yandex-team.ru/ya-make/manual/common/vars
+        env['MODDIR'] = self.options.moddir
+
+        # Set directory with the `node` executable as the PATH
+        env['PATH'] = os.path.dirname(self.options.nodejs_bin)
+
+        env['NODE_PATH'] = pm_utils.build_nm_path(self.options.bindir)
+
+        return env
+
+    @timeit
+    def _run_javascript_after_build(self):
+        if not self.options.with_after_build:
+            return
+
+        self._exec_nodejs_script(
+            script_path=self.options.after_build_js,
+            script_args=self.options.after_build_args.split("<~~~>"),
+            env=self._get_envs(),
+        )
+
+    @timeit
+    def _prepare_bindir(self):
+        if self.copy_package_json:
+            self._copy_package_json()
+        self._prepare_dependencies()
+        self._copy_src_files_to_bindir()
+
+    @timeit
+    def _prepare_dependencies(self):
+        self.__extract_peer_tars(self.options.bindir)
+
+    @timeit
+    def __extract_peer_tars(self, *args, **kwargs):
+        return extract_peer_tars(*args, **kwargs)
+
 
 @add_metaclass(ABCMeta)
-class BaseBuilder(BaseBuilderFileManager):
+class BaseTsBuilder(BaseBuilder):
     @staticmethod
     @timeit
     def load_ts_config(ts_config_file: str, sources_path: str) -> TsConfig:
@@ -85,32 +173,15 @@ class BaseBuilder(BaseBuilderFileManager):
 
         return ts_config
 
-    @staticmethod
-    @timeit
-    def bundle_dirs(output_dirs: list[str], build_path: str, bundle_path: str):
-        if not output_dirs:
-            raise RuntimeError("Please define `output_dirs`")
-
-        paths_to_pack = {}
-        for output_dir in output_dirs:
-            arcname = os.path.normpath(output_dir)
-            path_to_pack = os.path.normpath(os.path.join(build_path, output_dir))
-            paths_to_pack[path_to_pack] = arcname
-
-        archive.tar(
-            list(paths_to_pack.items()), bundle_path, compression_filter=None, compression_level=None, fixed_mtime=0
-        )
-
     @timeit
     def __init__(
         self,
-        options: CommonBuildersOptions,
+        options: CommonTsBuildersOptions,
         # TODO consider using self.options.output_dir or removing CommonBundlersOptions.output_dir at all
         output_dirs: list[str],
         # TODO consider supporting multiple ts_config_path?
         ts_config_path: str,
         copy_package_json=True,
-        external_dependencies=None,
     ):
         """
         :param output_dirs: output directory names
@@ -119,12 +190,15 @@ class BaseBuilder(BaseBuilderFileManager):
         :type ts_config_path: str
         :param copy_package_json: whether package.json should be copied to build path
         :type copy_package_json: bool
-        :param external_dependencies: external dependencies which will be linked to node_modules/ (mapping name -> path)
-        :type external_dependencies: dict
         """
-        super(BaseBuilder, self).__init__(options=options, ts_config_path=ts_config_path, output_dirs=output_dirs)
-        self.copy_package_json = copy_package_json
-        self.external_dependencies = external_dependencies
+        super(BaseTsBuilder, self).__init__(options, copy_package_json)
+        self.options = options  # this is for type hints to understand real options' type
+        self.output_dirs = output_dirs
+        self.ts_config_path = ts_config_path
+
+    def _get_copy_ignore_list(self) -> set[str]:
+        ignored = super(BaseTsBuilder, self)._get_copy_ignore_list()
+        return ignored.union(self.output_dirs + [self.ts_config_path])
 
     @property
     def ts_config_binpath(self) -> str:
@@ -142,45 +216,9 @@ class BaseBuilder(BaseBuilderFileManager):
         return resolve_bin(self.options.bindir, package_name, bin_name)
 
     @timeit
-    def build(self):
-        if self.copy_package_json:
-            self._copy_package_json()
-        self._prepare_dependencies()
-        self._copy_src_files_to_bindir()
-
-        self._build()
-        self._run_javascript_after_build()
-
-    @timeit
-    def __extract_peer_tars(self, *args, **kwargs):
-        return extract_peer_tars(*args, **kwargs)
-
-    @timeit
-    def _prepare_dependencies(self):
-        self.__extract_peer_tars(self.options.bindir)
-
-        if self.external_dependencies:
-            self._link_external_dependencies()
-
-    @timeit
-    def _link_external_dependencies(self):
-        nm_path = pm_utils.build_nm_path(self.options.bindir)
-        try:
-            os.makedirs(nm_path)
-        except OSError:
-            pass
-
-        # Don't want to use `os.makedirs(exists_ok=True)` here (we don't want to skip all "file exists" errors).
-        scope_paths = set()
-
-        for name, src in iteritems(self.external_dependencies):
-            dst = os.path.join(nm_path, name)
-            scope_path = os.path.dirname(dst)
-            if scope_path and scope_path not in scope_paths:
-                os.mkdir(scope_path)
-                scope_paths.add(scope_path)
-
-            os.symlink(src, dst, target_is_directory=True)
+    def _prepare_bindir(self):
+        super(BaseTsBuilder, self)._prepare_bindir()
+        self._create_bin_tsconfig()
 
     @abstractmethod
     def _output_macro(self) -> str | None:
@@ -254,52 +292,16 @@ class BaseBuilder(BaseBuilderFileManager):
 
     @timeit
     def _get_envs(self):
-        env = {}
+        env = super(BaseTsBuilder, self)._get_envs()
 
         if self.options.vcs_info:
             env.update(self._get_vcs_info_env(self.options.vcs_info))
-
-        # MODDIR is persistent API for users. Do not change without project changes.
-        # Other variables is not persistent and can not be exposed to users application
-        # See contract documentation: https://docs.yandex-team.ru/ya-make/manual/common/vars
-        env['MODDIR'] = self.options.moddir
-
-        # Set directory with the `node` executable as the PATH
-        env['PATH'] = os.path.dirname(self.options.nodejs_bin)
-
-        env['NODE_PATH'] = pm_utils.build_nm_path(self.options.bindir)
 
         for pair in self.options.env:
             key, value = pair.split("=", 1)
             env[key] = value
 
         return env
-
-    @timeit
-    def _exec_nodejs_script(self, script_path: str, script_args: list[str], env: dict):
-        args = [self.options.nodejs_bin, script_path] + script_args
-
-        if self.options.verbose:
-            sys.stderr.write("\n")
-            export = click.style("export", fg="green")
-            for key, value in env.items():
-                escaped_value = value.replace('"', '\\"').replace("$", "\\$")
-                sys.stderr.write(f'{export} {key}="{escaped_value}"\n')
-
-            sys.stderr.write(
-                f"cd {click.style(self.options.bindir, fg='cyan')} && {click.style(' '.join(args), fg='magenta')}\n\n"
-            )
-
-        return_code, stdout, stderr = popen(args, env=env, cwd=self.options.bindir)
-
-        if self.options.verbose:
-            if stdout:
-                sys.stderr.write(f"_exec stdout:\n{click.style(stdout, fg='green')}\n")
-            if stderr:
-                sys.stderr.write(f"_exec stderr:\n{click.style(stderr, fg='yellow')}\n")
-
-        if return_code != 0:
-            raise BuildError(self.options.command, return_code, stdout, stderr)
 
     @timeit
     def _make_bins_executable(self):
@@ -313,16 +315,13 @@ class BaseBuilder(BaseBuilderFileManager):
     def bundle(self):
         output_dirs = self.output_dirs
 
-        if self.options.after_build_js and self.options.after_build_outdir:
+        if self.options.with_after_build and self.options.after_build_outdir:
             output_dirs.append(self.options.after_build_outdir)
 
         return self.bundle_dirs(output_dirs, self.options.bindir, self.options.output_file)
 
     @timeit
     def _build(self):
-        # Pre-operations
-        self._create_bin_tsconfig()
-
         # Action (building)
         self._exec_nodejs_script(
             script_path=self._get_script_path(),
@@ -333,14 +332,3 @@ class BaseBuilder(BaseBuilderFileManager):
         # Post-operations
         self._assert_output_dirs_exists()
         self._make_bins_executable()
-
-    @timeit
-    def _run_javascript_after_build(self):
-        if not self.options.after_build_js:
-            return
-
-        self._exec_nodejs_script(
-            script_path=self.options.after_build_js,
-            script_args=self.options.after_build_args.split("<~~~>"),
-            env=self._get_envs(),
-        )

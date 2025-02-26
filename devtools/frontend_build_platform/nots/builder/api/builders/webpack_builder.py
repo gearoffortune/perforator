@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from devtools.frontend_build_platform.libraries.logging import timeit
-from .base_builder import BaseBuilder
+from .base_builder import BaseTsBuilder
 from ..models import CommonBundlersOptions
 
 
@@ -10,7 +10,7 @@ class WebpackBuilderOptions(CommonBundlersOptions):
     pass
 
 
-class WebpackBuilder(BaseBuilder):
+class WebpackBuilder(BaseTsBuilder):
     options: WebpackBuilderOptions
 
     @timeit

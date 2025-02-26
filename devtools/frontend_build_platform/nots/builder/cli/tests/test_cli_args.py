@@ -70,6 +70,7 @@ def test_build_package_args():
         --trace no
         --verbose no
         build-package
+        --output-file /Users/khoden/.ya/build/build_root/5gxr/000067/devtools/dummy_arcadia/typescript/simple/dummy_arcadia_typescript_simple.output.tar
     """
 
     # act + assert
@@ -93,6 +94,11 @@ def test_build_package_args():
         node_modules_bundle='/Users/khoden/.ya/build/build_root/5gxr/000067/devtools/dummy_arcadia/typescript/simple/workspace_node_modules.tar',
         # Command-specific
         command='build-package',
+        output_file='/Users/khoden/.ya/build/build_root/5gxr/000067/devtools/dummy_arcadia/typescript/simple/dummy_arcadia_typescript_simple.output.tar',
+        with_after_build=False,
+        after_build_js=None,
+        after_build_args=None,
+        after_build_outdir=None,
     )
 
 
@@ -139,6 +145,7 @@ def test_build_tsc_args():
         output_file='/Users/khoden/.ya/build/build_root/5gxr/000067/devtools/dummy_arcadia/typescript/simple/dummy_arcadia_typescript_simple.output.tar',
         tsconfigs=['tsconfig.json'],
         vcs_info=None,
+        with_after_build=False,
         after_build_js=None,
         after_build_args=None,
         after_build_outdir=None,
@@ -195,6 +202,7 @@ def test_build_next_args():
         ts_next_command='build',
         tsconfigs=['tsconfig.json'],
         vcs_info=None,
+        with_after_build=False,
         after_build_js=None,
         after_build_args=None,
         after_build_outdir=None,
@@ -249,6 +257,7 @@ def test_build_vite_args():
         output_dirs=['dist'],
         tsconfigs=['tsconfig.json'],
         vcs_info=None,
+        with_after_build=False,
         after_build_js=None,
         after_build_args=None,
         after_build_outdir=None,
@@ -304,6 +313,7 @@ def test_build_webpack_args():
         output_dirs=['dev-bundle', 'prod-bundle'],
         tsconfigs=['tsconfig.json'],
         vcs_info=None,
+        with_after_build=False,
         after_build_js=None,
         after_build_args=None,
         after_build_outdir=None,
@@ -361,6 +371,7 @@ def test_build_webpack_with_env_args():
         output_dirs=['dev-bundle', 'prod-bundle'],
         tsconfigs=['tsconfig.json'],
         vcs_info=None,
+        with_after_build=False,
         after_build_js=None,
         after_build_args=None,
         after_build_outdir=None,
@@ -386,6 +397,7 @@ def test_build_webpack_with_after_build():
         --output-dirs dev-bundle prod-bundle
         --tsconfigs tsconfig.json
         --vcs-info
+        --with-after-build
         --after-build-js path/to/script.js
         --after-build-args some-args
         --after-build-outdir dist
@@ -419,6 +431,7 @@ def test_build_webpack_with_after_build():
         output_dirs=['dev-bundle', 'prod-bundle'],
         tsconfigs=['tsconfig.json'],
         vcs_info=None,
+        with_after_build=True,
         after_build_js='path/to/script.js',
         after_build_args='some-args',
         after_build_outdir='dist',

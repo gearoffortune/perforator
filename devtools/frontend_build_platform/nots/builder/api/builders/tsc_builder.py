@@ -4,16 +4,16 @@ from dataclasses import dataclass
 from build.plugins.lib.nots.typescript.ts_config import TsConfig
 from devtools.frontend_build_platform.libraries.logging import timeit
 
-from .base_builder import BaseBuilder
-from ..models import CommonBuildersOptions
+from .base_builder import BaseTsBuilder
+from ..models import CommonTsBuildersOptions
 
 
 @dataclass
-class TscBuilderOptions(CommonBuildersOptions):
+class TscBuilderOptions(CommonTsBuildersOptions):
     pass
 
 
-class TscBuilder(BaseBuilder):
+class TscBuilder(BaseTsBuilder):
     options: TscBuilderOptions
 
     @timeit

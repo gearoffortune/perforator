@@ -1,18 +1,7 @@
 from argparse import ArgumentParser
-from dataclasses import dataclass
 
-from build.plugins.lib.nots.package_manager import (
-    PackageJson,
-    utils as pm_utils,
-)
 from devtools.frontend_build_platform.libraries.logging import timeit
-from devtools.frontend_build_platform.nots.builder.api import BaseOptions, create_node_modules
-from devtools.frontend_build_platform.nots.builder.api.builders.base_builder import BaseBuilderFileManager
-
-
-@dataclass
-class PackageBuilderOptions(BaseOptions):
-    pass
+from devtools.frontend_build_platform.nots.builder.api import create_node_modules, PackageBuilder, PackageBuilderOptions
 
 
 def build_package_parser(subparsers) -> ArgumentParser:
@@ -27,10 +16,12 @@ def build_package_parser(subparsers) -> ArgumentParser:
 
 @timeit
 def build_package_func(args: PackageBuilderOptions):
-    builder = BaseBuilderFileManager(args)
+    # Step 1 - install node_modules
+    create_node_modules(args)
 
-    pj = PackageJson.load(pm_utils.build_pj_path(args.curdir))
-    if pj.has_dependencies():
-        create_node_modules(args)
+    # Step 2 - run build script
+    builder = PackageBuilder(options=args)
+    builder.build()
 
-    builder._copy_src_files_to_bindir()
+    # Step 3 - create '<module_name>.output.tar'
+    builder.bundle()

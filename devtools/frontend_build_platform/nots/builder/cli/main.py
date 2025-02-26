@@ -53,6 +53,23 @@ def __produce_old_output_tar(output_file: str):
     library.python.fs.hardlink_or_copy(output_file, old_output_tar_file)
 
 
+def _postprocess_output(args: AllOptions) -> None:
+    with_after_build = getattr(args, 'with_after_build', False)
+    output_file = getattr(args, 'output_file', args.node_modules_bundle)
+
+    if args.command == 'build-package' and not with_after_build:
+        output_file = args.node_modules_bundle
+
+    if os.path.isfile(output_file):
+        if args.trace:
+            __add_tracing_to_output(args.bindir, output_file)
+
+        if output_file != args.node_modules_bundle:
+            # TODO FBP-1978 (remove call)
+            __produce_old_output_tar(output_file)
+            __add_uuid_for_output(args.bindir, output_file)
+
+
 # @timeit тут нельзя, т.к. измерение включается внутри
 def main():
     args_parser = get_args_parser()
@@ -67,21 +84,8 @@ def main():
         timeit_options.enable(silent=True, use_dumper=True, use_stderr=True)
 
     init_logging(args.verbose)
-
     args.func(args)
-
-    output_file = getattr(args, 'output_file', args.node_modules_bundle)
-
-    # There is no <module_name>.output.tar for TS_PACKAGE module
-    if os.path.isfile(output_file):
-        if args.trace:
-            __add_tracing_to_output(args.bindir, output_file)
-
-        if output_file != args.node_modules_bundle:
-            # TODO FBP-1978 (remove call)
-            __produce_old_output_tar(output_file)
-
-            __add_uuid_for_output(args.bindir, output_file)
+    _postprocess_output(args)
 
 
 if __name__ == "__main__":

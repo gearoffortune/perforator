@@ -43,7 +43,6 @@ def register_base_args(parser: ArgumentParser) -> None:
     parser.add_argument(
         '--trace',
         action=YesNoAction,
-        default=False,
         help="Add to the <module_name>.output.tar *.trace file (Trace Events Format, Chrome DevTools compatible)",
     )
     parser.add_argument('--verbose', action=YesNoAction, default=False, help="Use logging")
@@ -64,14 +63,8 @@ def __with_bundlers_options(parser: ArgumentParser) -> ArgumentParser:
 
 
 @timeit
-def __with_builders_options(parser: ArgumentParser):
-    """Common arguments for all builders"""
-
-    parser.add_argument(
-        '--output-file',
-        required=True,
-        help="Absolute path to <module_name>.output.tar, expected to be generated during build",
-    )
+def __with_ts_builders_options(parser: ArgumentParser):
+    """Common arguments for ts builders"""
 
     parser.add_argument(
         '--vcs-info',
@@ -94,6 +87,27 @@ def __with_builders_options(parser: ArgumentParser):
         required=False,
         action="append",
         help="Environment variable in VAR format, can be set many times",
+    )
+
+    return parser
+
+
+@timeit
+def __with_builders_options(parser: ArgumentParser):
+    """Common arguments for all builders"""
+
+    parser.add_argument(
+        '--output-file',
+        required=True,
+        help="Absolute path to <module_name>.output.tar, expected to be generated during build",
+    )
+
+    parser.add_argument(
+        "--with-after-build",
+        action='store_true',
+        required=False,
+        default=False,
+        help="Shows if should run after build script",
     )
 
     parser.add_argument(
@@ -122,17 +136,25 @@ def register_builders(subparsers):
     prepare_deps_parser(subparsers)
 
     # Only build node_modules
-    build_package_parser(subparsers)
     create_node_modules_parser(subparsers)
 
+    # Based builder
+    __with_builders_options(build_package_parser(subparsers))
+
     # TS transpilers
-    __with_builders_options(build_tsc_parser(subparsers))
-    __with_builders_options(build_ts_proto_parser(subparsers))
+    def add_ts_builder_options(s):
+        return __with_builders_options(__with_ts_builders_options(s))
+
+    add_ts_builder_options(build_tsc_parser(subparsers))
+    add_ts_builder_options(build_ts_proto_parser(subparsers))
 
     # Bundlers
-    __with_builders_options(__with_bundlers_options(build_next_parser(subparsers)))
-    __with_builders_options(__with_bundlers_options(build_vite_parser(subparsers)))
-    __with_builders_options(__with_bundlers_options(build_webpack_parser(subparsers)))
+    def add_bundler_options(s):
+        return __with_bundlers_options(add_ts_builder_options(s))
+
+    add_bundler_options(build_next_parser(subparsers))
+    add_bundler_options(build_vite_parser(subparsers))
+    add_bundler_options(build_webpack_parser(subparsers))
 
 
 @timeit

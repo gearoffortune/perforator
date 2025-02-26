@@ -7,6 +7,7 @@ PY_SRCS(
     builders/__init__.py
     builders/base_builder.py
     builders/next_builder.py
+    builders/package_builder.py
     builders/tsc_builder.py
     builders/vite_builder.py
     builders/webpack_builder.py

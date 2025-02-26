@@ -40,7 +40,7 @@ def build_tsc_func(args: TscBuilderOptions):
     for ts_config in ts_configs:
         TscBuilder(options=args, ts_config=ts_config).build()
 
-    if args.after_build_js:
+    if args.with_after_build:
         TscBuilder(options=args, ts_config=ts_configs[0]).run_javascript_after_build()
         if args.after_build_outdir:
             out_dirs.append(args.after_build_outdir)

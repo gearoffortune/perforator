@@ -1,6 +1,8 @@
 from .builders import (
     NextBuilder,
     NextBuilderOptions,
+    PackageBuilder,
+    PackageBuilderOptions,
     TscBuilder,
     TscBuilderOptions,
     ViteBuilder,
@@ -12,7 +14,7 @@ from .create_node_modules import (
     create_node_modules,
 )
 from .generators.ts_proto_generator import TsProtoGenerator, TsProtoGeneratorOptions
-from .models import BaseOptions, BuildError, CommonBuildersOptions, CommonBundlersOptions
+from .models import BaseOptions, BuildError, CommonTsBuildersOptions, CommonBundlersOptions
 from .prepare_deps import prepare_deps, PrepareDepsOptions
 from .utils import extract_all_output_tars, extract_peer_tars
 
@@ -21,11 +23,13 @@ __all__ = [
     # models
     'BaseOptions',
     'BuildError',
-    'CommonBuildersOptions',
+    'CommonTsBuildersOptions',
     'CommonBundlersOptions',
     # builders
     'NextBuilder',
     'NextBuilderOptions',
+    'PackageBuilder',
+    'PackageBuilderOptions',
     'TscBuilder',
     'TscBuilderOptions',
     'TsProtoGenerator',
