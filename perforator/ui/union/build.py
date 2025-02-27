@@ -27,6 +27,7 @@ def run_command(cmd: t.List[str]) -> None:
             f'Process `{process}` exited with code ${process.returncode}'
             f'\n\nstderr:\n{bytes2str(err)}'
             f'\n\nstdout:\n{bytes2str(out)}'
+            f'\n\ncwd: {os.getcwd()}'
         )
         raise RuntimeError(message)
     print(bytes2str(out))
@@ -35,15 +36,16 @@ def run_command(cmd: t.List[str]) -> None:
 def main():
     args = parse_args()
 
-    original_ui = os.path.join(args.curdir, '../app')
-    ui = os.path.join(args.bindir, 'app')
+    original_ui = os.path.join(args.curdir, '..')
+    ui = os.path.join(args.bindir, 'ui')
+    app = os.path.join(args.bindir, 'ui', 'app')
     shutil.copytree(
         original_ui,
         ui,
-        ignore=shutil.ignore_patterns('node_modules'),
+        ignore=shutil.ignore_patterns('node_modules', 'dist'),
     )
 
-    os.chdir(ui)
+    os.chdir(app)
 
     # for `node` executable file
     os.environ['PATH'] = args.node_dir + ':' + os.environ.get('PATH', '')
@@ -52,10 +54,11 @@ def main():
     pnpm = os.path.join(args.pnpm_dir, 'node_modules', 'pnpm', 'dist', 'pnpm.cjs')
 
     run_command([node, pnpm, 'install'])
+    run_command([node, pnpm, '--filter', '"../packages/**"', 'run', 'build'])
     run_command([node, pnpm, 'run', 'build'])
 
     with tarfile.open(os.path.join(args.bindir, 'output.tar'), 'w') as tar:
-        tar.add(os.path.join(ui, 'dist'), arcname='dist')
+        tar.add(os.path.join(app, 'dist'), arcname='dist')
 
 
 if __name__ == '__main__':

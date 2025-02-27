@@ -1,5 +1,6 @@
 RECURSE(
     app
     union
-    )
+    packages
+)
 
