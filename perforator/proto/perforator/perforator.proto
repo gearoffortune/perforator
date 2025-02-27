@@ -189,16 +189,16 @@ message GetProfileResponse {
 
 message ProfileQuery {
     // Service name. Optional.
-    string Service = 1;
+    optional string Service = 1;
 
     // Time interval. Optional.
-    TimeInterval TimeInterval = 2;
+    optional TimeInterval TimeInterval = 2;
 
     reserved 3 to 8;
     reserved "NodeID", "PodID", "BuildID", "CPU", "ProfilerVersion", "ProfileID";
 
 
-    // Selector string. Optional. Example: `{service=perforator.storage-production, build_id~=a}`
+    // Selector string.  Example: `{service=perforator.storage-production, build_id~=a}`
     // Time interval can be additionally specified in selector in format `{ts>"now - 1h", ts <= "now - 30m"}`
     // See perforator/pkg/humantime for timestamps formats
     string Selector = 9;
