@@ -20,6 +20,9 @@ type TLSConfig struct {
 	CertificateFile string `yaml:"certificate_file_path"`
 	KeyFile         string `yaml:"key_file_path"`
 	VerifyClient    bool   `yaml:"verify_client"`
+
+	CertificateFileDeprecated string `yaml:"certificate_file"`
+	KeyFileDeprecated         string `yaml:"key_file"`
 }
 
 type Config struct {
@@ -45,4 +48,19 @@ func ParseConfig(path string, strict bool) (conf *Config, err error) {
 	dec.KnownFields(strict)
 	err = dec.Decode(conf)
 	return
+}
+
+func (c *Config) FillDefault() {
+
+	// TLS backward compatibility.
+	// Previously, agent communicated with storage via only TLS, so you need to enable tls if these values ​​are present.
+	if c.TLS.CertificateFileDeprecated != "" {
+		c.TLS.Enabled = true
+		c.TLS.CertificateFile = c.TLS.CertificateFileDeprecated
+	}
+
+	if c.TLS.KeyFileDeprecated != "" {
+		c.TLS.Enabled = true
+		c.TLS.KeyFile = c.TLS.KeyFileDeprecated
+	}
 }

@@ -649,6 +649,8 @@ func NewStorageServer(
 	registry xmetrics.Registry,
 	opts *StorageOptions,
 ) (*StorageServer, error) {
+	conf.FillDefault()
+
 	if opts == nil {
 		opts = &StorageOptions{
 			ClusterName:            os.Getenv("DEPLOY_NODE_DC"),
