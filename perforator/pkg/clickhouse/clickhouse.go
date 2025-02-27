@@ -17,8 +17,11 @@ type Config struct {
 	Database                    string   `yaml:"db"`
 	User                        string   `yaml:"user"`
 	PasswordEnvironmentVariable string   `yaml:"password_env"`
-	InsecureSkipVerify          bool     `yaml:"insecure,omitempty"`
-	CACertPath                  string   `yaml:"ca_cert_path,omitempty"`
+	// TODO: all the followng fields should be replaced with
+	// TLSConfig (https://github.com/yandex/perforator/blob/283248e4d7c0bd8c66c9ff28178fb635be5581ab/perforator/pkg/storage/client/client.go#L114)
+	Plaintext          bool   `yaml:"plaintext,omitempty"`
+	InsecureSkipVerify bool   `yaml:"insecure,omitempty"`
+	CACertPath         string `yaml:"ca_cert_path,omitempty"`
 }
 
 func Connect(ctx context.Context, conf *Config) (driver.Conn, error) {
@@ -40,6 +43,9 @@ func Connect(ctx context.Context, conf *Config) (driver.Conn, error) {
 		}
 
 		tlsConf.RootCAs = certPool
+	}
+	if conf.Plaintext {
+		tlsConf = nil
 	}
 
 	conn, err := clickhouse.Open(&clickhouse.Options{
