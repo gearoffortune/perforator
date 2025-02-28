@@ -27,6 +27,7 @@ module.exports = {
         'import-helpers',
         'react',
         'react-hooks',
+        'react-refresh',
         'simple-import-sort',
     ],
     extends: [
