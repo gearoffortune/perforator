@@ -27,11 +27,11 @@ export interface FlamegraphProps {
     isDiff: boolean;
     theme: 'light' | 'dark';
     userSettings: UserSettings;
-    newData: ProfileData | null;
+    profileData: ProfileData | null;
     loading: boolean;
 }
 
-export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSettings, newData, loading }) => {
+export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSettings, profileData, loading }) => {
     const flamegraphContainer = React.useRef<HTMLDivElement | null>(null);
     const canvasRef = React.useRef<HTMLDivElement | null>(null);
     const [query, setQuery] = useSearchParams();
@@ -42,14 +42,14 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
     const reverse = (query.get('flamegraphReverse') ?? String(userSettings.reverseFlameByDefault)) === 'true';
 
     React.useEffect(() => {
-        if (newData) {
+        if (profileData) {
             const getCssVariable = (variable: string) => {
                 return getComputedStyle(flamegraphContainer.current!).getPropertyValue(variable);
             };
             const levelHeight = parseInt(getCssVariable('--flamegraph-level-height')!);
-            flamegraphOffsets.current = new FlamegraphOffseter(newData, { reverse, levelHeight });
+            flamegraphOffsets.current = new FlamegraphOffseter(profileData, { reverse, levelHeight });
         }
-    }, [newData, reverse]);
+    }, [profileData, reverse]);
 
     const handleSearch = React.useCallback(() => {
         setShowDialog(true);
@@ -87,7 +87,7 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
 
 
     React.useEffect(() => {
-        if (flamegraphContainer.current && newData && flamegraphOffsets.current) {
+        if (flamegraphContainer.current && profileData && flamegraphOffsets.current) {
             flamegraphContainer.current.style.setProperty('--flamegraph-font', userSettings.monospace === 'system' ? 'monospace' : 'var(--g-font-family-monospace)');
 
             const renderOptions = {
@@ -100,13 +100,13 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
                 reverse,
             };
 
-            return newFlame(flamegraphContainer.current, newData, flamegraphOffsets.current, renderOptions);
+            return newFlame(flamegraphContainer.current, profileData, flamegraphOffsets.current, renderOptions);
         }
         return () => {};
-    }, [getStateFromQuery, isDiff, newData, reverse, search, theme, updateStateInQuery, userSettings]);
+    }, [getStateFromQuery, isDiff, profileData, reverse, search, theme, updateStateInQuery, userSettings]);
 
     const handleContextMenu = React.useCallback((event: React.MouseEvent) => {
-        if (!flamegraphContainer.current || !newData || !flamegraphOffsets.current) {
+        if (!flamegraphContainer.current || !profileData || !flamegraphOffsets.current) {
             return;
         }
         event.preventDefault();
@@ -119,9 +119,9 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
             return;
         }
 
-        const stringifiedNode = readNodeStrings(newData, coordsClient);
+        const stringifiedNode = readNodeStrings(profileData, coordsClient);
         setPopupData({ offset: [offsetX, -offsetY], node: stringifiedNode });
-    }, [newData]);
+    }, [profileData]);
 
     const handleOutsideContextMenu: React.MouseEventHandler = React.useCallback((e) => {
         if (popupData) {
@@ -152,7 +152,7 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
         return <Loader />;
     }
 
-    const framesCount = newData?.rows?.reduce((acc, row) => acc + row.length, 0);
+    const framesCount = profileData?.rows?.reduce((acc, row) => acc + row.length, 0);
 
     return (
         <>

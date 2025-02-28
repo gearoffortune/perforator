@@ -30,7 +30,7 @@ export const TaskFlamegraph: React.FC<TaskFlamegraphProps> = (props) => {
     const { userSettings } = useUserSettings();
 
 
-    const [newData, setNewData] = React.useState<ProfileData | undefined>();
+    const [profileData, setProfileData] = React.useState<ProfileData | undefined>();
 
     const getProfileData = async () => {
         const fetchingStart = performance.now();
@@ -47,20 +47,20 @@ export const TaskFlamegraph: React.FC<TaskFlamegraphProps> = (props) => {
         console.log('Fetched data in', fetchingFinish - fetchingStart, 'ms');
 
         if (props.format === 'JSONFlamegraph') {
-            setNewData({ rows: data.rows.filter(Boolean), stringTable: data.stringTable });
+            setProfileData({ rows: data.rows.filter(Boolean), stringTable: data.stringTable });
         } else if (props.format === 'Flamegraph') {
-            setNewData(uiFactory()?.parseLegacyFormat?.(data));
+            setProfileData(uiFactory()?.parseLegacyFormat?.(data));
         }
         uiFactory().rum()?.finishDataLoading?.('task-flamegraph');
     };
 
     const prerenderedNewData = React.useMemo(() => {
         uiFactory().rum()?.startDataRendering?.('task-flamegraph', '', false);
-        if (newData) {
-            return prerenderColors(newData, { theme });
+        if (profileData) {
+            return prerenderColors(profileData, { theme });
         }
         return null;
-    }, [newData, theme]);
+    }, [profileData, theme]);
 
     const loading = !prerenderedNewData;
 
@@ -77,7 +77,7 @@ export const TaskFlamegraph: React.FC<TaskFlamegraphProps> = (props) => {
             isDiff={props.isDiff}
             theme={theme}
             userSettings={userSettings}
-            newData={prerenderedNewData}
+            profileData={prerenderedNewData}
             loading={loading}
         />
     );
