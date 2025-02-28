@@ -55,6 +55,7 @@ module.exports = {
         'no-multi-spaces': ['error', { ignoreEOLComments: true }],
         'no-multiple-empty-lines': 'error',
         'no-trailing-spaces': 'error',
+        'react-refresh/only-export-components': 'error',
         'object-curly-spacing': ['error', 'always'],
         'quotes': ['error', 'single'],
         'react/jsx-curly-spacing': ['error', { 'when': 'never', 'children': true }],

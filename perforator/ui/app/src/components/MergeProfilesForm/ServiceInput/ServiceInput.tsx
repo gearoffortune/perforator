@@ -1,9 +1,7 @@
 import React from 'react';
 
-import type { QueryInput, QueryInputRenderer } from 'src/components/MergeProfilesForm/QueryInput';
 import type { SelectFilter } from 'src/components/Select/Select';
 import { uiFactory } from 'src/factory';
-import { makeSelectorFromConditions } from 'src/utils/selector';
 
 import { fetchServices } from './fetchServices';
 
@@ -37,31 +35,4 @@ export const ServiceInput: React.FC<ServiceInputProps> = props => {
     });
 };
 
-const makeSelectorWithService = (service: string): string => (
-    makeSelectorFromConditions([{ field: 'service', value: service }])
-);
 
-const renderServiceInput: QueryInputRenderer = (query, setQuery, setTableSelector) => (
-    <div className="service-input">
-        <ServiceInput
-            service={query.service}
-            onUpdate={(service) => {
-                if (service) {
-                    if (setTableSelector) {
-                        setTableSelector(makeSelectorWithService(service));
-                    }
-                    setQuery({
-                        ...query,
-                        service,
-                    });
-                }
-            }}
-        />
-    </div>
-);
-
-export const SERVICE_QUERY_INPUT: QueryInput = {
-    name: 'Service',
-    queryField: 'service',
-    render: renderServiceInput,
-};

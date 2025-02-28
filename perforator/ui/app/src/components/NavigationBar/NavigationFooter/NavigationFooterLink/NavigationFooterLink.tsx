@@ -3,16 +3,10 @@ import React from 'react';
 import { FooterItem } from '@gravity-ui/navigation';
 import { Icon } from '@gravity-ui/uikit';
 
+import { openLink } from './utils';
+
 
 const ITEM_ICON_SIZE = 18;
-
-export const openLink = (url?: string) => {
-    if (url) {
-        window
-            .open(url, '_blank')
-            ?.focus();
-    }
-};
 
 export interface NavigationFooterLinkProps {
     text: string;

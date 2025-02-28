@@ -4,7 +4,8 @@ import { Bug } from '@gravity-ui/icons';
 
 import { uiFactory } from 'src/factory';
 
-import { NavigationFooterLink, openLink } from '../NavigationFooterLink/NavigationFooterLink';
+import { NavigationFooterLink } from '../NavigationFooterLink/NavigationFooterLink';
+import { openLink } from '../NavigationFooterLink/utils';
 
 
 export interface BugReportLinkProps {
