@@ -16,10 +16,7 @@ Please do not use it in production environments.
 
 {% note info %}
 
-To run Kubernetes locally you can isntall kind (kubernetes in docker).
-
-See official instalation instruction https://kind.sigs.k8s.io/docs/user/quick-start/#installation
-
+To run Kubernetes locally you can install [minikube](https://minikube.sigs.k8s.io/docs/start/) or [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation).
 
 {% endnote %}
 
