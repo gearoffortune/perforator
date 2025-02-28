@@ -7,7 +7,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/yandex/perforator/library/go/certifi"
+	"github.com/yandex/perforator/perforator/pkg/certifi"
 )
 
 func newTransportCredentialsDialOption(secure bool) (grpc.DialOption, error) {
@@ -23,7 +23,7 @@ func newTransportCredentials(secure bool) (credentials.TransportCredentials, err
 		return insecure.NewCredentials(), nil
 	}
 
-	certPool, err := certifi.NewCertPool()
+	certPool, err := certifi.NewDefaultCertPool()
 	if err != nil {
 		return nil, err
 	}
