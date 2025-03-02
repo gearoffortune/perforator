@@ -9,7 +9,7 @@ Build `perforator/cmd/cli` from the root of the repository.
 
 
 ```console
-export PERFORATOR_ENDPOINT="https://perforator.example.com"
+export PERFORATOR_ENDPOINT="<your perforator endpoint>:<your grpc port>"
 export PERFORATOR_SECURE=true
 ```
 
