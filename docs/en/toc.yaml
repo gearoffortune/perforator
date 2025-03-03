@@ -73,19 +73,17 @@ items:
         href: reference/language-support/overview.md
       - name: Python
         items:
-          - name: Profiling
-            items:
-              - name: Overview
-                href: reference/language-support/python/profiling.md
-              - name: Parsing Python ELF
-                href: reference/language-support/python/parse_elf.md
-              - name: Current thread state
-                href: reference/language-support/python/threadstate.md
-              - name: Stack unwinding
-                href: reference/language-support/python/stack-unwinding.md
-              - name: Symbolization
-                href: reference/language-support/python/symbolization.md
-          - name: Python stack vs Native stack
+          - name: Overview
+            href: reference/language-support/python/profiling.md
+          - name: Parsing Python ELF
+            href: reference/language-support/python/parse_elf.md
+          - name: Current thread state
+            href: reference/language-support/python/threadstate.md
+          - name: Stack unwinding
+            href: reference/language-support/python/stack-unwinding.md
+          - name: Symbolization
+            href: reference/language-support/python/symbolization.md
+          - name: Merging Python and Native stacks
             href: reference/language-support/python/merging.md
       - name: JVM-based languages
         href: reference/language-support/java.md
