@@ -1157,7 +1157,7 @@
     "title": "ESLint",
     "description": "Статический анализатор кода (линтер).\n\nОсуществляет поиск, а иногда и исправление частых ошибок.\nМожет следить за стилем кода, форматированием.\n\nРасширяем плагинами (Typescript, Prettier, Stylelint).\n\n[Подробнее про линтинг в tier-0](https://docs.yandex-team.ru/frontend-in-arcadia/index/quick-start#lint)",
     "type": "NPM_PACKAGE",
-    "default": "9.20.0",
+    "default": "9.20.1",
     "links": {
       "Home": "https://eslint.org",
       "Sources": "https://github.com/eslint/eslint",
@@ -1166,6 +1166,10 @@
     },
     "useDirectly": true,
     "versions": {
+      "9.20.1": {
+        "add_date": "2025-03-04T05:30:50",
+        "resources": []
+      },
       "9.20.0": {
         "add_date": "2025-02-25T05:31:35",
         "resources": []
@@ -4701,7 +4705,7 @@
     "title": "webpack",
     "description": "Классический сборщик frontend проектов\n\nВ tier-0 используется в модуле/макросе [`TS_WEBPACK()`](https://docs.yandex-team.ru/frontend-in-arcadia/references/TS_WEBPACK).",
     "type": "NPM_PACKAGE",
-    "default": "5.97.1",
+    "default": "5.98.0",
     "links": {
       "Home": "https://webpack.js.org",
       "Sources": "https://github.com/webpack/webpack",
@@ -4711,6 +4715,10 @@
     },
     "useDirectly": true,
     "versions": {
+      "5.98.0": {
+        "add_date": "2025-03-04T05:34:58",
+        "resources": []
+      },
       "5.97.1": {
         "add_date": "2024-12-24T05:35:24",
         "resources": []
