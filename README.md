@@ -1,6 +1,6 @@
 <img width="64" src="docs/_assets/logo.svg" /><br/>
 
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/yandex/perforator/blob/main/LICENSE)
+[![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](https://github.com/yandex/perforator/blob/main/LICENSE)
 [![eBPF code license](https://img.shields.io/badge/eBPF_code_License-GPLv2-blue.svg)](https://github.com/yandex/perforator/tree/main/perforator/agent/collector/progs/unwinder/LICENSE)
 [![Telegram](https://img.shields.io/badge/Telegram-ru-2ba2d9.svg)](https://t.me/perforator_ru)
 [![Telegram](https://img.shields.io/badge/Telegram-en-2ba2d9.svg)](https://t.me/perforator_en)
@@ -41,6 +41,8 @@ We are welcome to contributions! The [contributor's guide](CONTRIBUTING.md) prov
 
 ## License
 
-This project is licensed under the MIT License (MIT). [MIT License](https://github.com/yandex/perforator/tree/main/LICENSE)
+This project is licensed under the Apache 2.0 License (Apache-2.0). [Apache 2.0 License](https://github.com/yandex/perforator/tree/main/LICENSE)
+
+NB: Formerly, we licensed Perforator under MIT license. We switched to Apache 2.0 to waive custom CLA signature requirements and simplify contributions.
 
 The eBPF source code is licensed under the GPL 2.0 license. [GPL 2.0](https://github.com/yandex/perforator/tree/main/perforator/agent/collector/progs/unwinder/LICENSE)
