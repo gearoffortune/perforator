@@ -186,9 +186,12 @@ message StackFrames {
 // to inlining.
 //
 // Inside one chain, frames are stored bottom-up (leaf-to-root) order.
-// For example, if printf calls memcpy and memcpy call is inlined into printf,
+// For example, if printf calls memcpy, and memcpy call is inlined into printf,
 // the first frame inside inlining chain should reference memcpy and the last
 // one should reference printf.
+//
+// This can look somewhat unnatural, but it is the order most tools and formats
+// expect (for example, pprof).
 message InlineChains {
     // Offsets into line arrays.
     repeated uint32 offset = 1;
@@ -220,7 +223,7 @@ message Binaries {
     repeated uint32 path = 2;
 }
 
-// Threads contains information about processes and threads
+// Threads contains information about processes and threads.
 message Threads {
     // Process identifiers.
     repeated uint32 process_id = 1;
