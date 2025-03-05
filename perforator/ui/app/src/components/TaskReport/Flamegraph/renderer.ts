@@ -18,7 +18,7 @@ import type { FormatNode, ProfileData } from 'src/models/Profile.ts';
 import type { UserSettings } from 'src/providers/UserSettingsProvider/UserSettings.ts';
 
 import { hugenum } from './flame-utils.ts';
-import type { GetStateFromQuery } from './query-utils.ts';
+import type { GetStateFromQuery, SetStateFromQuery } from './query-utils.ts';
 import { shorten } from './shorten/shorten.ts';
 import { darken, DARKEN_FACTOR, diffcolor } from './utils/colors.ts';
 
@@ -39,9 +39,14 @@ function formatPct(value: any) {
 }
 
 
+export type QueryKeys =
+    | 'flamegraphReverse'
+    | 'flamegraphQuery'
+    | 'frameDepth'
+    | 'framePos';
 export type RenderFlamegraphOptions = {
-    getState: GetStateFromQuery;
-    setState: (state: Record<string, string | false>) => void;
+    getState: GetStateFromQuery<QueryKeys>;
+    setState: SetStateFromQuery<QueryKeys>;
     theme: RealTheme;
     isDiff: boolean;
     userSettings: UserSettings;
@@ -50,7 +55,6 @@ export type RenderFlamegraphOptions = {
 }
 
 interface RenderOpts {
-    subtree?: {initialH?: number; initialI?: number};
     pattern?: RegExp | null;
 }
 
@@ -63,6 +67,7 @@ type RenderFlamegraphType = (
 ) => () => void;
 
 export class FlamegraphOffseter {
+    currentNodeCoords: [number, number] = [0, 0];
     private rows: FormatNode[][];
 
     /**
@@ -79,7 +84,7 @@ export class FlamegraphOffseter {
     private reverse: boolean;
     private levelHeight: number;
 
-    constructor(profileData: ProfileData, options: {reverse: boolean; levelHeight: number}) {
+    constructor(profileData: ProfileData, options: { reverse: boolean; levelHeight: number }) {
         this.rows = profileData.rows;
         this.framesWindow = this.fillFramesWindow([0, 0]);
         this.reverse = options.reverse;
@@ -123,6 +128,10 @@ export class FlamegraphOffseter {
         };
     }
 
+    calcTopOffset(h: number) {
+        return this.reverse ? h * this.levelHeight : (this.rows.length * this.levelHeight) - (h + 1) * this.levelHeight;
+    }
+
     createShouldDrawFrame(h: number) {
         const currentLevelFramesWindow = this.framesWindow[h];
         const parentFramesWindow = this.framesWindow[h - 1];
@@ -147,9 +156,10 @@ export class FlamegraphOffseter {
 
     prerenderOffsets(canvasWidth: number, initialCoordinates: [number, number] = [0, 0]) {
         this.canvasWidth = canvasWidth;
+        this.currentNodeCoords = initialCoordinates;
         const [initialH, initialI] = initialCoordinates;
-        const widthEv = this.rows[initialH][initialI].eventCount;
-        this.widthRatio = widthEv / canvasWidth!;
+        const root = this.rows[initialH][initialI];
+        this.widthRatio = root.eventCount / canvasWidth!;
         this.minVisibleEv = minVisibleWidth * this.widthRatio;
         this.framesWindow = this.fillFramesWindow(initialCoordinates);
 
@@ -184,7 +194,7 @@ export class FlamegraphOffseter {
 
             if (frames[mid].x! > x) {
                 right = mid - 1;
-            } else if (frames[mid].x! + frames[mid].eventCount / this.widthRatio! <= x) {
+            } else if (frames[mid].x! + this.countWidth(frames[mid]) <= x) {
                 left = mid + 1;
             } else {
                 return mid;
@@ -220,7 +230,7 @@ export class FlamegraphOffseter {
         return this.reverse ? offset : ((this.rows.length * this.levelHeight) - offset);
     }
 
-    getCoordsByPosition: (x: number, y: number) => null | {h: number; i: number} = (x, y) => {
+    getCoordsByPosition: (x: number, y: number) => null | { h: number; i: number } = (x, y) => {
         const topOffset = this.getTopOffset(y);
         const h = Math.floor(topOffset / this.levelHeight);
 
@@ -244,6 +254,10 @@ export class FlamegraphOffseter {
             return true;
         }
         return false;
+    }
+
+    isBeforeCurrentNode(h: number) {
+        return h < this.currentNodeCoords[0];
     }
     private createUpdateWindow = (h: number) => (i: number) => {
         if (Array.isArray(this.framesWindow?.[h])) {
@@ -326,7 +340,7 @@ export const renderFlamegraph: RenderFlamegraphType = (
     const textMetrics = c.measureText('O');
     const charWidth = textMetrics.width || 6;
     function readString(id?: number) {
-        if (id === undefined) {return '';}
+        if (id === undefined) { return ''; }
         return profileData.stringTable[id];
     }
 
@@ -370,8 +384,6 @@ export const renderFlamegraph: RenderFlamegraphType = (
     }
 
 
-    let currentNode: FormatNode | null = null;
-
     type TitleArgs = {
         getPct: (arg: {
             rootPct: string | undefined;
@@ -389,7 +401,7 @@ export const renderFlamegraph: RenderFlamegraphType = (
         wrapNumbers = (nubmers: string) => nubmers,
     }: TitleArgs) {
         // eslint-disable-next-line @typescript-eslint/no-shadow
-        return function (f: FormatNode, selectedFrame: FormatNode | null, root?: FormatNode): string {
+        return function(f: FormatNode, selectedFrame: FormatNode | null, root?: FormatNode): string {
             const calcPercent = (baseFrame?: FormatNode | null) => baseFrame ? pct(f.eventCount, baseFrame.eventCount) : undefined;
             const percent = getPct({
                 rootPct: calcPercent(root),
@@ -457,9 +469,6 @@ export const renderFlamegraph: RenderFlamegraphType = (
 
         const newLabels: HTMLDivElement[] = [];
 
-        const { initialH = 0, initialI = 0 } = opts?.subtree ?? {};
-        currentNode = rows[initialH][initialI];
-
         const marked: Record<number | string, number> = {};
 
         function mark(f: FormatNode) {
@@ -490,12 +499,12 @@ export const renderFlamegraph: RenderFlamegraphType = (
 
 
         for (let h = 0; h < rows.length; h++) {
-            const y = reverse ? h * LEVEL_HEIGHT : canvasHeight! - (h + 1) * LEVEL_HEIGHT;
+            const y = fg.calcTopOffset(h);
             const row = rows[h];
-            const alpha = h < (initialH ?? 0);
+            const alpha = fg.isBeforeCurrentNode(h);
 
 
-            const drawFrame = function (i: number) {
+            const drawFrame = function(i: number) {
                 const node = row[i];
                 const width = fg.countWidth(node);
                 const nodeTitle = getNodeTitle(node);
@@ -533,7 +542,7 @@ export const renderFlamegraph: RenderFlamegraphType = (
 
             const shouldDrawFrame = fg.createShouldDrawFrame(h);
 
-            const renderNode = function (i: number) {
+            const renderNode = function(i: number) {
                 const node = row[i];
                 const should = shouldDrawFrame(i);
                 if (!should) {
@@ -603,33 +612,11 @@ export const renderFlamegraph: RenderFlamegraphType = (
             framePos: i.toString(),
         });
         fg.prerenderOffsets(canvasWidth!, [h, i]);
-        render({ subtree: { initialH: h, initialI: i }, pattern: searchPattern });
+        render({ pattern: searchPattern });
         canvas?.onmousemove?.(e);
     };
 
-    canvas.onmousemove = function (event) {
-        const coords = fg.getCoordsByPosition(event.offsetX, event.offsetY);
-
-        if (!coords) {
-            canvas.onmouseout?.(event);
-            return;
-        }
-        const { i, h } = coords;
-        const row = rows[h];
-        const node = row[i];
-
-
-        if (!fg.visible(node.eventCount)) {
-            canvas.onmouseout?.(event);
-            return;
-        }
-        const width = fg.countWidth(node);
-
-        const left = node.x! + canvas.offsetLeft;
-        const top = ((reverse ? h * LEVEL_HEIGHT : canvasHeight! - (h + 1) * LEVEL_HEIGHT) + canvas.offsetTop);
-        const title = getNodeTitle(node);
-        const isMainRoot = currentNode && currentNode.textId === root.textId && currentNode.eventCount === root.eventCount;
-        const highlightTitle = isMainRoot ? getCanvasTitle(node, null, root) : getCanvasTitle(node, currentNode!, root);
+    function calcHighlightColor(node: FormatNode) {
         const parsedColor = isDiff ? diffcolor(node, root) : node.color!;
 
         let newColor: string | null = null;
@@ -640,9 +627,38 @@ export const renderFlamegraph: RenderFlamegraphType = (
         // highlight is 0.4 darker than default color
         // but for non-diffs the node.color is already darkened by 0.2 so 0.2 is enough
         if (theme === 'dark' && isDiff) {
-            newColor = darken(newColor as string, 0.2);
+            newColor = darken(parsedColor as string, 0.2);
         }
-        renderHighlight(title, newColor, left, top, width, highlightTitle);
+        return newColor;
+    }
+    canvas.onmousemove = function(event) {
+        const coords = fg.getCoordsByPosition(event.offsetX, event.offsetY);
+
+        if (!coords) {
+            canvas.onmouseout?.(event);
+            return;
+        }
+        const { i, h } = coords;
+        const row = rows[h];
+        const node = row[i];
+        const currentNodeCoords = fg.currentNodeCoords;
+        const currentNode = row[currentNodeCoords[1]];
+
+
+        if (!fg.visible(node.eventCount)) {
+            canvas.onmouseout?.(event);
+            return;
+        }
+
+        const width = fg.countWidth(node);
+
+        const left = node.x! + canvas.offsetLeft;
+        const top = (fg.calcTopOffset(h) + canvas.offsetTop);
+        const title = getNodeTitle(node);
+        const isMainRoot = currentNode && currentNode.textId === root.textId && currentNode.eventCount === root.eventCount;
+        const highlightTitle = isMainRoot ? getCanvasTitle(node, null, root) : getCanvasTitle(node, currentNode!, root);
+        const color = calcHighlightColor(node);
+        renderHighlight(title, color, left, top, width, highlightTitle);
 
         canvas.onclick = handleClick;
         status.textContent = 'Function: ' + (isMainRoot ? getStatusTitle(node, null, root) : getStatusTitle(node, currentNode!, root));
@@ -653,6 +669,8 @@ export const renderFlamegraph: RenderFlamegraphType = (
 
 
     function clearHighlight() {
+        const currentNodeCoords = fg.currentNodeCoords;
+        const currentNode = rows[currentNodeCoords[0]][currentNodeCoords[1]];
         hl.style.display = 'none';
         status.textContent = 'Function: ' + getStatusTitle(currentNode!, null, root);
         canvas.title = '';
@@ -666,7 +684,7 @@ export const renderFlamegraph: RenderFlamegraphType = (
     const pos = Number(getState('framePos', '0'));
 
     fg.prerenderOffsets(canvasWidth!, [h, pos]);
-    render({ pattern: searchPattern, subtree: { initialH: h, initialI: pos } });
+    render({ pattern: searchPattern });
 
     const onResize = () => requestAnimationFrame(() => {
 
@@ -676,7 +694,7 @@ export const renderFlamegraph: RenderFlamegraphType = (
         canvas.style.width = null;
         initCanvas();
         fg.prerenderOffsets(canvasWidth!, [initialH, initialI]);
-        render({ subtree: { initialH, initialI }, pattern: searchPattern });
+        render({ pattern: searchPattern });
     });
     window.addEventListener('resize', onResize);
 

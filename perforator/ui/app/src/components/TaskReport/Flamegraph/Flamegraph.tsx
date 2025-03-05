@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 
-import { useSearchParams } from 'react-router-dom';
-
 import { Xmark } from '@gravity-ui/icons';
 import BarsAscendingAlignLeftArrowUpIcon from '@gravity-ui/icons/svgs/bars-ascending-align-left-arrow-up.svg?raw';
 import BarsDescendingAlignLeftArrowDownIcon from '@gravity-ui/icons/svgs/bars-descending-align-left-arrow-down.svg?raw';
@@ -14,9 +12,9 @@ import type { UserSettings } from 'src/providers/UserSettingsProvider/UserSettin
 
 import type { PopupData } from './ContextMenu.tsx';
 import { ContextMenu } from './ContextMenu.tsx';
-import type { GetStateFromQuery } from './query-utils.ts';
-import { getStateFromQueryParams, modifyQuery } from './query-utils.ts';
+import { useTypedQuery } from './query-utils.ts';
 import { RegexpDialog } from './RegexpDialog/RegexpDialog.tsx';
+import type { QueryKeys } from './renderer.ts';
 import { FlamegraphOffseter, renderFlamegraph as newFlame } from './renderer.ts';
 import { readNodeStrings } from './utils/read-string.ts';
 
@@ -34,12 +32,12 @@ export interface FlamegraphProps {
 export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSettings, profileData, loading }) => {
     const flamegraphContainer = React.useRef<HTMLDivElement | null>(null);
     const canvasRef = React.useRef<HTMLDivElement | null>(null);
-    const [query, setQuery] = useSearchParams();
+    const [getQuery, setQuery] = useTypedQuery<QueryKeys>();
     const [popupData, setPopupData] = useState<null | PopupData>(null);
     const [showDialog, setShowDialog] = useState(false);
     const flamegraphOffsets = React.useRef<FlamegraphOffseter | null>(null);
-    const search = query.get('flamegraphQuery');
-    const reverse = (query.get('flamegraphReverse') ?? String(userSettings.reverseFlameByDefault)) === 'true';
+    const search = getQuery('flamegraphQuery');
+    const reverse = (getQuery('flamegraphReverse') ?? String(userSettings.reverseFlameByDefault)) === 'true';
 
     React.useEffect(() => {
         if (profileData) {
@@ -56,34 +54,18 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
     }, []);
 
     const handleReverse = React.useCallback(() => {
-        setQuery(q => {
-            q.set('flamegraphReverse', String(!reverse));
-            return q;
-        });
+        setQuery({ 'flamegraphReverse': String(!reverse) });
     }, [reverse, setQuery]);
 
     const handleSearchReset = React.useCallback(() => {
-        setQuery(q => {
-            q.delete('flamegraphQuery');
-            return q;
-        });
+        setQuery({ flamegraphQuery: false });
     }, [setQuery]);
 
     const handleSearchUpdate = (text: string) => {
-        setQuery(q => {
-            q.set('flamegraphQuery', encodeURIComponent(text));
-            return q;
-        });
+        setQuery({ 'flamegraphQuery': encodeURIComponent(text) });
 
         setShowDialog(false);
     };
-
-
-    const updateStateInQuery = React.useCallback((q: Record<string, string | false>) => {
-        setQuery(newQuery => modifyQuery(newQuery, q));
-    }, [setQuery]);
-
-    const getStateFromQuery: GetStateFromQuery = React.useMemo(() => getStateFromQueryParams(query), [query]);
 
 
     React.useEffect(() => {
@@ -91,8 +73,8 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
             flamegraphContainer.current.style.setProperty('--flamegraph-font', userSettings.monospace === 'system' ? 'monospace' : 'var(--g-font-family-monospace)');
 
             const renderOptions = {
-                setState: updateStateInQuery,
-                getState: getStateFromQuery,
+                setState: setQuery,
+                getState: getQuery,
                 theme,
                 userSettings,
                 isDiff,
@@ -103,7 +85,7 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
             return newFlame(flamegraphContainer.current, profileData, flamegraphOffsets.current, renderOptions);
         }
         return () => {};
-    }, [getStateFromQuery, isDiff, profileData, reverse, search, theme, updateStateInQuery, userSettings]);
+    }, [getQuery, isDiff, profileData, reverse, search, setQuery, theme, userSettings]);
 
     const handleContextMenu = React.useCallback((event: React.MouseEvent) => {
         if (!flamegraphContainer.current || !profileData || !flamegraphOffsets.current) {
