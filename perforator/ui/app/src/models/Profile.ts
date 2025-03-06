@@ -19,6 +19,10 @@ export interface FormatNode {
     frameOrigin?: StringTableIndex;
     file?: StringTableIndex;
     kind?: StringTableIndex;
+    omittedNode?: boolean;
+    /** added during render for uninteresting frames on alt-click */
+    omittedEventCount?: number;
+    omittedSampleCount?: number;
     inlined?: boolean;
 }
 

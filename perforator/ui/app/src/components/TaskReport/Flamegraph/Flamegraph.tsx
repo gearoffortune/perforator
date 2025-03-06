@@ -60,6 +60,10 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
     const handleSearchReset = React.useCallback(() => {
         setQuery({ flamegraphQuery: false });
     }, [setQuery]);
+    const haveOmittedNodes = Boolean(getQuery('omittedIndexes'));
+    const handleOmittedNodesReset = React.useCallback(() => {
+        setQuery({ omittedIndexes: false });
+    }, [setQuery]);
 
     const handleSearchUpdate = (text: string) => {
         setQuery({ 'flamegraphQuery': encodeURIComponent(text) });
@@ -102,7 +106,7 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
         }
 
         const stringifiedNode = readNodeStrings(profileData, coordsClient);
-        setPopupData({ offset: [offsetX, -offsetY], node: stringifiedNode });
+        setPopupData({ offset: [offsetX, -offsetY], node: stringifiedNode, coords: [coordsClient.h, coordsClient.i] });
     }, [profileData]);
 
     const handleOutsideContextMenu: React.MouseEventHandler = React.useCallback((e) => {
@@ -161,6 +165,17 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
                 </div>
 
                 <div className="flamegraph__annotations">
+                    <div className="flamegraph__status" />
+                    <div className="flamegraph__deletion" style={{ display: haveOmittedNodes ? 'inherit' : 'none' }}>
+                        <Button
+                            className="flamegraph__clear-deletion"
+                            view="flat-danger"
+                            title="Clear Deletions"
+                            onClick={handleOmittedNodesReset}
+                        >
+                            <Icon data={Xmark} size={20} /> Reset omitted stacks
+                        </Button>
+                    </div>
                     <div className="flamegraph__match">
                     Matched: <span className="flamegraph__match-value" />
                         <Button
@@ -172,7 +187,6 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
                             <Icon data={Xmark} size={20} />
                         </Button>
                     </div>
-                    <div className="flamegraph__status" />
                 </div>
 
                 <div id="profile" className="flamegraph__content">
@@ -191,7 +205,7 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
                 </div>
             </div>
             {popupData && (
-                <ContextMenu onClosePopup={() => {setPopupData(null);}} popupData={popupData} anchorRef={canvasRef}/>
+                <ContextMenu onClosePopup={() => {setPopupData(null);}} popupData={popupData} anchorRef={canvasRef} getQuery={getQuery} setQuery={setQuery} />
             )}
         </>
     );

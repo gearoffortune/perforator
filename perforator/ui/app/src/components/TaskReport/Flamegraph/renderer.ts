@@ -19,6 +19,7 @@ import type { UserSettings } from 'src/providers/UserSettingsProvider/UserSettin
 
 import { hugenum } from './flame-utils.ts';
 import type { GetStateFromQuery, SetStateFromQuery } from './query-utils.ts';
+import { parseStacks, stringifyStacks } from './query-utils.ts';
 import { shorten } from './shorten/shorten.ts';
 import { darken, DARKEN_FACTOR, diffcolor } from './utils/colors.ts';
 
@@ -38,10 +39,16 @@ function formatPct(value: any) {
     return value ? `${value}%` : '';
 }
 
+export type I = number;
+export type H = number;
+
+export type Coordinate = [H, I];
+export type Interval = [I, I];
 
 export type QueryKeys =
     | 'flamegraphReverse'
     | 'flamegraphQuery'
+    | 'omittedIndexes'
     | 'frameDepth'
     | 'framePos';
 export type RenderFlamegraphOptions = {
@@ -67,7 +74,7 @@ type RenderFlamegraphType = (
 ) => () => void;
 
 export class FlamegraphOffseter {
-    currentNodeCoords: [number, number] = [0, 0];
+    currentNodeCoords: Coordinate = [0, 0];
     private rows: FormatNode[][];
 
     /**
@@ -77,7 +84,7 @@ export class FlamegraphOffseter {
      * everything up the subtree is filled before rendering
      * everything below the subtree is filled during render
      */
-    private framesWindow: Record<number, [number, number]>;
+    private framesWindow: Record<number, Interval>;
     private canvasWidth: number | undefined;
     private widthRatio: number | undefined;
     private minVisibleEv: number | undefined;
@@ -91,8 +98,8 @@ export class FlamegraphOffseter {
         this.levelHeight = options.levelHeight;
     }
 
-    fillFramesWindow([hmax, imax]: [number, number]): Record<number, [number, number]> {
-        const res: Record<number, [number, number]> = [];
+    fillFramesWindow([hmax, imax]: Coordinate): Record<number, Interval> {
+        const res: Record<number, Interval> = [];
         let nextParentIndex = imax;
 
         for (let h = Math.min(hmax, this.rows.length - 1); h >= 0; h--) {
@@ -154,14 +161,75 @@ export class FlamegraphOffseter {
         };
     }
 
-    prerenderOffsets(canvasWidth: number, initialCoordinates: [number, number] = [0, 0]) {
+    backpropagateOmittedEventCount(omittedOffsetCoordinates: Coordinate[]) {
+        const maxH = Math.max(...omittedOffsetCoordinates.map(([h, _i]) => h));
+        const omittedIndexesByHs = omittedOffsetCoordinates.reduce((acc, [h, i]) => {
+            if (!(acc[h] instanceof Set)) {
+                acc[h] = new Set();
+            }
+            acc[h].add(i);
+            return acc;
+        }, {} as Record<number, Set<number>>);
+        for (let h = maxH; h >= 0; h--) {
+            const row = this.rows[h];
+            const omittedIndexes = omittedIndexesByHs[h];
+            for (let i = 0; i < row.length; i++) {
+                const node = row[i];
+                if (omittedIndexes?.has?.(i)) {
+                    node.omittedEventCount = node.eventCount;
+                    node.omittedSampleCount = node.sampleCount;
+                    node.omittedNode = true;
+                }
+                if (node.omittedEventCount && node.omittedSampleCount && node.parentIndex !== -1 && h !== 0) {
+                    const parentNode = this.rows[h - 1][node.parentIndex];
+                    parentNode.omittedEventCount = (parentNode.omittedEventCount ?? 0) + node.omittedEventCount;
+                    parentNode.omittedSampleCount = (parentNode.omittedSampleCount ?? 0) + node.omittedSampleCount;
+                }
+            }
+        }
+        let omittedParentIndexes: Set<number> = new Set();
+        let nextOmittedParentIndexes: Set<number> = new Set();
+        for (let h = 0; h < this.rows.length; h++) {
+            const row = this.rows[h];
+            for (let i = 0; i < row.length; i++) {
+                const node = row[i];
+                if (node.omittedNode && node.omittedEventCount && node.omittedSampleCount) {
+                    nextOmittedParentIndexes.add(i);
+                }
+                if (omittedParentIndexes.has(node.parentIndex)) {
+                    node.omittedNode = true;
+                    node.omittedEventCount = node.eventCount;
+                    node.omittedSampleCount = node.sampleCount;
+                    nextOmittedParentIndexes.add(i);
+                }
+            }
+            omittedParentIndexes = nextOmittedParentIndexes;
+            nextOmittedParentIndexes = new Set();
+        }
+    }
+
+    clearOmittedEventCount() {
+        for (let h = 0; h < this.rows.length; h++) {
+            const row = this.rows[h];
+            for (let i = 0; i < row.length; i++) {
+                const node = row[i];
+                node.omittedEventCount = undefined;
+                node.omittedSampleCount = undefined;
+                node.omittedNode = false;
+            }
+        }
+    }
+
+    prerenderOffsets(canvasWidth: number, initialCoordinates: Coordinate, omittedOffsetCoordinates: Coordinate[] = []) {
+        this.clearOmittedEventCount();
         this.canvasWidth = canvasWidth;
         this.currentNodeCoords = initialCoordinates;
         const [initialH, initialI] = initialCoordinates;
-        const root = this.rows[initialH][initialI];
-        this.widthRatio = root.eventCount / canvasWidth!;
-        this.minVisibleEv = minVisibleWidth * this.widthRatio;
         this.framesWindow = this.fillFramesWindow(initialCoordinates);
+        this.backpropagateOmittedEventCount(omittedOffsetCoordinates);
+        const root = this.rows[initialH][initialI];
+        this.widthRatio = (root.eventCount - (root.omittedEventCount ?? 0)) / canvasWidth!;
+        this.minVisibleEv = minVisibleWidth * this.widthRatio;
 
         for (let h = 0; h < this.rows.length; h++) {
             const shouldDrawFrame = this.createShouldDrawFrame(h);
@@ -206,6 +274,12 @@ export class FlamegraphOffseter {
 
         return null;
     }
+    countEventCountWidth(node: FormatNode) {
+        return node.eventCount - (node.omittedEventCount ?? 0);
+    }
+    countSampleCountWidth(node: FormatNode) {
+        return node.sampleCount - (node.omittedSampleCount ?? 0);
+    }
     getCoordsByPositionWithKnownHeight(h: number, x: number) {
 
         const row = this.rows[h];
@@ -243,7 +317,11 @@ export class FlamegraphOffseter {
 
 
     countWidth(node: FormatNode) {
-        return Math.min(node.eventCount / this.widthRatio!, this.canvasWidth!);
+        const evWidth = node.eventCount - (node.omittedEventCount ?? 0);
+        if (evWidth === 0) {
+            return 0;
+        }
+        return Math.min((evWidth) / this.widthRatio!, this.canvasWidth!);
     }
     visible(eventCount: number) {
         return eventCount >= this.minVisibleEv!;
@@ -383,6 +461,7 @@ export const renderFlamegraph: RenderFlamegraphType = (
         findElement('match').style.display = showReset ? 'inherit' : 'none';
     }
 
+    // need to calculate cleared percentage
 
     type TitleArgs = {
         getPct: (arg: {
@@ -398,19 +477,19 @@ export const renderFlamegraph: RenderFlamegraphType = (
         getPct,
         getNumbers,
         getDelta,
-        wrapNumbers = (nubmers: string) => nubmers,
+        wrapNumbers = (numbers: string) => numbers,
     }: TitleArgs) {
         // eslint-disable-next-line @typescript-eslint/no-shadow
         return function(f: FormatNode, selectedFrame: FormatNode | null, root?: FormatNode): string {
-            const calcPercent = (baseFrame?: FormatNode | null) => baseFrame ? pct(f.eventCount, baseFrame.eventCount) : undefined;
+            const calcPercent = (baseFrame?: FormatNode | null) => baseFrame ? pct(fg.countEventCountWidth(f), fg.countEventCountWidth(baseFrame)) : undefined;
             const percent = getPct({
                 rootPct: calcPercent(root),
                 selectedPct: calcPercent(selectedFrame),
             });
             const shortenedTitle = getNodeTitle(f);
             const numbers = getNumbers({
-                sampleCount: hugenum(f.sampleCount),
-                eventCount: hugenum(f.eventCount),
+                sampleCount: hugenum(fg.countSampleCountWidth(f)),
+                eventCount: hugenum(fg.countEventCountWidth(f)),
                 percent,
             });
 
@@ -469,7 +548,9 @@ export const renderFlamegraph: RenderFlamegraphType = (
 
         const newLabels: HTMLDivElement[] = [];
 
+
         const marked: Record<number | string, number> = {};
+
 
         function mark(f: FormatNode) {
             const width = fg.countWidth(f);
@@ -513,6 +594,7 @@ export const renderFlamegraph: RenderFlamegraphType = (
                 if (isMarked) {
                     mark(node);
                 }
+
                 const color = isMarked ?
                     SEARCH_COLOR :
                     isDiff ? calculateDiffColor(node, root) : node.color!;
@@ -607,11 +689,23 @@ export const renderFlamegraph: RenderFlamegraphType = (
             return;
         }
         if (typeof i !== 'number') { return; }
-        setState({
-            frameDepth: h.toString(),
-            framePos: i.toString(),
-        });
-        fg.prerenderOffsets(canvasWidth!, [h, i]);
+
+        const omitted = parseStacks(getState('omittedIndexes', '') || '');
+        let initialCoord: Coordinate | undefined;
+        if (e.altKey && !fg.isBeforeCurrentNode(h)) {
+            if (!omitted.includes([h, i])) {
+                omitted.push([h, i]);
+            }
+            setState({ omittedIndexes: stringifyStacks(omitted) });
+            initialCoord = fg.currentNodeCoords;
+        } else {
+            setState({
+                frameDepth: h.toString(),
+                framePos: i.toString(),
+            });
+            initialCoord = [h, i];
+        }
+        fg.prerenderOffsets(canvasWidth!, initialCoord, omitted);
         render({ pattern: searchPattern });
         canvas?.onmousemove?.(e);
     };
@@ -631,7 +725,9 @@ export const renderFlamegraph: RenderFlamegraphType = (
         }
         return newColor;
     }
-    canvas.onmousemove = function(event) {
+    canvas.onclick = handleClick;
+
+    canvas.onmousemove = function (event) {
         const coords = fg.getCoordsByPosition(event.offsetX, event.offsetY);
 
         if (!coords) {
@@ -660,7 +756,6 @@ export const renderFlamegraph: RenderFlamegraphType = (
         const color = calcHighlightColor(node);
         renderHighlight(title, color, left, top, width, highlightTitle);
 
-        canvas.onclick = handleClick;
         status.textContent = 'Function: ' + (isMainRoot ? getStatusTitle(node, null, root) : getStatusTitle(node, currentNode!, root));
         return;
 
@@ -682,8 +777,9 @@ export const renderFlamegraph: RenderFlamegraphType = (
     // read query and display h and pos
     const h = Number(getState('frameDepth', '0'));
     const pos = Number(getState('framePos', '0'));
+    const omittedStacks = parseStacks(getState('omittedIndexes', '') || '');
 
-    fg.prerenderOffsets(canvasWidth!, [h, pos]);
+    fg.prerenderOffsets(canvasWidth!, [h, pos], omittedStacks);
     render({ pattern: searchPattern });
 
     const onResize = () => requestAnimationFrame(() => {
@@ -693,7 +789,7 @@ export const renderFlamegraph: RenderFlamegraphType = (
         //@ts-ignore
         canvas.style.width = null;
         initCanvas();
-        fg.prerenderOffsets(canvasWidth!, [initialH, initialI]);
+        fg.prerenderOffsets(canvasWidth!, [initialH, initialI], omittedStacks);
         render({ pattern: searchPattern });
     });
     window.addEventListener('resize', onResize);
@@ -714,3 +810,4 @@ export const renderFlamegraph: RenderFlamegraphType = (
         canvas.style.cursor = 'pointer';
     }
 };
+

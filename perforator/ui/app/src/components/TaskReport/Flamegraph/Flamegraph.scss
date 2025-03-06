@@ -21,11 +21,18 @@
     left: 0;
     background: var(--g-color-base-background);
     z-index: 1;
+    display: flex
+}
+
+.flamegraph__deletion {
+    display: inline;
 }
 
 .flamegraph__header {
     margin-bottom: var(--g-spacing-2);
     position: relative;
+    justify-content: center;
+    align-items: center;
 }
 
 .flamegraph__title {
@@ -93,7 +100,6 @@
 
 .flamegraph__match {
     display: none;
-    float: right;
     margin-left: var(--g-spacing-4);
     text-align: right;
 }
@@ -106,4 +112,5 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    margin-right: auto;
 }

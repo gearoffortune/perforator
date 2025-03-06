@@ -2,11 +2,16 @@ import React from 'react';
 
 import { Button, CopyToClipboard, Popup, type PopupProps } from '@gravity-ui/uikit';
 
+import { Hotkey } from 'src/components/Hotkey/Hotkey';
 import { uiFactory } from 'src/factory';
 import type { StringifiedNode } from 'src/models/Profile';
 
+import type { GetStateFromQuery, SetStateFromQuery } from './query-utils';
+import { parseStacks, stringifyStacks } from './query-utils';
+import type { QueryKeys } from './renderer';
 
-export type PopupData = { offset: [number, number]; node: StringifiedNode };
+
+export type PopupData = { offset: [number, number]; node: StringifiedNode; coords: [number, number] };
 
 function getHref(node: StringifiedNode) {
     return uiFactory().goToDefenitionHref(node);
@@ -16,8 +21,10 @@ type ContextMenuProps = {
     popupData: PopupData;
     anchorRef: PopupProps['anchorRef'];
     onClosePopup: () => void;
+    setQuery: SetStateFromQuery<QueryKeys>;
+    getQuery: GetStateFromQuery<QueryKeys>;
 };
-export const ContextMenu: React.FC<ContextMenuProps> = ({ popupData, anchorRef, onClosePopup }) => {
+export const ContextMenu: React.FC<ContextMenuProps> = ({ popupData, anchorRef, onClosePopup, setQuery, getQuery }) => {
     const href = getHref(popupData.node);
     const hasFile = Boolean(popupData.node.file);
     const shouldShowGoTo = (
@@ -47,7 +54,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ popupData, anchorRef, 
                 {...commonButtonProps}
             >
 
-            Copy name
+                Copy name
             </Button>}
         </CopyToClipboard>
         {/* eslint-disable-next-line no-nested-ternary */}
@@ -69,5 +76,17 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ popupData, anchorRef, 
                 </Button>}
             </CopyToClipboard>
         ) : null}
+        <Button
+            {...commonButtonProps}
+            onClick={() => {
+                const omitted = parseStacks(getQuery('omittedIndexes', '') || '');
+                omitted.push(popupData.coords);
+                setQuery({ omittedIndexes: stringifyStacks(omitted) });
+                onClosePopup();
+            }}
+        >
+            Omit stack
+            <Hotkey value="alt+click" />
+        </Button>
     </Popup>;
 };
