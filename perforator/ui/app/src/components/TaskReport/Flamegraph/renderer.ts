@@ -642,7 +642,7 @@ export const renderFlamegraph: RenderFlamegraphType = (
         const row = rows[h];
         const node = row[i];
         const currentNodeCoords = fg.currentNodeCoords;
-        const currentNode = row[currentNodeCoords[1]];
+        const currentNode = rows[currentNodeCoords[0]][currentNodeCoords[1]];
 
 
         if (!fg.visible(node.eventCount)) {
