@@ -15,5 +15,6 @@ You can start with [tutorial on local usage](./tutorials/native-profiling.md) or
 - [GitHub repository](https://github.com/yandex/perforator)
 - [Documentation](https://perforator.tech/docs)
 - [Post on Habr in Russian](https://habr.com/ru/companies/yandex/articles/875070/)
+- [Post on Medium](https://medium.com/yandex/yandexs-high-performance-profiler-is-now-open-source-95e291df9d18)
 - [Telegram Community chat (RU)](https://t.me/perforator_ru)
 - [Telegram Community chat (EN)](https://t.me/perforator_en)
