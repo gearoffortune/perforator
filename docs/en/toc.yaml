@@ -15,6 +15,10 @@ items:
       href: tutorials/helm-chart.md
     - name: Building your first profile with UI
       href: tutorials/ui.md
+    - name: Kubernetes
+      items:
+        - name: Installing NGINX Ingress Controller for Perforator
+          href: tutorials/kubernetes/ingress-nginx
   - name: Explanation
     labeled: true
     items:
