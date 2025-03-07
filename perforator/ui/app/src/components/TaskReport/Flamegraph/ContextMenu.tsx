@@ -14,7 +14,7 @@ import type { QueryKeys } from './renderer';
 export type PopupData = { offset: [number, number]; node: StringifiedNode; coords: [number, number] };
 
 function getHref(node: StringifiedNode) {
-    return uiFactory().goToDefenitionHref(node);
+    return uiFactory().goToDefinitionHref(node);
 }
 
 type ContextMenuProps = {
