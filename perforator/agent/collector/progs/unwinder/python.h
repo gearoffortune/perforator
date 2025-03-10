@@ -11,11 +11,11 @@
 #include <stddef.h>
 
 static ALWAYS_INLINE void* python_read_current_frame_from_thread_state(struct python_config* config, void* py_thread_state) {
-    if (py_thread_state == NULL) {
+    if (py_thread_state == NULL || config == NULL) {
         return NULL;
     }
 
-    void*  py_thread_state_or_cframe = py_thread_state;
+    void* py_thread_state_or_cframe = py_thread_state;
     u32 current_frame_offset = config->offsets.py_thread_state_offsets.current_frame_offset;
     if (config->offsets.py_thread_state_offsets.cframe_offset != PYTHON_UNSPECIFIED_OFFSET) {
         long err = bpf_probe_read_user(&py_thread_state_or_cframe, sizeof(void*), (void*) py_thread_state + config->offsets.py_thread_state_offsets.cframe_offset);
@@ -78,6 +78,13 @@ static ALWAYS_INLINE void* python_read_previous_frame(void* frame, struct python
 }
 
 static ALWAYS_INLINE bool python_read_frame_owner(enum python_frame_owner* owner, void* frame, struct python_config* config) {
+    if (config->offsets.py_interpreter_frame_offsets.owner_offset == PYTHON_UNSPECIFIED_OFFSET) {
+        // Before Python 3.11.4
+        *owner = FRAME_OWNED_BY_THREAD;
+        return true;
+    }
+
+    // For Python versions (3.11.4+) with owner field, read it
     long err = bpf_probe_read_user(owner, sizeof(u8), (void*) frame + config->offsets.py_interpreter_frame_offsets.owner_offset);
     if (err != 0) {
         metric_increment(METRIC_PYTHON_READ_FRAME_OWNER_ERROR_COUNT);
