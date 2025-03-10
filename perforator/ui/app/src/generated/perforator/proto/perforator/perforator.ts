@@ -125,13 +125,15 @@ export interface GetProfileResponse {
 
 export interface ProfileQuery {
   /** Service name. Optional. */
-  Service: string;
+  Service?:
+    | string
+    | undefined;
   /** Time interval. Optional. */
-  TimeInterval:
+  TimeInterval?:
     | TimeInterval
     | undefined;
   /**
-   * Selector string. Optional. Example: `{service=perforator.storage-production, build_id~=a}`
+   * Selector string.  Example: `{service=perforator.storage-production, build_id~=a}`
    * Time interval can be additionally specified in selector in format `{ts>"now - 1h", ts <= "now - 30m"}`
    * See perforator/pkg/humantime for timestamps formats
    */
@@ -172,6 +174,58 @@ export interface MergeProfilesResponse {
     | undefined;
   /** Info about profiles that participated in the merged profile. */
   ProfileMeta: ProfileMeta[];
+  /**
+   * Merged profile statistics.
+   * Can be used to estimate quality of the profile.
+   * See perforator/pkg/profile/quality.
+   */
+  Statistics: ProfileStatistics | undefined;
+}
+
+export interface ProfileStatistics {
+  /**
+   * Sum of the profile samples values. A profile sample can contain multiple
+   * values. For example, CPU profiles produced by Perforator often contain
+   * two sample types: "cpu.cycles" & "wall.seconds". For such profiles, the
+   * sample_value_sum will have two entries:
+   * {"cpu.cycles": sum_of_cpu_cycles, "wall.seconds": sum_of_walltime_seconds}.
+   */
+  sampleValueSum: { [key: string]: number };
+  /**
+   * Number of unique sample keys in the profile.
+   * Sample key is a unique combination of sample stack and labels.
+   * If this value is low, the profile is probably malformed.
+   */
+  uniqueSampleCount: string;
+  /**
+   * Number of stack frames in the profile. Average stack depth can be
+   * computed as total_frame_count / unique_sample_count.
+   */
+  totalFrameCount: string;
+  /**
+   * Number of unmapped frames (frames which were not attributed to a binary).
+   * If this value is high, then the profile is probably malformed.
+   */
+  unmappedFrameCount: string;
+  /**
+   * Number of unsymbolized frames (frames without source line info).
+   * If this value is high, then the profile is probably not readable.
+   */
+  unsymbolizedFrameCount: string;
+  /** Number of different executable binaries in the profile. */
+  totalBinaryCount: string;
+  /**
+   * Number of unavailable binaries in the profile. The binary is unavailable
+   * when the Perforator backend was not available to fetch it by build id,
+   * so frames from that binary are probably not symbolized.
+   * If this value is high, the profile is probably not readable.
+   */
+  unavailableBinaryCount: string;
+}
+
+export interface ProfileStatistics_SampleValueSumEntry {
+  key: string;
+  value: number;
 }
 
 export interface PGOMeta {
@@ -343,7 +397,35 @@ export interface FlamegraphOptions {
    * Show file names after function names.
    * Enabled by default.
    */
-  ShowFileNames?: boolean | undefined;
+  ShowFileNames?:
+    | boolean
+    | undefined;
+  /** How to display raw addresses in the flamegraph. */
+  RenderAddresses?: FlamegraphOptions_AddressRenderPolicy | undefined;
+}
+
+/**
+ * NB: This enum should match the same enumeration in the
+ * perforator/pkg/profile/flamegraph/render package.
+ */
+export enum FlamegraphOptions_AddressRenderPolicy {
+  /**
+   * RenderAddressesNever - Do not display raw addreses. Unsymolized functions will be rendered
+   * as something like <unsymbolized function>.
+   * This mode is recommended by default.
+   */
+  RenderAddressesNever = "RenderAddressesNever",
+  /**
+   * RenderAddressesUnsymbolized - Display raw addresses for unsymbolized functions only.
+   * This can be useful for debugging missing symbols.
+   */
+  RenderAddressesUnsymbolized = "RenderAddressesUnsymbolized",
+  /**
+   * RenderAddressesAlways - Always display raw addresses, even for properly symbolized code.
+   * This can be useful for debugging symbolization.
+   */
+  RenderAddressesAlways = "RenderAddressesAlways",
+  UNRECOGNIZED = "UNRECOGNIZED",
 }
 
 /** Empty */
