@@ -2,7 +2,7 @@ GO_LIBRARY()
 
 LICENSE(MIT)
 
-VERSION(v1.4.0)
+VERSION(v1.3.5)
 
 SRCS(
     reflect.go

@@ -2,7 +2,7 @@ GO_LIBRARY()
 
 LICENSE(MPL-2.0)
 
-VERSION(v1.8.1)
+VERSION(v1.7.1)
 
 GO_SKIP_TESTS(TestConnectorReturnsTimeout)
 
@@ -34,7 +34,6 @@ GO_TEST_SRCS(
     connection_test.go
     connector_test.go
     driver_test.go
-    dsn_fuzz_test.go
     dsn_test.go
     errors_test.go
     nulltime_test.go

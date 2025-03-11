@@ -35,7 +35,7 @@ func TestJSONText(t *testing.T) {
 	}
 
 	j = JSONText(`{"foo": 1, invalid, false}`)
-	_, err = j.Value()
+	v, err = j.Value()
 	if err == nil {
 		t.Errorf("Was expecting invalid json to fail!")
 	}

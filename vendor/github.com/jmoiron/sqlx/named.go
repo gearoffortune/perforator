@@ -174,7 +174,7 @@ func bindArgs(names []string, arg interface{}, m *reflectx.Mapper) ([]interface{
 	arglist := make([]interface{}, 0, len(names))
 
 	// grab the indirected value of arg
-	var v reflect.Value
+	v := reflect.ValueOf(arg)
 	for v = reflect.ValueOf(arg); v.Kind() == reflect.Ptr; {
 		v = v.Elem()
 	}
