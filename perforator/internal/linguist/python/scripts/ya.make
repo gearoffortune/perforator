@@ -1,1 +1,4 @@
-RECURSE(extract_offsets)
+RECURSE(
+    extract_offsets
+    load_offsets
+)
