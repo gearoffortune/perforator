@@ -17,8 +17,8 @@ SET(BPF_FLAGS
     -Werror
 )
 
-BPF(unwinder/unwinder.c unwinder.release.elf $BPF_FLAGS)
-BPF(unwinder/unwinder.c unwinder.debug.elf $BPF_FLAGS -DBPF_DEBUG)
+BPF(unwinder/unwinder.bpf.c unwinder.release.elf $BPF_FLAGS)
+BPF(unwinder/unwinder.bpf.c unwinder.debug.elf $BPF_FLAGS -DBPF_DEBUG)
 
 ADDINCL(
     contrib/libs/libbpf/include
