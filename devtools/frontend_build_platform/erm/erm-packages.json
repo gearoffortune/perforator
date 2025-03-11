@@ -1157,7 +1157,7 @@
     "title": "ESLint",
     "description": "Статический анализатор кода (линтер).\n\nОсуществляет поиск, а иногда и исправление частых ошибок.\nМожет следить за стилем кода, форматированием.\n\nРасширяем плагинами (Typescript, Prettier, Stylelint).\n\n[Подробнее про линтинг в tier-0](https://docs.yandex-team.ru/frontend-in-arcadia/index/quick-start#lint)",
     "type": "NPM_PACKAGE",
-    "default": "9.20.1",
+    "default": "9.21.0",
     "links": {
       "Home": "https://eslint.org",
       "Sources": "https://github.com/eslint/eslint",
@@ -1166,6 +1166,10 @@
     },
     "useDirectly": true,
     "versions": {
+      "9.21.0": {
+        "add_date": "2025-03-11T05:30:46",
+        "resources": []
+      },
       "9.20.1": {
         "add_date": "2025-03-04T05:30:50",
         "resources": []
@@ -4504,7 +4508,7 @@
     "title": "Vite",
     "description": "Современный сборщик frontend проектов\n\nПод капотом используется более низкоуровневый сборщик [rollup](https://rollupjs.org/).\n\nДля транспиляции TypeScript может использовать нативные способы: [esbuild](https://esbuild.github.io/), [SWC](https://swc.rs/)\n\nПоэтому, если требуется использовать `rollup` или `esbuild`/`SWC` на проекте - то `vite` - ваш выбор.\n\nВ tier-0 используется в модуле/макросе [`TS_VITE()`](https://docs.yandex-team.ru/frontend-in-arcadia/references/TS_VITE).",
     "type": "NPM_PACKAGE",
-    "default": "6.1.0",
+    "default": "6.1.1",
     "links": {
       "Home": "https://vitejs.dev/",
       "Sources": "https://github.com/vitejs/vite/tree/main",
@@ -4514,6 +4518,10 @@
     },
     "useDirectly": true,
     "versions": {
+      "6.1.1": {
+        "add_date": "2025-03-11T05:34:26",
+        "resources": []
+      },
       "6.1.0": {
         "add_date": "2025-02-25T05:39:38",
         "resources": []
