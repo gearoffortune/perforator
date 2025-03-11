@@ -3225,6 +3225,31 @@
           }
         ]
       },
+      "18.20.7": {
+        "add_date": "2025-03-11T05:31:28",
+        "resources": [
+          {
+            "id": 8230808213,
+            "platform": "linux",
+            "arch": "x64"
+          },
+          {
+            "id": 8230810504,
+            "platform": "linux",
+            "arch": "arm64"
+          },
+          {
+            "id": 8230811692,
+            "platform": "darwin",
+            "arch": "x64"
+          },
+          {
+            "id": 8230812730,
+            "platform": "darwin",
+            "arch": "arm64"
+          }
+        ]
+      },
       "18.20.6": {
         "add_date": "2025-02-04T05:31:26",
         "resources": [
