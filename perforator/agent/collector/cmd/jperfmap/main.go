@@ -61,7 +61,7 @@ func mainImpl(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to dump perfmap: %w", err)
 	}
-	fmt.Println(resp)
+	fmt.Println("Command succeeded", resp)
 
 	return nil
 }

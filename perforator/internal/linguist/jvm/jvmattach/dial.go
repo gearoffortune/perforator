@@ -67,12 +67,11 @@ func (d *Dialer) dialImpl(ctx context.Context, target Target) (*VirtualMachineCo
 		d.Logger.Debug(ctx, "Socket already exists")
 		return conn, nil
 	}
-	var needsCleanup bool
-	needsCleanup, err = d.sendAttachRequest(ctx, target)
+	var attachFilePath string
+	attachFilePath, err = d.sendAttachRequest(ctx, target)
 	// we need to register cleanup before checking for error
-	if needsCleanup {
+	if attachFilePath != "" {
 		defer func() {
-			attachFilePath := getAttachFilePath(target)
 			d.Logger.Debug(ctx, "Cleaning up attach file", log.String("path", attachFilePath))
 			err := os.Remove(attachFilePath)
 			if err != nil {
@@ -104,26 +103,46 @@ func (d *Dialer) dialImpl(ctx context.Context, target Target) (*VirtualMachineCo
 	}
 }
 
-func getAttachFilePath(target Target) string {
-	return path.Join(target.CWD, fmt.Sprintf(".attach_pid%d", target.NamespacedPID))
+func getAttachFilePaths(target Target) []string {
+	return []string{
+		// https://github.com/openjdk/jdk/blob/cd9f1d3d921531511a7552807d099d5d3cce01a6/src/hotspot/os/posix/attachListener_posix.cpp#L418
+		path.Join(target.CWD, fmt.Sprintf(".attach_pid%d", target.NamespacedPID)),
+		// https://github.com/openjdk/jdk/blob/cd9f1d3d921531511a7552807d099d5d3cce01a6/src/hotspot/os/linux/os_linux.cpp#L1530
+		// we use this alternate location as well in case process CWD is located within a read-only filesystem
+		path.Join(target.Chroot, fmt.Sprintf("tmp/.attach_pid%d", target.NamespacedPID)),
+	}
 }
 
-func (d *Dialer) sendAttachRequest(ctx context.Context, target Target) (bool, error) {
-	attachFilePath := getAttachFilePath(target)
-	d.Logger.Debug(ctx, "Creating attach file", log.String("path", attachFilePath))
-	err := os.WriteFile(attachFilePath, []byte{}, 0644)
-	if errors.Is(err, os.ErrExist) {
-		d.Logger.Debug(ctx, "Attach file already exists, skipping")
-	} else if err != nil {
-		return false, fmt.Errorf("failed to create attach file %w", err)
+func (d *Dialer) sendAttachRequest(ctx context.Context, target Target) (string, error) {
+	var errs []error
+	var ok bool
+	var cleanupPath string
+	for _, attachFilePath := range getAttachFilePaths(target) {
+		d.Logger.Debug(ctx, "Creating attach file", log.String("path", attachFilePath))
+		err := os.WriteFile(attachFilePath, []byte{}, 0644)
+		if errors.Is(err, os.ErrExist) {
+			d.Logger.Debug(ctx, "Attach file already exists, skipping", log.String("path", attachFilePath))
+			err = nil
+		}
+		if err == nil {
+			d.Logger.Debug(ctx, "Attach file created", log.String("path", attachFilePath))
+			cleanupPath = attachFilePath
+			ok = true
+			break
+		}
+		d.Logger.Debug(ctx, "Failed to create attach file", log.String("path", attachFilePath), log.Error(err))
+		errs = append(errs, fmt.Errorf("failed to create attach file at %q: %w", attachFilePath, err))
+	}
+	if !ok {
+		return "", fmt.Errorf("all attempts to create attach file failed: %w", errors.Join(errs...))
 	}
 
 	d.Logger.Info(ctx, "Sending SIGQUIT signal to JVM")
-	err = target.ProcessFD.SendSignal(syscall.SIGQUIT)
+	err := target.ProcessFD.SendSignal(syscall.SIGQUIT)
 	if err != nil {
-		return true, fmt.Errorf("failed to send SIGQUIT: %w", err)
+		return cleanupPath, fmt.Errorf("failed to send SIGQUIT: %w", err)
 	}
-	return true, nil
+	return cleanupPath, nil
 }
 
 func (d *Dialer) tryConnect(ctx context.Context, chroot string, nspid linux.ProcessID) (*VirtualMachineConn, error) {
