@@ -33,8 +33,8 @@ func makeSelectorForNewMicroscope(
 	startTime time.Time,
 	duration time.Duration,
 ) (string, error) {
-	if duration > time.Hour {
-		return "", fmt.Errorf("duration %s is more than 1 hour", duration.String())
+	if duration > 2*24*time.Hour {
+		return "", fmt.Errorf("duration %s is more than 2 days", duration.String())
 	}
 	builder := profilequerylang.NewBuilder().From(startTime).To(startTime.Add(duration))
 	if podID != "" {
