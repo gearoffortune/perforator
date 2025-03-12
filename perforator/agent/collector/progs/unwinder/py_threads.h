@@ -62,12 +62,12 @@ static ALWAYS_INLINE u32 python_read_native_thread_id(void* py_thread_state, str
     }
 
     u32 native_thread_id = 0;
-    long err = bpf_probe_read_user(&native_thread_id, sizeof(u32), (void*)py_thread_state + thread_state_offsets->native_thread_id_offset);
+    long err = bpf_probe_read_user(&native_thread_id, sizeof(u32), (void*)py_thread_state + thread_state_offsets->native_thread_id);
     if (err != 0) {
         metric_increment(METRIC_PYTHON_READ_NATIVE_THREAD_ID_ERROR_COUNT);
         BPF_TRACE(
             "python: failed to read native thread ID at offset %d: %d",
-            thread_state_offsets->native_thread_id_offset,
+            thread_state_offsets->native_thread_id,
             err
         );
         return 0;
@@ -111,7 +111,7 @@ static ALWAYS_INLINE void* python_retrieve_main_interpreterstate(void* py_runtim
     long err = bpf_probe_read_user(
         &main_interpreter_state,
         sizeof(void*),
-        py_runtime_ptr + runtime_state_offsets->py_interpreters_main_offset
+        py_runtime_ptr + runtime_state_offsets->py_interpreters_main
     );
     if (err != 0) {
         BPF_TRACE("python: failed to read main PyInterpreterState: %d", err);
@@ -136,7 +136,7 @@ static ALWAYS_INLINE void* python_retrieve_thread_state_from_interpreterstate(vo
     long err = bpf_probe_read_user(
         &head_thread_state,
         sizeof(void*),
-        py_interpreter_state + interpreter_state_offsets->threads_head_offset
+        py_interpreter_state + interpreter_state_offsets->threads_head
     );
     if (err != 0) {
         BPF_TRACE("python: failed to read head *PyThreadState from *PyInterpreterState: %d", err);
@@ -172,7 +172,7 @@ static NOINLINE void* python_read_next_thread_state(void* py_thread_state, struc
     }
 
     void* next_thread_state = NULL;
-    long err = bpf_probe_read_user(&next_thread_state, sizeof(void*), (void*)py_thread_state + thread_state_offsets->next_thread_offset);
+    long err = bpf_probe_read_user(&next_thread_state, sizeof(void*), (void*)py_thread_state + thread_state_offsets->next_thread);
     if (err != 0) {
         BPF_TRACE("python: failed to read next *PyThreadState: %d", err);
         return NULL;
@@ -187,7 +187,7 @@ static NOINLINE void* python_read_prev_thread_state(void* py_thread_state, struc
     }
 
     void* prev_thread_state = NULL;
-    long err = bpf_probe_read_user(&prev_thread_state, sizeof(void*), (void*)py_thread_state + thread_state_offsets->prev_thread_offset);
+    long err = bpf_probe_read_user(&prev_thread_state, sizeof(void*), (void*)py_thread_state + thread_state_offsets->prev_thread);
     if (err != 0) {
         BPF_TRACE("python: failed to read prev *PyThreadState: %d", err);
         return NULL;

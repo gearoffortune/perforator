@@ -3,20 +3,20 @@
 #include "binary.h"
 
 struct python_interpreter_state_offsets {
-    u32 next_offset;
-    u32 threads_head_offset;
+    u32 next;
+    u32 threads_head;
 };
 
 struct python_runtime_state_offsets {
-    u32 py_interpreters_main_offset;
+    u32 py_interpreters_main;
 };
 
 struct python_thread_state_offsets {
-    u32 cframe_offset;
-    u32 current_frame_offset;
-    u32 native_thread_id_offset;
-    u32 prev_thread_offset;
-    u32 next_thread_offset;
+    u32 cframe;
+    u32 current_frame;
+    u32 native_thread_id;
+    u32 prev_thread;
+    u32 next_thread;
 };
 
 // Python threads share the same thread group in current pid namespace.
@@ -49,28 +49,28 @@ enum python_frame_owner : u8 {
 };
 
 struct python_ascii_object_offsets {
-    u32 length_offset;
-    u32 data_offset;
-    u32 state_offset;
+    u32 length;
+    u32 data;
+    u32 state;
     u8 ascii_bit;
     u8 compact_bit;
     u8 statically_allocated_bit;
 };
 
 struct python_code_object_offsets {
-    u32 co_firstlineno_offset;
-    u32 filename_offset;
-    u32 qualname_offset;
+    u32 co_firstlineno;
+    u32 filename;
+    u32 qualname;
 };
 
 struct python_interpreter_frame_offsets {
-    u32 f_code_offset;
-    u32 previous_offset;
-    u32 owner_offset;
+    u32 f_code;
+    u32 previous;
+    u32 owner;
 };
 
 struct python_cframe_offsets {
-    u32 current_frame_offset;
+    u32 current_frame;
 };
 
 struct python_internals_offsets {

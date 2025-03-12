@@ -1,7 +1,13 @@
 package agent
 
 import (
-	"errors"
+	"embed"
+	"encoding/json"
+	"fmt"
+	"path"
+	"regexp"
+	"strconv"
+	"strings"
 
 	"github.com/yandex/perforator/perforator/agent/preprocessing/proto/python"
 	"github.com/yandex/perforator/perforator/internal/unwinder"
@@ -11,119 +17,320 @@ const (
 	UnspecifiedOffset = uint32((1 << 32) - 1)
 )
 
-// Offsets from https://github.com/python/cpython/blob/main/Include/cpython/pystate.h#L59
-func PyThreadStateOffsetsByVersion(version *python.PythonVersion) (*unwinder.PythonThreadStateOffsets, error) {
-	switch {
-	case version.Major == 3 && version.Minor == 13:
-		return &unwinder.PythonThreadStateOffsets{
-			CframeOffset:         UnspecifiedOffset,
-			CurrentFrameOffset:   72,
-			NativeThreadIdOffset: 160,
-			PrevThreadOffset:     0,
-			NextThreadOffset:     8,
-		}, nil
-	case version.Major == 3 && version.Minor == 12:
-		return &unwinder.PythonThreadStateOffsets{
-			CframeOffset:         56,
-			CurrentFrameOffset:   UnspecifiedOffset,
-			NativeThreadIdOffset: 144,
-			PrevThreadOffset:     0,
-			NextThreadOffset:     8,
-		}, nil
-	default:
-		return nil, errors.New("no pythreadstate offsets for this version")
+//go:embed offsets/*.json
+var offsetsFS embed.FS
+
+// Map from Python version (encoded as uint32) to offsets
+var pythonVersionOffsets map[uint32]*unwinder.PythonInternalsOffsets
+
+// Structure to match the JSON format from extract_offsets.py
+type jsonOffsets struct {
+	PyThreadState      map[string]int `json:"PyThreadState"`
+	PyInterpreterState map[string]int `json:"PyInterpreterState"`
+	PyCodeObject       map[string]int `json:"PyCodeObject"`
+	PyFrameObject      map[string]int `json:"PyFrameObject,omitempty"`
+	PyRuntimeState     map[string]int `json:"_PyRuntimeState"`
+	PyCFrame           map[string]int `json:"_PyCFrame,omitempty"`
+	PyInterpreterFrame map[string]int `json:"_PyInterpreterFrame,omitempty"`
+	PyASCIIObject      map[string]int `json:"PyASCIIObject"`
+}
+
+// Convert a version string (major.minor.micro) to an encoded uint32
+func encodeVersionFromString(version string) uint32 {
+	parts := strings.Split(version, ".")
+	if len(parts) < 3 {
+		return 0
+	}
+
+	major, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return 0
+	}
+
+	minor, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return 0
+	}
+
+	micro, err := strconv.Atoi(parts[2])
+	if err != nil {
+		return 0
+	}
+
+	// Create a PythonVersion struct and use encodeVersion
+	pythonVersion := &python.PythonVersion{
+		Major: uint32(major),
+		Minor: uint32(minor),
+		Micro: uint32(micro),
+	}
+
+	return encodeVersion(pythonVersion)
+}
+
+// Init function to load all JSON files and build the offsets map
+func init() {
+	pythonVersionOffsets = make(map[uint32]*unwinder.PythonInternalsOffsets)
+
+	// Read all files from the embedded filesystem
+	entries, err := offsetsFS.ReadDir("offsets")
+	if err != nil {
+		panic(fmt.Sprintf("Failed to read offsets directory: %v", err))
+	}
+
+	// Compile the regex pattern once
+	versionPattern := regexp.MustCompile(`cpython-(\d+\.\d+\.\d+)-offsets\.json`)
+
+	// Parse each file
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".json") {
+			// Parse the version from the filename
+			matches := versionPattern.FindStringSubmatch(entry.Name())
+			if len(matches) < 2 {
+				continue // Skip files that don't match the pattern
+			}
+
+			versionStr := matches[1]
+			versionParts := strings.Split(versionStr, ".")
+			if len(versionParts) < 3 {
+				continue // Skip invalid versions
+			}
+
+			// Read the file content
+			jsonData, err := offsetsFS.ReadFile(path.Join("offsets", entry.Name()))
+			if err != nil {
+				panic(fmt.Sprintf("Failed to read offset file %s: %v", entry.Name(), err))
+			}
+
+			// Parse the JSON into offsets
+			var data jsonOffsets
+			if err := json.Unmarshal(jsonData, &data); err != nil {
+				panic(fmt.Sprintf("Failed to parse JSON from %s: %v", entry.Name(), err))
+			}
+
+			// Convert to PythonInternalsOffsets
+			offsets := convertToPythonInternalsOffsets(data)
+
+			// Store by encoded version
+			versionKey := encodeVersionFromString(versionStr)
+			pythonVersionOffsets[versionKey] = offsets
+		}
 	}
 }
 
-// Offsets from https://github.com/python/cpython/blob/a4562fedadb73fe1e978dece65c3bcefb4606678/Include/internal/pycore_frame.h#L62
-func PyInterpreterFrameOffsetsByVersion(version *python.PythonVersion) (*unwinder.PythonInterpreterFrameOffsets, error) {
-	switch {
-	case version.Major == 3 && version.Minor >= 12 && version.Minor <= 13:
-		return &unwinder.PythonInterpreterFrameOffsets{
-			FCodeOffset:    0,
-			PreviousOffset: 8,
-			OwnerOffset:    70,
-		}, nil
-	default:
-		return nil, errors.New("no py interpreter frame offsets for this version")
+// Extract PyThreadState offsets from JSON data
+func extractPyThreadStateOffsets(data map[string]int) unwinder.PythonThreadStateOffsets {
+	var offsets unwinder.PythonThreadStateOffsets
+
+	if val, ok := data["next"]; ok {
+		offsets.NextThread = uint32(val)
+	} else {
+		offsets.NextThread = UnspecifiedOffset
 	}
+
+	if val, ok := data["prev"]; ok {
+		offsets.PrevThread = uint32(val)
+	} else {
+		offsets.PrevThread = UnspecifiedOffset
+	}
+
+	if val, ok := data["native_thread_id"]; ok {
+		offsets.NativeThreadId = uint32(val)
+	} else {
+		offsets.NativeThreadId = UnspecifiedOffset
+	}
+
+	if val, ok := data["cframe"]; ok {
+		offsets.Cframe = uint32(val)
+	} else {
+		offsets.Cframe = UnspecifiedOffset
+	}
+
+	if val, ok := data["current_frame"]; ok {
+		offsets.CurrentFrame = uint32(val)
+	} else if val, ok := data["frame"]; ok {
+		// For Python 3.10
+		offsets.CurrentFrame = uint32(val)
+	} else {
+		offsets.CurrentFrame = UnspecifiedOffset
+	}
+
+	return offsets
 }
 
-// Offsets from https://github.com/python/cpython/blob/3.13/Include/internal/pycore_interp.h#L94C1-L146C36
-func PyInterpreterStateOffsetsByVersion(version *python.PythonVersion) (*unwinder.PythonInterpreterStateOffsets, error) {
-	switch {
-	case version.Major == 3 && version.Minor == 12:
-		return &unwinder.PythonInterpreterStateOffsets{
-			NextOffset:        0,
-			ThreadsHeadOffset: 72,
-		}, nil
-	case version.Major == 3 && version.Minor == 13:
-		return &unwinder.PythonInterpreterStateOffsets{
-			NextOffset:        7264,
-			ThreadsHeadOffset: 7344,
-		}, nil
-	default:
-		return nil, errors.New("no py interpreter state offsets for this version")
+// Extract PyInterpreterState offsets from JSON data
+func extractPyInterpreterStateOffsets(data map[string]int) unwinder.PythonInterpreterStateOffsets {
+	var offsets unwinder.PythonInterpreterStateOffsets
+
+	if val, ok := data["next"]; ok {
+		offsets.Next = uint32(val)
+	} else {
+		offsets.Next = UnspecifiedOffset
 	}
+
+	if val, ok := data["threads.head"]; ok {
+		offsets.ThreadsHead = uint32(val)
+	} else {
+		offsets.ThreadsHead = UnspecifiedOffset
+	}
+
+	return offsets
 }
 
-// Offsets from https://github.com/python/cpython/blob/a4562fedadb73fe1e978dece65c3bcefb4606678/Include/cpython/code.h#L73
-func PyCodeObjectOffsetsByVersion(version *python.PythonVersion) (*unwinder.PythonCodeObjectOffsets, error) {
-	if version.Major == 3 && version.Minor >= 12 && version.Minor <= 13 {
-		return &unwinder.PythonCodeObjectOffsets{
-			CoFirstlinenoOffset: 68,
-			FilenameOffset:      112,
-			QualnameOffset:      128,
-		}, nil
+// Extract PyCodeObject offsets from JSON data
+func extractPyCodeObjectOffsets(data map[string]int) unwinder.PythonCodeObjectOffsets {
+	var offsets unwinder.PythonCodeObjectOffsets
+
+	if val, ok := data["co_firstlineno"]; ok {
+		offsets.CoFirstlineno = uint32(val)
+	} else {
+		offsets.CoFirstlineno = UnspecifiedOffset
 	}
 
-	return nil, errors.New("no py code object offsets for this version")
+	if val, ok := data["co_filename"]; ok {
+		offsets.Filename = uint32(val)
+	} else {
+		offsets.Filename = UnspecifiedOffset
+	}
+
+	if val, ok := data["co_qualname"]; ok {
+		offsets.Qualname = uint32(val)
+	} else {
+		offsets.Qualname = UnspecifiedOffset
+	}
+
+	return offsets
 }
 
-// Offsets from https://github.com/python/cpython/blob/a4562fedadb73fe1e978dece65c3bcefb4606678/Include/cpython/unicodeobject.h#L54
-func PyASCIIObjectOffsetsByVersion(version *python.PythonVersion) (*unwinder.PythonAsciiObjectOffsets, error) {
-	if version.Major == 3 && version.Minor >= 12 && version.Minor <= 13 {
-		return &unwinder.PythonAsciiObjectOffsets{
-			LengthOffset:           16,
-			DataOffset:             40,
-			StateOffset:            32,
-			AsciiBit:               6,
-			CompactBit:             5,
-			StaticallyAllocatedBit: 7,
-		}, nil
+// Extract PyInterpreterFrame offsets from JSON data
+func extractPyInterpreterFrameOffsets(data map[string]int) unwinder.PythonInterpreterFrameOffsets {
+	var offsets unwinder.PythonInterpreterFrameOffsets
+
+	if val, ok := data["f_code"]; ok {
+		offsets.FCode = uint32(val)
+	} else if val, ok := data["f_executable"]; ok {
+		// Python 3.13+ uses f_executable instead of f_code
+		offsets.FCode = uint32(val)
+	} else {
+		offsets.FCode = UnspecifiedOffset
 	}
 
-	return nil, errors.New("no py ascii object offsets for this version")
+	if val, ok := data["previous"]; ok {
+		offsets.Previous = uint32(val)
+	} else {
+		offsets.Previous = UnspecifiedOffset
+	}
+
+	if val, ok := data["owner"]; ok {
+		offsets.Owner = uint32(val)
+	} else {
+		offsets.Owner = UnspecifiedOffset
+	}
+
+	return offsets
 }
 
-// Offsets from https://github.com/python/cpython/blob/3.12/Include/cpython/pystate.h#L67
-func PyCframeOffsetsByVersion(version *python.PythonVersion) (*unwinder.PythonCframeOffsets, error) {
-	if version.Major == 3 && version.Minor == 12 {
-		return &unwinder.PythonCframeOffsets{
-			CurrentFrameOffset: 0,
-		}, nil
+// Extract PyCFrame offsets from JSON data
+func extractPyCFrameOffsets(data map[string]int) unwinder.PythonCframeOffsets {
+	var offsets unwinder.PythonCframeOffsets
+
+	if val, ok := data["current_frame"]; ok {
+		offsets.CurrentFrame = uint32(val)
+	} else {
+		offsets.CurrentFrame = UnspecifiedOffset
 	}
 
-	if version.Major == 3 && version.Minor == 13 {
-		return &unwinder.PythonCframeOffsets{
-			CurrentFrameOffset: UnspecifiedOffset,
-		}, nil
-	}
-
-	return nil, errors.New("no py cframe offsets for this version")
+	return offsets
 }
 
-// Offsets from https://github.com/python/cpython/blob/3.13/Include/internal/pycore_runtime.h#L208
-func PyRuntimeOffsetsByVersion(version *python.PythonVersion) (*unwinder.PythonRuntimeStateOffsets, error) {
-	if version.Major == 3 && version.Minor == 12 {
-		return &unwinder.PythonRuntimeStateOffsets{
-			PyInterpretersMainOffset: 48,
-		}, nil
-	} else if version.Major == 3 && version.Minor == 13 {
-		return &unwinder.PythonRuntimeStateOffsets{
-			PyInterpretersMainOffset: 640,
-		}, nil
+// Extract PyRuntimeState offsets from JSON data
+func extractPyRuntimeStateOffsets(data map[string]int) unwinder.PythonRuntimeStateOffsets {
+	var offsets unwinder.PythonRuntimeStateOffsets
+
+	if val, ok := data["interpreters.main"]; ok {
+		offsets.PyInterpretersMain = uint32(val)
+	} else {
+		offsets.PyInterpretersMain = UnspecifiedOffset
 	}
 
-	return nil, errors.New("no py runtime offsets for this version")
+	return offsets
+}
+
+// Extract PyASCIIObject offsets from JSON data
+func extractPyASCIIObjectOffsets(data map[string]int) unwinder.PythonAsciiObjectOffsets {
+	var offsets unwinder.PythonAsciiObjectOffsets
+
+	if val, ok := data["length"]; ok {
+		offsets.Length = uint32(val)
+	} else {
+		offsets.Length = UnspecifiedOffset
+	}
+
+	if val, ok := data["state"]; ok {
+		offsets.State = uint32(val)
+	} else {
+		offsets.State = UnspecifiedOffset
+	}
+
+	if val, ok := data["data"]; ok {
+		offsets.Data = uint32(val)
+	} else {
+		offsets.Data = UnspecifiedOffset
+	}
+
+	// Use the bit flags from the JSON if available, otherwise use defaults
+	if val, ok := data["ascii_bit"]; ok {
+		offsets.AsciiBit = uint8(val)
+	} else {
+		offsets.AsciiBit = 6 // Default
+	}
+
+	if val, ok := data["compact_bit"]; ok {
+		offsets.CompactBit = uint8(val)
+	} else {
+		offsets.CompactBit = 5 // Default
+	}
+
+	if val, ok := data["static_bit"]; ok {
+		offsets.StaticallyAllocatedBit = uint8(val)
+	} else {
+		offsets.StaticallyAllocatedBit = 7 // Default
+	}
+
+	return offsets
+}
+
+// Convert JSON offsets to PythonInternalsOffsets
+func convertToPythonInternalsOffsets(data jsonOffsets) *unwinder.PythonInternalsOffsets {
+	offsets := &unwinder.PythonInternalsOffsets{}
+
+	// Extract offsets for each Python structure
+	if data.PyThreadState != nil {
+		offsets.PyThreadStateOffsets = extractPyThreadStateOffsets(data.PyThreadState)
+	}
+
+	if data.PyInterpreterState != nil {
+		offsets.PyInterpreterStateOffsets = extractPyInterpreterStateOffsets(data.PyInterpreterState)
+	}
+
+	if data.PyCodeObject != nil {
+		offsets.PyCodeObjectOffsets = extractPyCodeObjectOffsets(data.PyCodeObject)
+	}
+
+	if data.PyInterpreterFrame != nil {
+		offsets.PyInterpreterFrameOffsets = extractPyInterpreterFrameOffsets(data.PyInterpreterFrame)
+	}
+
+	if data.PyCFrame != nil {
+		offsets.PyCframeOffsets = extractPyCFrameOffsets(data.PyCFrame)
+	}
+
+	if data.PyRuntimeState != nil {
+		offsets.PyRuntimeStateOffsets = extractPyRuntimeStateOffsets(data.PyRuntimeState)
+	}
+
+	if data.PyASCIIObject != nil {
+		offsets.PyAsciiObjectOffsets = extractPyASCIIObjectOffsets(data.PyASCIIObject)
+	}
+
+	return offsets
 }

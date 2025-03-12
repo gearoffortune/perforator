@@ -16,19 +16,19 @@ static ALWAYS_INLINE void* python_read_current_frame_from_thread_state(struct py
     }
 
     void* py_thread_state_or_cframe = py_thread_state;
-    u32 current_frame_offset = config->offsets.py_thread_state_offsets.current_frame_offset;
-    if (config->offsets.py_thread_state_offsets.cframe_offset != PYTHON_UNSPECIFIED_OFFSET) {
-        long err = bpf_probe_read_user(&py_thread_state_or_cframe, sizeof(void*), (void*) py_thread_state + config->offsets.py_thread_state_offsets.cframe_offset);
+    u32 current_frame_offset = config->offsets.py_thread_state_offsets.current_frame;
+    if (config->offsets.py_thread_state_offsets.cframe != PYTHON_UNSPECIFIED_OFFSET) {
+        long err = bpf_probe_read_user(&py_thread_state_or_cframe, sizeof(void*), (void*) py_thread_state + config->offsets.py_thread_state_offsets.cframe);
         if (err != 0) {
             metric_increment(METRIC_PYTHON_READ_PYCFRAME_ERROR_COUNT);
             BPF_TRACE(
                 "python: failed to read cframe from *Pythread_state by offset %d: %d",
-                config->offsets.py_thread_state_offsets.cframe_offset,
+                config->offsets.py_thread_state_offsets.cframe,
                 err
             );
             return NULL;
         }
-        current_frame_offset = config->offsets.py_cframe_offsets.current_frame_offset;
+        current_frame_offset = config->offsets.py_cframe_offsets.current_frame;
 
         BPF_TRACE("python: Successfully read *_PyCFrame addr %p", py_thread_state_or_cframe);
     }
@@ -62,13 +62,13 @@ static ALWAYS_INLINE void* python_read_previous_frame(void* frame, struct python
     long err = bpf_probe_read_user(
         &frame,
         sizeof(void*),
-        (void*) frame + config->offsets.py_interpreter_frame_offsets.previous_offset
+        (void*) frame + config->offsets.py_interpreter_frame_offsets.previous
     );
     if (err != 0) {
         metric_increment(METRIC_PYTHON_READ_PREVIOUS_FRAME_ERROR);
         BPF_TRACE(
             "python: failed to read previous frame by offset %d: %d",
-            config->offsets.py_interpreter_frame_offsets.previous_offset,
+            config->offsets.py_interpreter_frame_offsets.previous,
             err
         );
         return NULL;
@@ -78,19 +78,19 @@ static ALWAYS_INLINE void* python_read_previous_frame(void* frame, struct python
 }
 
 static ALWAYS_INLINE bool python_read_frame_owner(enum python_frame_owner* owner, void* frame, struct python_config* config) {
-    if (config->offsets.py_interpreter_frame_offsets.owner_offset == PYTHON_UNSPECIFIED_OFFSET) {
+    if (config->offsets.py_interpreter_frame_offsets.owner == PYTHON_UNSPECIFIED_OFFSET) {
         // Before Python 3.11.4
         *owner = FRAME_OWNED_BY_THREAD;
         return true;
     }
 
     // For Python versions (3.11.4+) with owner field, read it
-    long err = bpf_probe_read_user(owner, sizeof(u8), (void*) frame + config->offsets.py_interpreter_frame_offsets.owner_offset);
+    long err = bpf_probe_read_user(owner, sizeof(u8), (void*) frame + config->offsets.py_interpreter_frame_offsets.owner);
     if (err != 0) {
         metric_increment(METRIC_PYTHON_READ_FRAME_OWNER_ERROR_COUNT);
         BPF_TRACE(
             "python: failed to read frame owner at offset %d: %d",
-            config->offsets.py_interpreter_frame_offsets.owner_offset,
+            config->offsets.py_interpreter_frame_offsets.owner,
             err
         );
         return false;
@@ -116,21 +116,21 @@ static ALWAYS_INLINE bool python_read_code_object(struct python_code_object* res
     result_object->filename = 0;
     result_object->qualname = 0;
 
-    long err = bpf_probe_read_user(&result_object->qualname, sizeof(void*), code + config->offsets.py_code_object_offsets.qualname_offset);
+    long err = bpf_probe_read_user(&result_object->qualname, sizeof(void*), code + config->offsets.py_code_object_offsets.qualname);
     if (err != 0) {
         BPF_TRACE(
             "python: failed to read qualname at offset %d: %d",
-            config->offsets.py_code_object_offsets.qualname_offset,
+            config->offsets.py_code_object_offsets.qualname,
             err
         );
         return false;
     }
 
-    err = bpf_probe_read_user(&result_object->filename, sizeof(void*), code + config->offsets.py_code_object_offsets.filename_offset);
+    err = bpf_probe_read_user(&result_object->filename, sizeof(void*), code + config->offsets.py_code_object_offsets.filename);
     if (err != 0) {
         BPF_TRACE(
             "python: failed to read filename at offset %d: %d",
-            config->offsets.py_code_object_offsets.filename_offset,
+            config->offsets.py_code_object_offsets.filename,
             err
         );
         return false;
@@ -148,7 +148,7 @@ static ALWAYS_INLINE bool python_read_python_ascii_string(char* buffer, size_t b
     buffer[0] = '\0';
 
     size_t length = 0;
-    long err = bpf_probe_read_user(&length, sizeof(length), (void*) py_object + config->offsets.py_ascii_object_offsets.length_offset);
+    long err = bpf_probe_read_user(&length, sizeof(length), (void*) py_object + config->offsets.py_ascii_object_offsets.length);
     if (err != 0) {
         BPF_TRACE("python: failed to read ascii string length: %d", err);
         return false;
@@ -158,7 +158,7 @@ static ALWAYS_INLINE bool python_read_python_ascii_string(char* buffer, size_t b
     BPF_TRACE("python: read ascii string length %d, buffer_size %u", length, buffer_size);
 
     u32 status = 0;
-    err = bpf_probe_read_user(&status, sizeof(u32), (void*) py_object + config->offsets.py_ascii_object_offsets.state_offset);
+    err = bpf_probe_read_user(&status, sizeof(u32), (void*) py_object + config->offsets.py_ascii_object_offsets.state);
     if (err != 0) {
         BPF_TRACE("python: failed to read ascii status: %d", err);
         return false;
@@ -176,7 +176,7 @@ static ALWAYS_INLINE bool python_read_python_ascii_string(char* buffer, size_t b
         length = buffer_size;
     }
 
-    err = bpf_probe_read_user_str(buffer, length, (void*) py_object + config->offsets.py_ascii_object_offsets.data_offset);
+    err = bpf_probe_read_user_str(buffer, length, (void*) py_object + config->offsets.py_ascii_object_offsets.data);
     if (err < 0)  {
         BPF_TRACE("python: failed to read ascii string data: %d", err);
         return false;
@@ -215,11 +215,11 @@ static ALWAYS_INLINE bool python_process_frame(struct python_frame* res_frame, v
     }
 
     void* code = NULL;
-    long err = bpf_probe_read_user(&code, sizeof(void*), (void*) frame + config->offsets.py_interpreter_frame_offsets.f_code_offset);
+    long err = bpf_probe_read_user(&code, sizeof(void*), (void*) frame + config->offsets.py_interpreter_frame_offsets.f_code);
     if (err != 0) {
         BPF_TRACE(
             "python: failed to read PyCodeObject* at offset %d: %d",
-            config->offsets.py_interpreter_frame_offsets.f_code_offset,
+            config->offsets.py_interpreter_frame_offsets.f_code,
             err
         );
         return false;
@@ -232,7 +232,7 @@ static ALWAYS_INLINE bool python_process_frame(struct python_frame* res_frame, v
 
     state->symbol_key.pid = state->pid;
     state->symbol_key.code_object = (u64) code;
-    err = bpf_probe_read(&state->symbol_key.co_firstlineno, sizeof(int), (void*) code + config->offsets.py_code_object_offsets.co_firstlineno_offset);
+    err = bpf_probe_read(&state->symbol_key.co_firstlineno, sizeof(int), (void*) code + config->offsets.py_code_object_offsets.co_firstlineno);
     if (err != 0) {
         BPF_TRACE("python: failed to read co_firstlineno: %d", err);
         return false;

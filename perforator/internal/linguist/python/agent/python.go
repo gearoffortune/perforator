@@ -1,55 +1,24 @@
 package agent
 
 import (
+	"fmt"
+
 	"github.com/yandex/perforator/perforator/agent/preprocessing/proto/python"
 	"github.com/yandex/perforator/perforator/internal/unwinder"
 )
 
 func PythonInternalsOffsetsByVersion(version *python.PythonVersion) (*unwinder.PythonInternalsOffsets, error) {
-	threadStateOffsets, err := PyThreadStateOffsetsByVersion(version)
-	if err != nil {
-		return nil, err
+	if version == nil {
+		return nil, fmt.Errorf("nil version provided")
 	}
 
-	interpreterFrameOffsets, err := PyInterpreterFrameOffsetsByVersion(version)
-	if err != nil {
-		return nil, err
+	versionKey := encodeVersion(version)
+
+	if offsets, ok := pythonVersionOffsets[versionKey]; ok {
+		return offsets, nil
 	}
 
-	codeObjectOffsets, err := PyCodeObjectOffsetsByVersion(version)
-	if err != nil {
-		return nil, err
-	}
-
-	asciiObjectOffsets, err := PyASCIIObjectOffsetsByVersion(version)
-	if err != nil {
-		return nil, err
-	}
-
-	cframeOffsets, err := PyCframeOffsetsByVersion(version)
-	if err != nil {
-		return nil, err
-	}
-
-	runtimeOffsets, err := PyRuntimeOffsetsByVersion(version)
-	if err != nil {
-		return nil, err
-	}
-
-	interpreterStateOffsets, err := PyInterpreterStateOffsetsByVersion(version)
-	if err != nil {
-		return nil, err
-	}
-
-	return &unwinder.PythonInternalsOffsets{
-		PyRuntimeStateOffsets:     *runtimeOffsets,
-		PyInterpreterStateOffsets: *interpreterStateOffsets,
-		PyThreadStateOffsets:      *threadStateOffsets,
-		PyCframeOffsets:           *cframeOffsets,
-		PyInterpreterFrameOffsets: *interpreterFrameOffsets,
-		PyCodeObjectOffsets:       *codeObjectOffsets,
-		PyAsciiObjectOffsets:      *asciiObjectOffsets,
-	}, nil
+	return nil, fmt.Errorf("no offsets available for Python %d.%d.%d", version.Major, version.Minor, version.Micro)
 }
 
 func IsVersionSupported(version *python.PythonVersion) bool {
@@ -57,11 +26,13 @@ func IsVersionSupported(version *python.PythonVersion) bool {
 		return false
 	}
 
-	return version.Major == 3 && (version.Minor == 12 || version.Minor == 13)
+	versionKey := encodeVersion(version)
+	_, ok := pythonVersionOffsets[versionKey]
+	return ok
 }
 
 func encodeVersion(version *python.PythonVersion) uint32 {
-	return version.Micro + (version.Minor << 8) + (version.Major)<<16
+	return version.Micro + (version.Minor << 8) + (version.Major << 16)
 }
 
 // Only supported python version config must be passed here.
