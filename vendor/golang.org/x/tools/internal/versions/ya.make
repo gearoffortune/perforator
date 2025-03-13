@@ -2,17 +2,14 @@ GO_LIBRARY()
 
 LICENSE(BSD-3-Clause)
 
-VERSION(v0.22.1-0.20240829175637-39126e24d653)
+VERSION(v0.26.0)
 
 SRCS(
+    constraint.go
+    constraint_go121.go
     features.go
     gover.go
-    toolchain.go
-    toolchain_go119.go
-    toolchain_go120.go
-    toolchain_go121.go
     types.go
-    types_go122.go
     versions.go
 )
 
