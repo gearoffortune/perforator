@@ -3,6 +3,7 @@ package samplefilter
 import (
 	"testing"
 
+	pprof "github.com/google/pprof/profile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -28,17 +29,17 @@ func TestBuildBuildIDFilter(t *testing.T) {
 		},
 		{
 			name:  "UnsupportedMultiValue",
-			query: "{buildid=\"123|456\"}",
+			query: "{build_ids=\"123|456\"}",
 			error: true,
 		},
 		{
 			name:  "UnsupportedNotEqual",
-			query: "{buildid!=\"123\"}",
+			query: "{build_ids!=\"123\"}",
 			error: true,
 		},
 		{
 			name:   "OK",
-			query:  "{buildid=\"123\"}",
+			query:  "{build_ids=\"123\"}",
 			filter: "123",
 		},
 	} {
@@ -62,46 +63,46 @@ func TestBuildIDFilterMatch(t *testing.T) {
 	tests := []struct {
 		name     string
 		filter   string
-		labels   map[string][]string
+		buildIDs []string
 		expected bool
 	}{
 		{
-			name:   "EmptyFilterMatchesAnyBuildID",
-			filter: "",
-			labels: map[string][]string{
-				"buildid": []string{"123", "456"},
-			},
+			name:     "EmptyFilterMatchesAnyBuildID",
+			filter:   "",
+			buildIDs: []string{"123", "456"},
 			expected: true,
 		},
 		{
-			name:   "EmptyFilterMatchesMissingBuildID",
-			filter: "",
-			labels: map[string][]string{
-				"otherlabel": []string{"123"},
-			},
+			name:     "EmptyFilterMatchesMissingBuildID",
+			filter:   "",
+			buildIDs: []string{"123"},
 			expected: true,
 		},
 		{
-			name:   "SimpleMatch",
-			filter: "123",
-			labels: map[string][]string{
-				"buildid": []string{"123"},
-			},
+			name:     "SimpleMatch",
+			filter:   "123",
+			buildIDs: []string{"123"},
 			expected: true,
 		},
 		{
-			name:   "SimpleNoMatch",
-			filter: "123",
-			labels: map[string][]string{
-				"buildid": []string{"456"},
-			},
+			name:     "SimpleNoMatch",
+			filter:   "123",
+			buildIDs: []string{"456"},
 			expected: false,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			f := buildIDFilter(test.filter)
-			assert.Equal(t, test.expected, f.Matches(test.labels))
+			s := &pprof.Sample{}
+			for _, b := range test.buildIDs {
+				s.Location = append(s.Location, &pprof.Location{
+					Mapping: &pprof.Mapping{
+						BuildID: b,
+					},
+				})
+			}
+			assert.Equal(t, test.expected, f.Matches(s))
 		})
 	}
 }

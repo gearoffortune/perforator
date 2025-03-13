@@ -110,7 +110,9 @@ func TestTlsFilterMatch(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
-			require.Equal(t, test.expected, tlsFilter.Matches(test.labels))
+			require.Equal(t, test.expected, tlsFilter.Matches(&pprof.Sample{
+				Label: test.labels,
+			}))
 		})
 	}
 }

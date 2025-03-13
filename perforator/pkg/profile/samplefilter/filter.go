@@ -7,7 +7,7 @@ import (
 )
 
 type SampleFilter interface {
-	Matches(labels map[string][]string) bool
+	Matches(sample *pprof.Sample) bool
 }
 
 func FilterProfilesBySampleFilters(profiles []*pprof.Profile, filters ...SampleFilter) (res []*pprof.Profile) {
@@ -15,7 +15,7 @@ func FilterProfilesBySampleFilters(profiles []*pprof.Profile, filters ...SampleF
 		p.Sample = foreach.Filter(p.Sample, func(sample *pprof.Sample) bool {
 			ok := true
 			for _, filter := range filters {
-				if !filter.Matches(sample.Label) {
+				if !filter.Matches(sample) {
 					ok = false
 					break
 				}

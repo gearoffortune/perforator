@@ -2,7 +2,8 @@ package samplefilter
 
 import (
 	"fmt"
-	"slices"
+
+	pprof "github.com/google/pprof/profile"
 
 	"github.com/yandex/perforator/observability/lib/querylang"
 	"github.com/yandex/perforator/perforator/pkg/profilequerylang"
@@ -12,19 +13,19 @@ type buildIDFilter string
 
 const (
 	nopBuildIDFilter    buildIDFilter = ""
-	buildIDMatcherField string        = "buildid"
-	buildIDLabelName    string        = "buildid"
+	buildIDMatcherField string        = "build_ids"
 )
 
-func (bf buildIDFilter) Matches(labels map[string][]string) bool {
+func (bf buildIDFilter) Matches(sample *pprof.Sample) bool {
 	if bf == nopBuildIDFilter {
 		return true
 	}
-	actualBuildID, ok := labels[buildIDLabelName]
-	if !ok {
-		return false
+	for _, location := range sample.Location {
+		if location.Mapping != nil && location.Mapping.BuildID == string(bf) {
+			return true
+		}
 	}
-	return slices.Contains(actualBuildID, string(bf))
+	return false
 }
 
 func BuildBuildIDFilter(selector *querylang.Selector) (SampleFilter, error) {

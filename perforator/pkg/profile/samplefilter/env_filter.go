@@ -3,6 +3,8 @@ package samplefilter
 import (
 	"fmt"
 
+	pprof "github.com/google/pprof/profile"
+
 	"github.com/yandex/perforator/observability/lib/querylang"
 	"github.com/yandex/perforator/perforator/pkg/env"
 	"github.com/yandex/perforator/perforator/pkg/profilequerylang"
@@ -10,10 +12,10 @@ import (
 
 type envFilter map[string]string
 
-func (ef envFilter) Matches(labels map[string][]string) bool {
+func (ef envFilter) Matches(sample *pprof.Sample) bool {
 	// Store set in order to solve case with duplicate label keys.
 	matches := make(map[string]struct{})
-	for k, v := range labels {
+	for k, v := range sample.Label {
 		if len(v) == 0 {
 			continue
 		}
