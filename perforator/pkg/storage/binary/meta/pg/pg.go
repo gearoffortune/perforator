@@ -18,7 +18,8 @@ import (
 )
 
 type storageMetrics struct {
-	failedUpdateLastUsedTimestamp metrics.Counter
+	failedUpdateLastUsedTimestamp  metrics.Counter
+	successUpdateLastUsedTimestamp metrics.Counter
 }
 
 type Storage struct {
@@ -31,11 +32,16 @@ type Storage struct {
 
 type Options struct {
 	DropStuckUploadPeriod time.Duration
+	// Minimum interval between last_used_timestamp updates for the same binary
+	LastUsedTimestampUpdateInterval time.Duration
 }
 
 func (o *Options) fillDefault() {
 	if o.DropStuckUploadPeriod == time.Duration(0) {
 		o.DropStuckUploadPeriod = 5 * time.Minute
+	}
+	if o.LastUsedTimestampUpdateInterval == time.Duration(0) {
+		o.LastUsedTimestampUpdateInterval = 15 * time.Minute
 	}
 }
 
@@ -48,7 +54,8 @@ func NewPostgresBinaryStorage(l xlog.Logger, reg metrics.Registry, cluster *hasq
 		cluster: cluster,
 		opts:    &opts,
 		metrics: &storageMetrics{
-			failedUpdateLastUsedTimestamp: reg.Counter("binaries.postgres.failed_update_last_used_timestamp.count"),
+			failedUpdateLastUsedTimestamp:  reg.Counter("binaries.postgres.failed_update_last_used_timestamp.count"),
+			successUpdateLastUsedTimestamp: reg.Counter("binaries.postgres.success_update_last_used_timestamp.count"),
 		},
 	}
 }
@@ -177,13 +184,41 @@ func (s *Storage) updateLastUsedTimestamp(
 	_, err = primary.DBx().ExecContext(
 		ctx,
 		`UPDATE binaries 
-			SET last_used_timestamp = NOW() 
-			WHERE build_id = ANY($1) AND upload_status != $2`,
+		 SET last_used_timestamp = NOW() 
+		 WHERE build_id = ANY($1) 
+		 AND upload_status != $2`,
 		buildIDs,
 		string(binarymeta.InProgress),
 	)
 
 	return err
+}
+
+func (s *Storage) updateLastUsedTimestampsIfNeeded(ctx context.Context, rows []BinaryRow) {
+	var needsUpdate []string
+	now := time.Now()
+	updateThreshold := now.Add(-s.opts.LastUsedTimestampUpdateInterval)
+
+	for _, row := range rows {
+		if row.UploadStatus != string(binarymeta.InProgress) &&
+			(row.LastUsedTimestamp.IsZero() || row.LastUsedTimestamp.Before(updateThreshold)) {
+			needsUpdate = append(needsUpdate, row.BuildID)
+		}
+	}
+
+	if len(needsUpdate) > 0 {
+		s.l.Debug(ctx, "Updating timestamps for binaries", log.Array("build_ids", needsUpdate))
+		if err := s.updateLastUsedTimestamp(ctx, needsUpdate); err != nil {
+			s.metrics.failedUpdateLastUsedTimestamp.Inc()
+			s.l.Warn(
+				ctx, "Failed to update last used timestamp for binaries",
+				log.Array("build_ids", needsUpdate),
+				log.Error(err),
+			)
+		} else {
+			s.metrics.successUpdateLastUsedTimestamp.Inc()
+		}
+	}
 }
 
 func (s *Storage) GetBinaries(
@@ -220,14 +255,7 @@ func (s *Storage) GetBinaries(
 		return nil, err
 	}
 
-	if err := s.updateLastUsedTimestamp(ctx, buildIDs); err != nil {
-		s.metrics.failedUpdateLastUsedTimestamp.Inc()
-		s.l.Warn(
-			ctx, "Failed to update last used timestamp for binaries",
-			log.Array("build_ids", buildIDs),
-			log.Error(err),
-		)
-	}
+	s.updateLastUsedTimestampsIfNeeded(ctx, rows)
 
 	res := make([]*binarymeta.BinaryMeta, 0, len(rows))
 	for _, row := range rows {
