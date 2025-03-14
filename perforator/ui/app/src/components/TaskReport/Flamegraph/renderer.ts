@@ -17,11 +17,13 @@ import { uiFactory } from 'src/factory/index.ts';
 import type { FormatNode, ProfileData } from 'src/models/Profile.ts';
 import type { UserSettings } from 'src/providers/UserSettingsProvider/UserSettings.ts';
 
-import { hugenum } from './flame-utils.ts';
+import { pct } from './pct.ts';
 import type { GetStateFromQuery, SetStateFromQuery } from './query-utils.ts';
 import { parseStacks, stringifyStacks } from './query-utils.ts';
 import { shorten } from './shorten/shorten.ts';
+import { getCanvasTitleFull, getStatusTitleFull, renderTitleFull } from './title.ts';
 import { darken, DARKEN_FACTOR, diffcolor } from './utils/colors.ts';
+import { getNodeTitleFull } from './utils/node-title.ts';
 
 
 const dw = Math.floor(255 * (1 - DARKEN_FACTOR)).toString(16);
@@ -30,14 +32,6 @@ const WHITE_TEXT_COLOR = `#${dw}${dw}${dw}`;
 
 const minVisibleWidth = 1e-2;
 
-
-function pct(a: number, b: number) {
-    return a >= b ? '100' : (100 * a / b).toFixed(2);
-}
-
-function formatPct(value: any) {
-    return value ? `${value}%` : '';
-}
 
 export type I = number;
 export type H = number;
@@ -422,17 +416,7 @@ export const renderFlamegraph: RenderFlamegraphType = (
         return profileData.stringTable[id];
     }
 
-    function getNodeTitle(node: FormatNode): string {
-        const kind = readString(node.kind);
-        let nodeTitle = maybeShorten(readString(node.textId)) + ' ' + readString(node.file);
-        if (kind !== '') {
-            nodeTitle += ` (${kind})`;
-        }
-        if (node.inlined) {
-            nodeTitle += ' (inlined)';
-        }
-        return nodeTitle;
-    }
+    const getNodeTitle = getNodeTitleFull.bind(null, readString, maybeShorten);
 
     function drawLabel(text: string, x: number, y: number, w: number, opacity: string, color: string) {
         const node = labelTemplate.firstChild!.cloneNode(true) as HTMLDivElement;
@@ -463,76 +447,11 @@ export const renderFlamegraph: RenderFlamegraphType = (
 
     // need to calculate cleared percentage
 
-    type TitleArgs = {
-        getPct: (arg: {
-            rootPct: string | undefined;
-            selectedPct: string | undefined;
-        }) => string;
-        getNumbers: (arg: { sampleCount: string; eventCount: string; percent: string }) => string;
-        wrapNumbers: (numbers: string) => string;
-        getDelta: (delta: string) => string;
-    };
+    const renderTitle = renderTitleFull.bind(null, fg.countEventCountWidth, fg.countSampleCountWidth, getNodeTitle, isDiff);
 
-    function renderTitle({
-        getPct,
-        getNumbers,
-        getDelta,
-        wrapNumbers = (numbers: string) => numbers,
-    }: TitleArgs) {
-        // eslint-disable-next-line @typescript-eslint/no-shadow
-        return function(f: FormatNode, selectedFrame: FormatNode | null, root?: FormatNode): string {
-            const calcPercent = (baseFrame?: FormatNode | null) => baseFrame ? pct(fg.countEventCountWidth(f), fg.countEventCountWidth(baseFrame)) : undefined;
-            const percent = getPct({
-                rootPct: calcPercent(root),
-                selectedPct: calcPercent(selectedFrame),
-            });
-            const shortenedTitle = getNodeTitle(f);
-            const numbers = getNumbers({
-                sampleCount: hugenum(fg.countSampleCountWidth(f)),
-                eventCount: hugenum(fg.countEventCountWidth(f)),
-                percent,
-            });
+    const getStatusTitle = getStatusTitleFull(renderTitle);
 
-            let diffString = '';
-
-
-            if (isDiff) {
-                let delta = 0;
-                const anyFrame = (selectedFrame || root) as FormatNode;
-                if (anyFrame.baseEventCount && f.baseEventCount && anyFrame.baseEventCount > 1e-3) {
-                    delta =
-                        f.eventCount / anyFrame.eventCount -
-                        f.baseEventCount / anyFrame.baseEventCount;
-                } else {
-                    delta = f.eventCount / anyFrame.eventCount;
-                }
-                const deltaString = (delta >= 0.0 ? '+' : '') + (delta * 100).toFixed(2) + '%';
-                diffString += getDelta(deltaString);
-            }
-
-            return shortenedTitle + wrapNumbers(numbers + diffString);
-        };
-    }
-
-    const getStatusTitle = renderTitle({
-        getPct: ({ rootPct, selectedPct }) => (
-            [rootPct, selectedPct].filter(Boolean).map(formatPct).join('/')
-        ),
-        getNumbers: ({ sampleCount, eventCount, percent }) => `${eventCount} cycles, ${sampleCount} samples, ${percent}`,
-        wrapNumbers: numbers => ` (${numbers})`,
-        getDelta: delta => `, ${delta}`,
-
-    });
-
-    const getCanvasTitle = renderTitle({
-        getPct: ({ rootPct, selectedPct }) => (
-            (rootPct ? `Percentage of root frame: ${formatPct(rootPct)}\n` : '')
-            + (selectedPct ? `Percentage of selected frame: ${formatPct(selectedPct)}\n` : '')
-        ),
-        getNumbers: ({ sampleCount, eventCount, percent }) => `\nSamples: ${sampleCount}\nCycles: ${eventCount}\n${percent}`,
-        wrapNumbers: numbers => numbers.trimEnd(),
-        getDelta: delta => `Diff: ${delta}\n`,
-    });
+    const getCanvasTitle = getCanvasTitleFull(renderTitle);
 
 
     function renderImpl(opts?: RenderOpts) {
