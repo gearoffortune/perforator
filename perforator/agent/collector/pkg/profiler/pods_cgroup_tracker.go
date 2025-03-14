@@ -209,7 +209,7 @@ func (t *PodsCgroupTracker) ResolveWorkload(cgroups []string) ([]string, bool) {
 	return convertedParts, true
 }
 
-func newPodsCgroupTracker(c *config.PodsDeploySystemConfig, l log.Logger) (*PodsCgroupTracker, error) {
+func newPodsCgroupTracker(c *config.PodsDeploySystemConfig, l log.Logger, cgroupPrefix string) (*PodsCgroupTracker, error) {
 	l = l.WithName("pod_tracker")
 
 	var podsLister deploysystemmodel.PodsLister
@@ -227,7 +227,7 @@ func newPodsCgroupTracker(c *config.PodsDeploySystemConfig, l log.Logger) (*Pods
 		kubeletOverrides.CgroupsQOSMode = c.KubernetesConfig.KubeletCgroupQOSMode
 		kubeletOverrides.CgroupContainerPrefix = c.KubernetesConfig.KubeletCgroupContainerPrefix
 
-		podsLister, err = kubelet.NewPodsLister(xlog.New(l), c.KubernetesConfig.TopologyLableKey, kubeletOverrides)
+		podsLister, err = kubelet.NewPodsLister(xlog.New(l), c.KubernetesConfig.TopologyLableKey, kubeletOverrides, cgroupPrefix)
 		if err != nil {
 			return nil, err
 		}

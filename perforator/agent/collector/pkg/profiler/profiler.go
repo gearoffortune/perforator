@@ -172,14 +172,6 @@ func NewProfiler(c *config.Config, l log.Logger, r metrics.Registry, opts ...opt
 		}
 	}
 
-	if c.PodsDeploySystemConfig != nil && c.PodsDeploySystemConfig.DeploySystem != "" {
-		podsCgroupTracker, err := newPodsCgroupTracker(c.PodsDeploySystemConfig, l)
-		if err != nil {
-			return nil, err
-		}
-		profiler.podsCgroupTracker = podsCgroupTracker
-	}
-
 	err := profiler.initialize(r)
 	if err != nil {
 		l.Error("Failed to initialize profiler", log.Error(err))
@@ -334,6 +326,16 @@ func (p *Profiler) initialize(r metrics.Registry) (err error) {
 		return fmt.Errorf("failed to load cgroupfs: %w", err)
 	}
 	p.log.Info("Loaded cgroupfs state", log.String("cgroupfs_version", p.cgroups.CgroupVersion().String()))
+
+	if p.conf.PodsDeploySystemConfig != nil && p.conf.PodsDeploySystemConfig.DeploySystem != "" {
+		cgroupPrefix := p.cgroups.CgroupPrefix()
+		podsCgroupTracker, err := newPodsCgroupTracker(p.conf.PodsDeploySystemConfig, p.log, cgroupPrefix)
+		if err != nil {
+			return err
+		}
+		p.podsCgroupTracker = podsCgroupTracker
+		p.log.Info("Successfully loaded pods cgroup tracker", log.String("deploy_system", p.conf.PodsDeploySystemConfig.DeploySystem))
+	}
 
 	// Prepare eBPF config.
 	p.log.Info("Preparing profiler config")

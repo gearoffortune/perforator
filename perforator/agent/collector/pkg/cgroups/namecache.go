@@ -109,6 +109,7 @@ type nameCache interface {
 	cgroupBaseName(id uint64) string
 	populate() error
 	cgroupVersion() CgroupVersion
+	cgroupPrefix() string
 }
 
 type cgroupNameCache struct {
@@ -222,4 +223,8 @@ func (m *cgroupNameCache) cgroupBaseName(id uint64) string {
 
 func (m *cgroupNameCache) cgroupVersion() CgroupVersion {
 	return m.fs.version
+}
+
+func (m *cgroupNameCache) cgroupPrefix() string {
+	return m.fs.prefix
 }

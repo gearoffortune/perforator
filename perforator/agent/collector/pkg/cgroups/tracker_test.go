@@ -116,7 +116,11 @@ func (n *testNameCache) populate() error {
 }
 
 func (n *testNameCache) cgroupVersion() CgroupVersion {
-	panic("Unsupported")
+	panic("cgroupVersion unsupported")
+}
+
+func (n *testNameCache) cgroupPrefix() string {
+	panic("cgroupPrefix unsupported")
 }
 
 func TestTracker_Simple(t *testing.T) {

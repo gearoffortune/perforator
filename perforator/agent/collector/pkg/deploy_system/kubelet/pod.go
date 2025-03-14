@@ -10,7 +10,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 
 	deploysystemmodel "github.com/yandex/perforator/perforator/agent/collector/pkg/deploy_system/model"
-	"github.com/yandex/perforator/perforator/internal/kubeletclient"
 	"github.com/yandex/perforator/perforator/pkg/xlog"
 )
 
@@ -83,7 +82,7 @@ func (p *Pod) IsPerforatorEnabled() (*bool, string) {
 
 type PodsLister struct {
 	logger                   xlog.Logger
-	client                   *kubeletclient.Client
+	client                   *http.Client
 	nodeName                 string
 	nodeURL                  string
 	kubeletSettingsOverrides KubeletSettingsOverrides
@@ -91,6 +90,9 @@ type PodsLister struct {
 
 	// In most cases equals to the value of topology.kubernetes.io/zone lable. See https://kubernetes.io/docs/reference/labels-annotations-taints/#topologykubernetesiozone
 	topology string
+
+	// E.g., "/sys/fs/cgroup"
+	cgroupPrefix string
 }
 
 func (p *PodsLister) GetHost() string {
@@ -155,7 +157,7 @@ func (p *PodsLister) List(ctx context.Context) ([]deploysystemmodel.Pod, error) 
 	return res, nil
 }
 
-func NewPodsLister(logger xlog.Logger, topologyLableKey string, kubeletSettingsOverrides KubeletSettingsOverrides) (*PodsLister, error) {
+func NewPodsLister(logger xlog.Logger, topologyLableKey string, kubeletSettingsOverrides KubeletSettingsOverrides, cgroupPrefix string) (*PodsLister, error) {
 	if topologyLableKey == "" {
 		topologyLableKey = defaultTopologyLableKey
 	}
@@ -173,11 +175,12 @@ func NewPodsLister(logger xlog.Logger, topologyLableKey string, kubeletSettingsO
 	// Failed to verify the legitimacy of the server and therefore could not establish a secure connection to it.
 	// By default the kubelet serving certificate deployed by kubeadm is self-signed:
 	// https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-certs/#:~:text=By%20default%20the%20kubelet%20serving%20certificate%20deployed%20by%20kubeadm%20is%20self%2Dsigned
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	tr := &kubeletTokenTransport{
+		rt: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
 	}
-	httpclient := &http.Client{Transport: tr}
-	client := kubeletclient.New(httpclient)
+	client := &http.Client{Transport: tr}
 
 	podLister := &PodsLister{
 		logger:                   logger,
@@ -185,6 +188,7 @@ func NewPodsLister(logger xlog.Logger, topologyLableKey string, kubeletSettingsO
 		nodeURL:                  url + "/pods",
 		client:                   client,
 		kubeletSettingsOverrides: kubeletSettingsOverrides,
+		cgroupPrefix:             cgroupPrefix,
 	}
 
 	topology, err := podLister.getTopology(topologyLableKey)
@@ -207,12 +211,15 @@ func (p *PodsLister) Init(ctx context.Context) error {
 	if p.kubeletSettingsOverrides.CgroupsQOSMode == "" {
 		resolveNeeded = true
 	}
+	if p.kubeletSettingsOverrides.CgroupDriver == "systemd" && p.kubeletSettingsOverrides.CgroupContainerPrefix == "" {
+		resolveNeeded = true
+	}
 	var resolved kubeletCgroupSettings
 	if resolveNeeded {
 		var err error
 		resolved, err = resolveKubeletCgroupSettings(ctx, p.client)
 		if err != nil {
-			return fmt.Errorf("failed to detect kubelet cgroup root: %w", err)
+			return fmt.Errorf("failed to resolve kubelet cgroup settings: %w", err)
 		}
 	}
 	if p.kubeletSettingsOverrides.CgroupDriver != "" {
@@ -236,6 +243,16 @@ func (p *PodsLister) Init(ctx context.Context) error {
 	default:
 		return fmt.Errorf("invalid value for cgroups qos mode override (expected none, not-guaranteed or all): %q", p.kubeletSettingsOverrides.CgroupsQOSMode)
 	}
+	if p.kubeletSettingsOverrides.CgroupContainerPrefix != "" {
+		resolved.containerPrefix = p.kubeletSettingsOverrides.CgroupContainerPrefix
+	}
+
 	p.kubeletSettings = resolved
+	if p.kubeletSettings.containerPrefix == "" && p.kubeletSettings.systemd {
+		err := p.resolveKubeletContainerPrefix()
+		if err != nil {
+			return fmt.Errorf("couldn't resolve container prefix %w", err)
+		}
+	}
 	return nil
 }

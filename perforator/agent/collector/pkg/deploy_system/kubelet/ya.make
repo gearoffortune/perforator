@@ -3,6 +3,7 @@ GO_LIBRARY()
 SRCS(
     kubelet.go
     pod.go
+    transport.go
 )
 
 GO_TEST_SRCS(kubelet_test.go)

@@ -2,7 +2,6 @@ RECURSE(
     asyncfilecache
     asynctask
     buildinfo
-    kubeletclient
     linguist
     logfield
     offline_processing

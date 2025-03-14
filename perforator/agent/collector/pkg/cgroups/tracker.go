@@ -100,6 +100,10 @@ func (t *Tracker) CgroupVersion() CgroupVersion {
 	return t.nameCache.cgroupVersion()
 }
 
+func (t *Tracker) CgroupPrefix() string {
+	return t.nameCache.cgroupPrefix()
+}
+
 func (t *Tracker) updateCgroupID(oldID uint64, newID uint64, lock bool) *cgroup {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()

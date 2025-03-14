@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -17,12 +19,10 @@ import (
 
 	"github.com/yandex/perforator/library/go/core/log"
 	"github.com/yandex/perforator/library/go/slices"
-	"github.com/yandex/perforator/perforator/internal/kubeletclient"
 	"github.com/yandex/perforator/perforator/pkg/xlog"
 )
 
 const (
-	tokenPath   = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	kubeletPort = "10250"
 	nodeEnv     = "NODE_NAME"
 	nodeIP      = "NODE_IP"
@@ -30,6 +30,10 @@ const (
 	kubernetesAPIServerHost = "kubernetes.default.svc.cluster.local"
 
 	getPodsRequestTimeout = 10 * time.Second
+
+	containerdPrefix = "cri-containerd-" // https://github.com/containerd/containerd/blob/59c8cf6ea5f4175ad512914dd5ce554942bf144f/internal/cri/server/podsandbox/helpers_linux.go#L67
+	crioPrefix       = "crio-"           // https://github.com/cri-o/cri-o/blob/086f182d7d883326159b165d9b5958ae2ff53e14/internal/config/cgmgr/cgmgr_linux.go#L23
+	criDockerdPrefix = "docker-"         // https://github.com/Mirantis/cri-dockerd/blob/372c8f747e45b976b4b69a4023a69438e84f7e23/core/sandbox_helpers.go#L54
 )
 
 var qosClassToCgroupSubstr = map[kube.PodQOSClass]string{
@@ -102,9 +106,10 @@ type kubeletConfigWrapper struct {
 }
 
 type kubeletConfig struct {
-	CgroupRoot    string `json:"cgroupRoot"`
-	CgroupDriver  string `json:"cgroupDriver"`
-	CgroupsPerQOS bool   `json:"cgroupsPerQOS"`
+	CgroupRoot               string `json:"cgroupRoot"`
+	CgroupDriver             string `json:"cgroupDriver"`
+	CgroupsPerQOS            bool   `json:"cgroupsPerQOS"`
+	ContainerRuntimeEndpoint string `json:"containerRuntimeEndpoint"`
 }
 
 type KubeletSettingsOverrides struct {
@@ -133,7 +138,77 @@ type kubeletCgroupSettings struct {
 	containerPrefix string
 }
 
-func resolveKubeletCgroupSettings(ctx context.Context, client *kubeletclient.Client) (kubeletCgroupSettings, error) {
+func (p *PodsLister) resolveKubeletContainerPrefix() error {
+	// Try to derive from the container's cgroup
+	pods, err := p.getPods()
+	if err != nil {
+		return err
+	}
+	if len(pods) == 0 {
+		return fmt.Errorf("couldn't get kubernetes pods, the pod list is empty")
+	}
+
+	var (
+		containerPrefix string
+		cgroupFullPath  string
+		lasError        error
+	)
+podLoop:
+	for _, pod := range pods {
+		cgroup, err := buildCgroup(&p.kubeletSettings, podInfo{
+			UID:      pod.ObjectMeta.UID,
+			QOSClass: pod.Status.QOSClass,
+		})
+		if err != nil {
+			lasError = err
+			continue
+		}
+		cgroupFullPath = filepath.Join(p.cgroupPrefix, cgroup)
+
+		entries, err := os.ReadDir(cgroupFullPath)
+		if err != nil {
+			lasError = err
+			continue
+		}
+
+		pattern := regexp.MustCompile(`([a-z0-9]{64})`)
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+			name := entry.Name()
+			if pattern.MatchString(name) {
+				idx := strings.LastIndex(name, "-")
+				containerPrefix = name[:idx+1]
+				break podLoop
+			}
+		}
+	}
+
+	if containerPrefix != "" {
+		p.kubeletSettings.containerPrefix = containerPrefix
+		return nil
+	}
+
+	return fmt.Errorf("container prefix is empty, last checked pod cgroup: %s; last error: %w", cgroupFullPath, lasError)
+}
+
+func tryResolveContainerPrefixFromContainerRuntime(config kubeletConfig) string {
+	// Try to resolve via well-known container runtime endpoints
+	// https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#installing-runtime
+	switch config.ContainerRuntimeEndpoint {
+	case "unix:///var/run/containerd/containerd.sock":
+		return containerdPrefix
+	case "unix:///var/run/crio/crio.sock":
+		return crioPrefix
+	case "unix:///var/run/cri-dockerd.sock":
+		return criDockerdPrefix
+	}
+
+	return ""
+}
+
+func resolveKubeletCgroupSettings(ctx context.Context, client *http.Client) (kubeletCgroupSettings, error) {
 	var s kubeletCgroupSettings
 	url, err := getNodeURL()
 	if err != nil {
@@ -160,33 +235,27 @@ func resolveKubeletCgroupSettings(ctx context.Context, client *kubeletclient.Cli
 	if err != nil {
 		return s, fmt.Errorf("error unmarshalling /configz response body: %w", err)
 	}
+	s.root = strings.Split(config.Config.CgroupRoot, "/")
+	s.root = slices.Filter(s.root, func(s string) bool { return s != "" })
 
 	if config.Config.CgroupsPerQOS {
 		s.qosMode = cgroupsQOSModeNotGuaranteed
+		s.root = append(s.root, "kubepods") // https://github.com/kubernetes/kubernetes/blob/aa08c90fca8d30038d3f05c0e8f127b540b40289/pkg/kubelet/cm/container_manager_linux.go#L255
 	} else {
 		s.qosMode = cgroupsQOSModeNone
 	}
 
-	s.root = strings.Split(config.Config.CgroupRoot, "/")
-	s.root = slices.Filter(s.root, func(s string) bool { return s != "" })
-	s.root = append(s.root, "kubepods")
 	if config.Config.CgroupDriver == "systemd" {
 		s.systemd = true
-		// https://github.com/containerd/containerd/blob/59c8cf6ea5f4175ad512914dd5ce554942bf144f/internal/cri/server/podsandbox/helpers_linux.go#L67
-		// TODO(PERFORATOR-682): detect container runtime (containerd / crio) and set containerPrefix accordingly.
-		s.containerPrefix = "cri-containerd-"
+		s.containerPrefix = tryResolveContainerPrefixFromContainerRuntime(config.Config)
 	} else if config.Config.CgroupDriver != "cgroupfs" {
 		return kubeletCgroupSettings{}, fmt.Errorf("unsupported cgroup driver %q (expected systemd or cgroupfs)", config.Config.CgroupDriver)
 	}
+
 	return s, nil
 }
 
 func (p *PodsLister) getTopology(topologyLableKey string) (string, error) {
-	token, err := os.ReadFile(tokenPath)
-	if err != nil {
-		return "", fmt.Errorf("couldn't read service account token, %w", err)
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), getPodsRequestTimeout)
 	defer cancel()
 
@@ -196,8 +265,6 @@ func (p *PodsLister) getTopology(topologyLableKey string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
-	req.Header.Set("Authorization", "Bearer "+string(token))
 
 	resp, err := p.client.Do(req)
 	if err != nil {
@@ -280,10 +347,6 @@ func makeSystemDPath(parts []string) string {
 	return path.Join(converted...)
 }
 
-// BuildCgroup returns unified cgroup for cgroup v2 in a format like:
-// "/sys/fs/cgroup/kubepods/<POD_QOSClass>/pod<POD_UID>"
-// or freezer cgroup for cgroup v1
-// "/sys/fs/cgroup/freezer/kubepods/<POD_QOSClass>/pod<POD_UID>".
 func buildCgroup(settings *kubeletCgroupSettings, pod podInfo) (string, error) {
 	podUID := string(pod.UID)
 	var includeQOS bool
