@@ -1507,7 +1507,7 @@
     "title": "Next.js",
     "description": "Сборщик-бандлер от проекта Next.js\n\nОчень opinionated, но кому-то подходит.\n\nВ tier-0 используется в модуле/макросе [`TS_NEXT()`](https://docs.yandex-team.ru/frontend-in-arcadia/references/TS_NEXT).",
     "type": "NPM_PACKAGE",
-    "default": "15.1.7",
+    "default": "15.2.1",
     "links": {
       "Home": "https://nextjs.org",
       "Sources": "https://github.com/vercel/next.js",
@@ -1516,6 +1516,10 @@
     },
     "useDirectly": true,
     "versions": {
+      "15.2.1": {
+        "add_date": "2025-03-18T05:30:56",
+        "resources": []
+      },
       "15.1.7": {
         "add_date": "2025-02-25T05:32:00",
         "resources": []
@@ -4337,7 +4341,7 @@
     "title": "Stylelint",
     "description": "Инструмент для линтинга файлов стилей.\n\nИспользуется в макросе [TS_STYLELINT()](https://docs.yandex-team.ru/frontend-in-arcadia/references/macros#ts-stylelint).",
     "type": "NPM_PACKAGE",
-    "default": "16.14.1",
+    "default": "16.15.0",
     "links": {
       "Home": "https://stylelint.io/",
       "Sources": "https://github.com/stylelint/stylelint",
@@ -4347,6 +4351,10 @@
     },
     "useDirectly": true,
     "versions": {
+      "16.15.0": {
+        "add_date": "2025-03-18T05:35:12",
+        "resources": []
+      },
       "16.14.1": {
         "add_date": "2025-02-11T05:32:08",
         "resources": []
@@ -4449,7 +4457,7 @@
     "title": "TypeScript",
     "description": "Официальная реализация языка TypeScript\n\nВ проекте используется только `tsc` - компилятор/траспиллер TS в JS.\nТакже ожидается наличие `tsconfig.json` на проекте.\n\nВ tier-0 используется напрямую в модуле/макросе [`TS_TSC()`](https://docs.yandex-team.ru/frontend-in-arcadia/references/TS_TSC).\nНо опосредованно может использоваться и в других макросах.",
     "type": "NPM_PACKAGE",
-    "default": "5.7.3",
+    "default": "5.8.2",
     "links": {
       "Home": "https://www.typescriptlang.org",
       "Sources": "https://github.com/microsoft/TypeScript/",
@@ -4461,6 +4469,10 @@
     "useDirectly": true,
     "defaultBinName": "tsc",
     "versions": {
+      "5.8.2": {
+        "add_date": "2025-03-18T05:35:21",
+        "resources": []
+      },
       "5.7.3": {
         "add_date": "2025-01-28T05:31:48",
         "resources": []
@@ -4543,7 +4555,7 @@
     "title": "Vite",
     "description": "Современный сборщик frontend проектов\n\nПод капотом используется более низкоуровневый сборщик [rollup](https://rollupjs.org/).\n\nДля транспиляции TypeScript может использовать нативные способы: [esbuild](https://esbuild.github.io/), [SWC](https://swc.rs/)\n\nПоэтому, если требуется использовать `rollup` или `esbuild`/`SWC` на проекте - то `vite` - ваш выбор.\n\nВ tier-0 используется в модуле/макросе [`TS_VITE()`](https://docs.yandex-team.ru/frontend-in-arcadia/references/TS_VITE).",
     "type": "NPM_PACKAGE",
-    "default": "6.1.1",
+    "default": "6.2.0",
     "links": {
       "Home": "https://vitejs.dev/",
       "Sources": "https://github.com/vitejs/vite/tree/main",
@@ -4553,6 +4565,10 @@
     },
     "useDirectly": true,
     "versions": {
+      "6.2.0": {
+        "add_date": "2025-03-18T05:35:32",
+        "resources": []
+      },
       "6.1.1": {
         "add_date": "2025-03-11T05:34:26",
         "resources": []
