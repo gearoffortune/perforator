@@ -1,0 +1,56 @@
+{{- if .Values.ingress.storage.enabled -}}
+{{- $serviceName := (include "perforator.storage.service.name" .) -}}
+{{- $port := .Values.storage.service.ports.grpc.port -}} 
+{{- if and .Values.ingress.storage.className (not (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion)) }}
+  {{- if not (hasKey .Values.ingress.storage.annotations "kubernetes.io/ingress.class") }}
+  {{- $_ := set .Values.ingress.storage.annotations "kubernetes.io/ingress.class" .Values.ingress.storage.className}}
+  {{- end }}
+{{- end }}
+apiVersion: {{ include "perforator.ingress.apiVersion" . }}
+kind: Ingress
+metadata:
+  name: {{ include "perforator.fullname" . }}-ingress-storage
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "perforator.selectorLabels" . | nindent 4 }}
+  {{- with .Values.ingress.storage.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if and .Values.ingress.storage.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
+  ingressClassName: {{ .Values.ingress.storage.className }}
+  {{- end }}
+  {{- if .Values.ingress.storage.tls }}
+  tls:
+    {{- range .Values.ingress.storage.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.storage.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            {{- if and .pathType (semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion) }}
+            pathType: {{ .pathType }}
+            {{- end }}
+            backend:
+              {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
+              service:
+                name: {{ $serviceName }}
+                port:
+                  number: {{ $port }}
+              {{- else }}
+              serviceName: {{ $serviceName }}
+              servicePort: {{ $port }}
+              {{- end }}
+          {{- end }}
+    {{- end }}
+{{- end }}

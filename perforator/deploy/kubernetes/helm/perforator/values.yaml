@@ -280,6 +280,13 @@ agent:
       # The name of the label on the target service to use as the job name in prometheus.
       jobLabel: ""
 
+  # Adds entries to a Pod's /etc/hosts
+  # See https://kubernetes.io/docs/tasks/network/customize-hosts-file-for-pods/
+  hostAliases:
+  #  - ip: "127.0.0.1"
+  #    hostnames:
+  #      - "example.local"
+
   containerPorts:
     metrics: 9156
       
@@ -713,7 +720,7 @@ ingress:
     enabled: false
     # Annotations for http ingress.
     annotations: {}
-    # Specifies http ingress class name for example: nginx.
+    # Specifies http ingress class name e.g. "nginx".
     className: ""
     # Specifies hosts.
     hosts:
@@ -730,7 +737,7 @@ ingress:
     enabled: false
     # Annotations for grpc ingress.
     annotations: {}
-    # Specifies grpc ingress class name for example: nginx.
+    # Specifies grpc ingress class name e.g. "nginx".
     className: ""
     # Specifies hosts.
     hosts:
@@ -742,6 +749,26 @@ ingress:
     #  - secretName: example-tls-secret
     #    hosts:
     #      - example.com
+
+  # You can setup ingress for perforator storage, it might be used for inter-cluster deployment.
+  # Note that agent-storage communication is conducted via grpc.
+  storage:
+    # Enables storage ingress.
+    enabled: false
+    # Annotations for storage ingress.
+    annotations: {}
+    # Specifies storage ingress class name e.g. "nginx".
+    className: ""
+    # Specifies hosts.
+    hosts:
+      - host: storage.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+    #  - secretName: storage-tls-secret
+    #    hosts:
+    #      - storage.com
 
 gc:
   enabled: true
