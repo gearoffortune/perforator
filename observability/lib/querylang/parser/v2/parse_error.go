@@ -17,7 +17,7 @@ type ParseError struct {
 	errType ParseErrorType
 }
 
-func (p ParseError) Error() string {
+func (p *ParseError) Error() string {
 	switch p.errType {
 	case Syntax:
 		return fmt.Sprintf("syntax errors: %s", p.msg)
@@ -38,15 +38,15 @@ func NewParseError(syntaxErrors []error, semanticErrors []error) error {
 	return nil
 }
 
-func NewSyntaxParseError(syntaxErrors []error) ParseError {
-	return ParseError{
+func NewSyntaxParseError(syntaxErrors []error) *ParseError {
+	return &ParseError{
 		msg:     fmt.Sprintf("%s", errors.Join(syntaxErrors...)),
 		errType: Syntax,
 	}
 }
 
-func NewSemanticParseError(semanticErrors []error) ParseError {
-	return ParseError{
+func NewSemanticParseError(semanticErrors []error) *ParseError {
+	return &ParseError{
 		msg:     fmt.Sprintf("%s", errors.Join(semanticErrors...)),
 		errType: Semantic,
 	}
