@@ -41,7 +41,7 @@ func (o *Options) fillDefault() {
 		o.DropStuckUploadPeriod = 5 * time.Minute
 	}
 	if o.LastUsedTimestampUpdateInterval == time.Duration(0) {
-		o.LastUsedTimestampUpdateInterval = 15 * time.Minute
+		o.LastUsedTimestampUpdateInterval = time.Hour
 	}
 }
 
