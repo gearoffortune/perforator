@@ -1,7 +1,6 @@
 package parserv2
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 	"regexp"
@@ -39,13 +38,7 @@ func (l *listener) hasErrors() bool {
 }
 
 func (l *listener) Err() error {
-	if len(l.syntaxErrors) > 0 {
-		return fmt.Errorf("syntax errors: %s", errors.Join(l.syntaxErrors...))
-	}
-	if len(l.semanticErrors) > 0 {
-		return fmt.Errorf("semantic errors: %s", errors.Join(l.semanticErrors...))
-	}
-	return nil
+	return NewParseError(l.syntaxErrors, l.semanticErrors)
 }
 
 func (l *listener) onSyntaxError(err error) {
