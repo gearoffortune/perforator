@@ -19,10 +19,10 @@ View `profile.pprof` file.
 ## Start a subprocess and collect its flamegraph
 
 ```console
-perforator record --duration 1m -o ./flame.svg -- ls
+perforator record --duration 1m -o ./flame.html -- ls
 ```
 
-View `flame.svg` file.
+View `flame.html` file.
 
 ## Collect profile of a process and serve a flamegraph on localhost:9000
 
@@ -41,10 +41,10 @@ perforator record -a --duration 1m --serve ":9000"
 
 View the flamegraph at `http://localhost:9000` in your browser.
 
-## Collect profile of a whole system and save flamegraph SVG to file.
+## Collect profile of a whole system and save flamegraph HTML to file.
 
 ```console
-perforator record -a --duration 1m --output flame.svg
+perforator record -a --duration 1m --output flame.html
 ```
 
-View `flame.svg` file.
+View `flame.html` file.
