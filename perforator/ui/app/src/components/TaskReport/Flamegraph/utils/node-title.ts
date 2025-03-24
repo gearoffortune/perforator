@@ -1,9 +1,9 @@
 import type { FormatNode } from 'src/models/Profile';
 
 
-type ReadString = (id?: number) => string;
+export type ReadString = (id?: number) => string;
 
-type StringModifier = (s: string) => string;
+export type StringModifier = (s: string) => string;
 
 export function getNodeTitleFull(readString: ReadString, maybeShorten: StringModifier, node: FormatNode): string {
     const kind = readString(node.kind);

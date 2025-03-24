@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { Xmark } from '@gravity-ui/icons';
 import BarsAscendingAlignLeftArrowUpIcon from '@gravity-ui/icons/svgs/bars-ascending-align-left-arrow-up.svg?raw';
 import BarsDescendingAlignLeftArrowDownIcon from '@gravity-ui/icons/svgs/bars-descending-align-left-arrow-down.svg?raw';
+import FunnelIcon from '@gravity-ui/icons/svgs/funnel.svg?raw';
+import FunnelXmarkIcon from '@gravity-ui/icons/svgs/funnel-xmark.svg?raw';
 import MagnifierIcon from '@gravity-ui/icons/svgs/magnifier.svg?raw';
 import { Button, Icon, Loader } from '@gravity-ui/uikit';
 
@@ -61,13 +63,16 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
         setQuery({ flamegraphQuery: false });
     }, [setQuery]);
     const haveOmittedNodes = Boolean(getQuery('omittedIndexes'));
+    const keepOnlyFound = getQuery('keepOnlyFound') === 'true';
+    const switchKeepOnlyFound = React.useCallback(() => {
+        setQuery({ keepOnlyFound: !keepOnlyFound ? 'true' : false });
+    }, [keepOnlyFound, setQuery]);
     const handleOmittedNodesReset = React.useCallback(() => {
         setQuery({ omittedIndexes: false });
     }, [setQuery]);
 
     const handleSearchUpdate = (text: string) => {
         setQuery({ 'flamegraphQuery': encodeURIComponent(text) });
-
         setShowDialog(false);
     };
 
@@ -84,12 +89,13 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
                 isDiff,
                 searchPattern: search ? RegExp(decodeURIComponent(search)) : null,
                 reverse,
+                keepOnlyFound,
             };
 
             return newFlame(flamegraphContainer.current, profileData, flamegraphOffsets.current, renderOptions);
         }
         return () => {};
-    }, [getQuery, isDiff, profileData, reverse, search, setQuery, theme, userSettings]);
+    }, [getQuery, isDiff, keepOnlyFound, profileData, reverse, search, setQuery, theme, userSettings]);
 
     const handleContextMenu = React.useCallback((event: React.MouseEvent) => {
         if (!flamegraphContainer.current || !profileData || !flamegraphOffsets.current) {
@@ -121,10 +127,12 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
         if ((event.ctrlKey || event.metaKey) && event.code === 'KeyF') {
             event.preventDefault();
             handleSearch();
+        } else if (event.altKey && event.code === 'KeyF') {
+            switchKeepOnlyFound();
         } else if (event.key === 'Escape') {
             handleSearchReset();
         }
-    }, [handleSearch, handleSearchReset]);
+    }, [handleSearch, handleSearchReset, switchKeepOnlyFound]);
 
     React.useEffect(() => {
         window.addEventListener('keydown', handleKeyDown);
@@ -160,6 +168,13 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
                         Search
                             <Hotkey value="cmd+F" />
                         </Button>
+                        {search ?
+                            <Button onClick={switchKeepOnlyFound}>
+                                <Icon data={keepOnlyFound ? FunnelXmarkIcon : FunnelIcon}/>
+                                {keepOnlyFound ? 'Show all stacks' : 'Show matched stacks'}
+                                <Hotkey value="alt+F"/>
+                            </Button>
+                            : null}
                     </div>
                     <div className="flamegraph__frames-count">Showing {framesCount} frames</div>
                 </div>
