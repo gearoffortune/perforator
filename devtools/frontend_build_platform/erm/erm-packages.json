@@ -1157,7 +1157,7 @@
     "title": "ESLint",
     "description": "Статический анализатор кода (линтер).\n\nОсуществляет поиск, а иногда и исправление частых ошибок.\nМожет следить за стилем кода, форматированием.\n\nРасширяем плагинами (Typescript, Prettier, Stylelint).\n\n[Подробнее про линтинг в tier-0](https://docs.yandex-team.ru/frontend-in-arcadia/index/quick-start#lint)",
     "type": "NPM_PACKAGE",
-    "default": "9.21.0",
+    "default": "9.22.0",
     "links": {
       "Home": "https://eslint.org",
       "Sources": "https://github.com/eslint/eslint",
@@ -1166,6 +1166,10 @@
     },
     "useDirectly": true,
     "versions": {
+      "9.22.0": {
+        "add_date": "2025-03-25T05:33:15",
+        "resources": []
+      },
       "9.21.0": {
         "add_date": "2025-03-11T05:30:46",
         "resources": []
@@ -4011,7 +4015,7 @@
   "playwright": {
     "description": "Раннер для тестов Playwright, позволяет выполнять end-to-end тесты с учётом специфики различных браузеров и устройств",
     "type": "NPM_PACKAGE",
-    "default": "1.50.1",
+    "default": "1.51.0",
     "links": {
       "Home": "https://playwright.dev/",
       "Sources": "https://github.com/microsoft/playwright",
@@ -4021,6 +4025,10 @@
     "specifier": ">=1.41.2",
     "useDirectly": true,
     "versions": {
+      "1.51.0": {
+        "add_date": "2025-03-25T05:34:19",
+        "resources": []
+      },
       "1.50.1": {
         "add_date": "2025-02-18T05:37:01",
         "resources": []
