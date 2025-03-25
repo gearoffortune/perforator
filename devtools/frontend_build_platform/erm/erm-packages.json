@@ -4590,7 +4590,7 @@
     "title": "Vite",
     "description": "Современный сборщик frontend проектов\n\nПод капотом используется более низкоуровневый сборщик [rollup](https://rollupjs.org/).\n\nДля транспиляции TypeScript может использовать нативные способы: [esbuild](https://esbuild.github.io/), [SWC](https://swc.rs/)\n\nПоэтому, если требуется использовать `rollup` или `esbuild`/`SWC` на проекте - то `vite` - ваш выбор.\n\nВ tier-0 используется в модуле/макросе [`TS_VITE()`](https://docs.yandex-team.ru/frontend-in-arcadia/references/TS_VITE).",
     "type": "NPM_PACKAGE",
-    "default": "6.2.0",
+    "default": "6.2.1",
     "links": {
       "Home": "https://vitejs.dev/",
       "Sources": "https://github.com/vitejs/vite/tree/main",
@@ -4600,6 +4600,10 @@
     },
     "useDirectly": true,
     "versions": {
+      "6.2.1": {
+        "add_date": "2025-03-25T05:34:35",
+        "resources": []
+      },
       "6.2.0": {
         "add_date": "2025-03-18T05:35:32",
         "resources": []
