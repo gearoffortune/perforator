@@ -1,9 +1,10 @@
 import React from 'react';
 
-import axios from 'axios';
+import { parseFromWebStream } from '@discoveryjs/json-ext';
 
 import { useThemeType } from '@gravity-ui/uikit';
 
+import { ErrorPanel } from 'src/components/ErrorPanel/ErrorPanel';
 import { uiFactory } from 'src/factory';
 import type { ProfileData } from 'src/models/Profile';
 import { useUserSettings } from 'src/providers/UserSettingsProvider/UserSettingsContext.ts';
@@ -31,27 +32,31 @@ export const TaskFlamegraph: React.FC<TaskFlamegraphProps> = (props) => {
 
 
     const [profileData, setProfileData] = React.useState<ProfileData | undefined>();
+    const [error, setError] = React.useState<Error | undefined>();
 
     const getProfileData = async () => {
+
         const fetchingStart = performance.now();
-        const data = (
-            await axios.get(props.url, {
-                headers: {
-                    'Accept-encoding': 'gzip',
-                },
-            })
-        )?.data;
+        const req = await fetch(props.url);
+        const data = await parseFromWebStream(req.body!);
         const fetchingFinish = performance.now();
 
         // eslint-disable-next-line no-console
         console.log('Fetched data in', fetchingFinish - fetchingStart, 'ms');
-
         if (props.format === 'JSONFlamegraph') {
             setProfileData({ rows: data.rows.filter(Boolean), stringTable: data.stringTable });
         } else if (props.format === 'Flamegraph') {
             setProfileData(uiFactory()?.parseLegacyFormat?.(data));
         }
         uiFactory().rum()?.finishDataLoading?.('task-flamegraph');
+    };
+
+    const getProfileDataWithCatch = async () => {
+        try {
+            await getProfileData();
+        } catch (e) {
+            setError(e as Error);
+        }
     };
 
     const prerenderedNewData = React.useMemo(() => {
@@ -68,9 +73,14 @@ export const TaskFlamegraph: React.FC<TaskFlamegraphProps> = (props) => {
         if (!isMounted.current) {
             uiFactory().rum()?.makeSpaSubPage?.('task-flamegraph');
             isMounted.current = true;
-            getProfileData();
+            getProfileDataWithCatch();
+
         }
     });
+
+    if (error) {
+        return <ErrorPanel message={error.message}/>;
+    }
 
     return (
         <Flamegraph

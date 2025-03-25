@@ -11,6 +11,9 @@ importers:
       '@bem-react/classname':
         specifier: 1.6.0
         version: 1.6.0
+      '@discoveryjs/json-ext':
+        specifier: 0.6.3
+        version: 0.6.3
       '@gravity-ui/components':
         specifier: 3.12.4
         version: 3.12.4(@gravity-ui/uikit@6.34.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -403,6 +406,10 @@ packages:
     engines: {node: ^14 || ^16 || >=18}
     peerDependencies:
       postcss-selector-parser: ^6.0.13
+
+  '@discoveryjs/json-ext@0.6.3':
+    resolution: {integrity: sha512-4B4OijXeVNOPZlYA2oEwWOTkzyltLao+xbotHQeqN++Rv27Y6s818+n2Qkp8q+Fxhn0t/5lA5X1Mxktud8eayQ==}
+    engines: {node: '>=14.17.0'}
 
   '@esbuild/aix-ppc64@0.19.12':
     resolution: {integrity: sha512-bmoCYyWdEL3wDQIVbcyzRyeKLgk2WtWLTWz1ZIAZF/EGbNOwSA6ew3PftJ1PqMiOOGu0OyFMzG53L0zqIpPeNA==}
@@ -3671,6 +3678,8 @@ snapshots:
   '@csstools/selector-specificity@3.1.1(postcss-selector-parser@6.1.2)':
     dependencies:
       postcss-selector-parser: 6.1.2
+
+  '@discoveryjs/json-ext@0.6.3': {}
 
   '@esbuild/aix-ppc64@0.19.12':
     optional: true
