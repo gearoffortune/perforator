@@ -65,9 +65,9 @@ describe('flamegraph titles', () => {
 
     const renderTitle = renderTitleFull.bind(null, n => n.eventCount, n => n.sampleCount, getNodeTitle, false);
 
-    const getStatusTitle = getStatusTitleFull(renderTitle);
+    const getStatusTitle = getStatusTitleFull('cycles', renderTitle);
 
-    const getCanvasTitle = getCanvasTitleFull(renderTitle);
+    const getCanvasTitle = getCanvasTitleFull('cycles', renderTitle);
     it('should correctly render canvas title', () => {
         expect(getCanvasTitle(childOne, null, node)).toMatchSnapshot();
         expect(getCanvasTitle(childTwo, null, node)).toMatchSnapshot();
@@ -89,9 +89,9 @@ describe('flamegraph titles for diffs', () => {
 
     const renderTitle = renderTitleFull.bind(null, n => n.eventCount, n => n.sampleCount, getNodeTitle, true);
 
-    const getStatusTitle = getStatusTitleFull(renderTitle);
+    const getStatusTitle = getStatusTitleFull('cycles', renderTitle);
 
-    const getCanvasTitle = getCanvasTitleFull(renderTitle);
+    const getCanvasTitle = getCanvasTitleFull('cycles', renderTitle);
 
     it('should correctly render canvas title', () => {
         expect(getCanvasTitle(childOne, null, node)).toMatchSnapshot();

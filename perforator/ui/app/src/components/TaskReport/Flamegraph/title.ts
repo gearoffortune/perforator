@@ -58,21 +58,25 @@ export function renderTitleFull(countEventCountWidth: NodeGetter<number>, countS
     };
 }
 
-export const getStatusTitleFull = (renderTitle: RenderTitleResult) => renderTitle({
+function capitalize(s: string) {
+    return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+export const getStatusTitleFull = (eventName: string, renderTitle: RenderTitleResult) => renderTitle({
     getPct: ({ rootPct, selectedPct }) => (
         [rootPct, selectedPct].filter(Boolean).map(formatPct).join('/')
     ),
-    getNumbers: ({ sampleCount, eventCount, percent }) => `${eventCount} cycles, ${sampleCount} samples, ${percent}`,
+    getNumbers: ({ sampleCount, eventCount, percent }) => `${eventCount} ${eventName}, ${sampleCount} samples, ${percent}`,
     wrapNumbers: numbers => ` (${numbers})`,
     getDelta: delta => `, ${delta}`,
 });
 
-export const getCanvasTitleFull = (renderTitle: RenderTitleResult) => renderTitle({
+export const getCanvasTitleFull = (eventName: string, renderTitle: RenderTitleResult) => renderTitle({
     getPct: ({ rootPct, selectedPct }) => (
         (rootPct ? `Percentage of root frame: ${formatPct(rootPct)}\n` : '')
         + (selectedPct ? `Percentage of selected frame: ${formatPct(selectedPct)}\n` : '')
     ),
-    getNumbers: ({ sampleCount, eventCount, percent }) => `\nSamples: ${sampleCount}\nCycles: ${eventCount}\n${percent}`,
+    getNumbers: ({ sampleCount, eventCount, percent }) => `\nSamples: ${sampleCount}\n${capitalize(eventName)}: ${eventCount}\n${percent}`,
     wrapNumbers: numbers => numbers.trimEnd(),
     getDelta: delta => `Diff: ${delta}\n`,
 });

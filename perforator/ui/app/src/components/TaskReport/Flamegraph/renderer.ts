@@ -529,9 +529,11 @@ export const renderFlamegraph: RenderFlamegraphType = (
 
     const renderTitle = renderTitleFull.bind(null, fg.countEventCountWidth, fg.countSampleCountWidth, getNodeTitle, isDiff);
 
-    const getStatusTitle = getStatusTitleFull(renderTitle);
+    const eventType = readString(profileData.meta.eventType);
 
-    const getCanvasTitle = getCanvasTitleFull(renderTitle);
+    const getStatusTitle = getStatusTitleFull(eventType, renderTitle);
+
+    const getCanvasTitle = getCanvasTitleFull(eventType, renderTitle);
 
 
     function renderImpl(opts?: RenderOpts) {

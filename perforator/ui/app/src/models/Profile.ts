@@ -29,7 +29,16 @@ export interface FormatNode {
 export type ProfileData = {
     rows: FormatNode[][];
     stringTable: string[];
+    meta: ProfileMeta;
 }
+
+
+export type ProfileMeta = {
+    eventType: StringTableIndex;
+    frameType: StringTableIndex;
+    version: number;
+}
+
 
 type StringifiableFields = 'frameOrigin' | 'file' | 'kind' | 'textId';
 export type StringifiedNode = Omit<FormatNode, StringifiableFields> & {
