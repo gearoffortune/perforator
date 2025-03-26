@@ -18,6 +18,7 @@ import { uiFactory } from 'src/factory/index.ts';
 import type { FormatNode, ProfileData } from 'src/models/Profile.ts';
 import type { UserSettings } from 'src/providers/UserSettingsProvider/UserSettings.ts';
 
+import { hugenum } from './flame-utils.ts';
 import { pct } from './pct.ts';
 import type { GetStateFromQuery, SetStateFromQuery } from './query-utils.ts';
 import { parseStacks, stringifyStacks } from './query-utils.ts';
@@ -520,8 +521,9 @@ export const renderFlamegraph: RenderFlamegraphType = (
     const rows = profileData.rows;
     const root = rows[0][0];
 
-    function renderSearch(matched: number, showReset: boolean) {
+    function renderSearch(matched: number, title: string, showReset: boolean) {
         findElement('match-value').textContent = pct(matched, canvasWidth!) + '%';
+        findElement('match-value').title = title;
         findElement('match').style.display = showReset ? 'inherit' : 'none';
     }
 
@@ -551,10 +553,18 @@ export const renderFlamegraph: RenderFlamegraphType = (
 
 
         const marked: Record<number | string, number> = {};
+        let markedEventCount = 0;
+        let markedSampleCount = 0;
+        let markedBaseEventCount = 0;
+        let markedBaseSampleCount = 0;
 
 
         function mark(f: FormatNode) {
             const width = fg.countWidth(f);
+            markedEventCount += (f.eventCount - (f.omittedEventCount ?? 0));
+            markedSampleCount += (f.sampleCount - (f.omittedSampleCount ?? 0));
+            markedBaseEventCount += f.baseEventCount ?? 0;
+            markedBaseSampleCount += f.baseSampleCount ?? 0;
             if (!(marked[f.x!] >= width)) {
                 marked[f.x!] = width;
             }
@@ -653,7 +663,17 @@ export const renderFlamegraph: RenderFlamegraphType = (
         }
         labels?.replaceChildren(...newLabels);
 
-        renderSearch(totalMarked(), Boolean(opts?.pattern));
+        function templateTitle(eventCount: number, sampleCount: number) {
+            return `${hugenum(eventCount)} ${eventType} / ${hugenum(sampleCount)} samples`;
+        }
+
+        let title = templateTitle(markedEventCount, markedSampleCount);
+
+        if (markedBaseEventCount && markedBaseSampleCount) {
+            title = 'Diff: ' + title + '\nBase: ' + templateTitle(markedBaseEventCount, markedBaseSampleCount);
+        }
+
+        renderSearch(totalMarked(), title, Boolean(opts?.pattern));
 
 
     }
