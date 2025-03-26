@@ -515,7 +515,8 @@ func (s *StorageServer) pushBinaryPerformUpload(buildID string, reqStream perfor
 		},
 	)
 	if err != nil {
-		if !errors.Is(err, binarymeta.ErrAlreadyUploaded) && !errors.Is(err, binarymeta.ErrUploadInProgress) {
+		if !errors.Is(err, binarymeta.ErrAlreadyUploaded) &&
+			!errors.Is(err, binarymeta.ErrUploadInProgress) {
 			s.metrics.storedBinariesErrors.Inc()
 		}
 		return fmt.Errorf("failed to store binary in meta storage: %w", err)

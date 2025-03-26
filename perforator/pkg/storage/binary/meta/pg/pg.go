@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jmoiron/sqlx"
 	hasql "golang.yandex/hasql/sqlx"
 
@@ -97,6 +98,12 @@ func (s *Storage) storeBinary(ctx context.Context, tx *sqlx.Tx, binaryMeta *bina
 		newRow.Attributes,
 		newRow.UploadStatus,
 	)
+
+	var pgErr *pgconn.PgError
+	// if duplicate key violation consider it as ErrUploadInProgress
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "binaries_pkey" {
+		return binarymeta.ErrUploadInProgress
+	}
 
 	return err
 }
