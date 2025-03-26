@@ -38,14 +38,15 @@ export const TaskFlamegraph: React.FC<TaskFlamegraphProps> = (props) => {
 
         const fetchingStart = performance.now();
         const req = await fetch(props.url);
-        const data = await parseFromWebStream(req.body!);
         const fetchingFinish = performance.now();
 
         // eslint-disable-next-line no-console
         console.log('Fetched data in', fetchingFinish - fetchingStart, 'ms');
         if (props.format === 'JSONFlamegraph') {
+            const data = await parseFromWebStream(req.body!);
             setProfileData({ rows: data.rows.filter(Boolean), stringTable: data.stringTable });
         } else if (props.format === 'Flamegraph') {
+            const data = await req.text();
             setProfileData(uiFactory()?.parseLegacyFormat?.(data));
         }
         uiFactory().rum()?.finishDataLoading?.('task-flamegraph');
