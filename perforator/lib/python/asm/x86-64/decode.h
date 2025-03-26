@@ -26,79 +26,22 @@
 #include <llvm/Object/ELFObjectFile.h>
 #include <llvm/Object/ObjectFile.h>
 
+#include <library/cpp/logger/global/global.h>
+
 #include <util/generic/array_ref.h>
 #include <util/generic/function_ref.h>
 #include <util/generic/maybe.h>
+#include <util/generic/hash.h>
+#include <util/generic/vector.h>
 
-namespace NPerforator::NLinguist::NPython::NDecode {
+#include <perforator/lib/asm/x86/evaluator.h>
+
+namespace NPerforator::NLinguist::NPython::NAsm {
     using ThreadImageOffsetType = i64;
-} // namespace NPerforator::NLinguist::NPython::NDecode
+} // namespace NPerforator::NLinguist::NPython::NAsm
 
 
-namespace NPerforator::NLinguist::NPython::NDecode::NX86 {
-
-template <typename ELFT>
-void DecodeInstructions(
-    llvm::object::ELFObjectFile<ELFT>* elf,
-    TConstArrayRef<ui8> bytecode,
-    TFunctionRef<bool(const llvm::MCInst&, ui64 size)> instCallback
-) {
-    LLVMInitializeX86Target();
-    LLVMInitializeX86TargetInfo();
-    LLVMInitializeX86TargetMC();
-    LLVMInitializeX86Disassembler();
-
-    auto triple = elf->makeTriple();
-    std::string error;
-    const llvm::Target* target = llvm::TargetRegistry::lookupTarget(triple.getTriple(), error);
-    if (!target) {
-        Cout << "Failed to lookup target by triple " << triple.getTriple() << ' ' << error << Endl;
-        return;
-    }
-
-    auto mri = target->createMCRegInfo(triple.getTriple());
-
-    llvm::MCTargetOptions options;
-    std::unique_ptr<llvm::MCAsmInfo> asmInfo(
-        target->createMCAsmInfo(
-            *mri,
-            triple.getTriple(),
-            options
-        )
-    );
-
-    auto subTargetInfo = target->createMCSubtargetInfo(triple.getTriple(), "", "");
-    if (subTargetInfo == nullptr) {
-        return;
-    }
-
-    llvm::MCContext context(triple, asmInfo.get(), mri, subTargetInfo);
-
-    std::unique_ptr<llvm::MCDisassembler> disasm(target->createMCDisassembler(*subTargetInfo, context));
-
-    for (size_t i = 0; i < bytecode.size(); ) {
-        llvm::MCInst inst;
-        ui64 size = 0;
-        auto status = disasm->getInstruction(inst, size, llvm::ArrayRef<ui8>(bytecode.data() + i, bytecode.size() - i), i, llvm::nulls());
-
-        if (status != llvm::MCDisassembler::Success) {
-            break;
-        }
-
-        if (llvm::X86::isRET(inst.getOpcode()) ||
-            llvm::X86::isRETFQ(inst.getOpcode()) ||
-            llvm::X86::isRETF(inst.getOpcode())) {
-            break;
-        }
-
-        if (!instCallback(inst, size)) {
-            break;
-        }
-
-        // Move to the next instruction
-        i += size;
-    }
-}
+namespace NPerforator::NLinguist::NPython::NAsm::NX86 {
 
 /*
 000000000028a0b0 <_PyThreadState_GetCurrent@@Base>:
@@ -117,7 +60,7 @@ TMaybe<ThreadImageOffsetType> DecodePyThreadStateGetCurrent(
     TConstArrayRef<ui8> bytecode
 ) {
     ThreadImageOffsetType result = 0;
-    DecodeInstructions(elf, bytecode, [&](const llvm::MCInst& inst, ui64 size) {
+    DecodeInstructions(TLoggerOperator<TGlobalLog>::Log(), elf->makeTriple(), bytecode, [&](const llvm::MCInst& inst, ui64 size) {
         Y_UNUSED(size);
 
         switch (inst.getOpcode()) {
@@ -177,7 +120,7 @@ TMaybe<ThreadImageOffsetType> DecodeCurrentFastGet(
     TConstArrayRef<ui8> bytecode
 ) {
     ThreadImageOffsetType lastNegativeImm = 0;
-    DecodeInstructions(elf, bytecode, [&](const llvm::MCInst& inst, ui64 size) {
+    DecodeInstructions(TLoggerOperator<TGlobalLog>::Log(), elf->makeTriple(), bytecode, [&](const llvm::MCInst& inst, ui64 size) {
         Y_UNUSED(size);
 
         switch (inst.getOpcode()) {
@@ -271,7 +214,7 @@ TMaybe<ui64> DecodePyGetVersion(
 
     // Look for instructions that load address into the 4th argument argument register (rcx/ecx)
     // Check the implementation of Py_GetVersion: https://github.com/python/cpython/blob/v3.11.0/Python/getversion.c#L12
-    DecodeInstructions(elf, bytecode, [&](const llvm::MCInst& inst, ui64 size) {
+    DecodeInstructions(TLoggerOperator<TGlobalLog>::Log(), elf->makeTriple(), bytecode, [&](const llvm::MCInst& inst, ui64 size) {
         rip += size;
 
         switch (inst.getOpcode()) {
@@ -331,4 +274,11 @@ TMaybe<ui64> DecodePyGetVersion(
     return pythonVersionBuffer;
 }
 
-} // namespace NPerforator::NLinguist::NPython::NDecode::NX86
+
+TMaybe<ui64> DecodeAutoTSSKeyAddress(
+    llvm::object::ObjectFile* elf,
+    ui64 functionAddress,
+    TConstArrayRef<ui8> bytecode
+);
+
+} // namespace NPerforator::NLinguist::NPython::NAsm::NX86

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "decode_x86_64.h"
+#include <perforator/lib/python/asm/x86-64/decode.h>
 
 #include <perforator/lib/tls/parser/tls.h>
 
@@ -63,15 +63,15 @@ public:
     TMaybe<TParsedPythonVersion> ParseVersion();
 
     // _Py_tss_tstate (https://github.com/python/cpython/blob/main/Include/internal/pycore_pystate.h#L116)
-    TMaybe<NDecode::ThreadImageOffsetType> ParseTLSPyThreadState();
+    TMaybe<NAsm::ThreadImageOffsetType> ParseTLSPyThreadState();
 
     // _PyRuntime singleton
     TMaybe<ui64> ParsePyRuntimeAddress();
 
-    /*
-    TODO(@pashaguskov): support 3.12- versions
-    uint64 ParseAutoTSSKeyAddress();
-    */
+    // Parses the absolute address of autoTSSkey field by disassembling PyGILState_Check
+    // In previous versions is known as autoTLSkey static variable
+    TMaybe<ui64> ParseAutoTSSKeyAddress();
+
 private:
     void ParseGlobalsAddresses();
 

@@ -47,4 +47,11 @@ int main(int argc, const char* argv[]) {
     } else {
         Cout << "Found `_PyRuntime` address: " << *pyRuntimeAddress << Endl;
     }
+
+    auto autoTSSKeyAddress = analyzer.ParseAutoTSSKeyAddress();
+    if (!autoTSSKeyAddress) {
+        Cout << "Found no `autoTSSkey` address" << Endl;
+    } else {
+        Cout << "Found `autoTSSkey` address: " << *autoTSSKeyAddress << Endl;
+    }
 }

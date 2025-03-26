@@ -186,7 +186,7 @@ TMaybe<TPythonVersion> TryParsePyGetVersion(
         Min<size_t>(64, sectionData.size() - offset)  // Limit to first 64 bytes
     );
 
-    auto versionAddress = NDecode::NX86::DecodePyGetVersion(elf, pyGetVersionAddress, bytecode);
+    auto versionAddress = NAsm::NX86::DecodePyGetVersion(elf, pyGetVersionAddress, bytecode);
     if (!versionAddress) {
         return Nothing();
     }
@@ -264,7 +264,7 @@ TMaybe<TParsedPythonVersion> TPythonAnalyzer::ParseVersion() {
 }
 
 template <typename ELFT>
-TMaybe<NDecode::ThreadImageOffsetType> ParseTLSPyThreadState(
+TMaybe<NAsm::ThreadImageOffsetType> ParseTLSPyThreadState(
     llvm::object::ObjectFile* file,
     TPythonAnalyzer::TGlobalsAddresses* addresses
 ) {
@@ -305,13 +305,13 @@ TMaybe<NDecode::ThreadImageOffsetType> ParseTLSPyThreadState(
     );
 
     if (addresses->CurrentFastGetAddress != 0) {
-        return NDecode::NX86::DecodeCurrentFastGet(elf, bytecode);
+        return NAsm::NX86::DecodeCurrentFastGet(elf, bytecode);
     }
 
-    return NDecode::NX86::DecodePyThreadStateGetCurrent(elf, bytecode);
+    return NAsm::NX86::DecodePyThreadStateGetCurrent(elf, bytecode);
 }
 
-TMaybe<NDecode::ThreadImageOffsetType> TPythonAnalyzer::ParseTLSPyThreadState() {
+TMaybe<NAsm::ThreadImageOffsetType> TPythonAnalyzer::ParseTLSPyThreadState() {
     ParseGlobalsAddresses();
 
     #define TRY_ELF_TYPE(ELFT) \
@@ -367,6 +367,82 @@ TMaybe<ui64> TPythonAnalyzer::ParsePyRuntimeAddress() {
     }
 
     return MakeMaybe(GlobalsAddresses_->PyRuntimeAddress);
+}
+
+template <typename ELFT>
+TMaybe<ui64> ParseAutoTSSKeyAddress(
+    llvm::object::ObjectFile* file,
+    const TPythonAnalyzer::TGlobalsAddresses& addresses
+) {
+    llvm::object::ELFObjectFile<ELFT>* elf = llvm::dyn_cast<llvm::object::ELFObjectFile<ELFT>>(file);
+    if (!elf) {
+        return Nothing();
+    }
+
+    if (addresses.PyRuntimeAddress == 0) {
+        return Nothing();
+    }
+
+    // Look for PyGILState_Check symbol
+    ui64 pyGILStateCheckAddress = 0;
+    for (auto&& symbol : elf->getDynamicSymbolIterators()) {
+        Y_LLVM_UNWRAP(name, symbol.getName(), { continue; });
+        Y_LLVM_UNWRAP(address, symbol.getAddress(), { continue; });
+
+        if (TStringBuf{name.data(), name.size()} == "PyGILState_Check") {
+            pyGILStateCheckAddress = address;
+            break;
+        }
+    }
+
+    if (pyGILStateCheckAddress == 0) {
+        return Nothing();
+    }
+
+    auto textSection = LookForSection(elf, kTextSectionName);
+    if (!textSection) {
+        return Nothing();
+    }
+
+    Y_LLVM_UNWRAP(sectionData, textSection->getContents(), { return Nothing(); });
+    if (pyGILStateCheckAddress < textSection->getAddress()) {
+        return Nothing();
+    }
+
+    ui64 offset = pyGILStateCheckAddress - textSection->getAddress();
+    if (offset >= sectionData.size()) {
+        return Nothing();
+    }
+
+    // Disassemble at most 100 bytes, which should be enough for PyGILState_Check
+    TConstArrayRef<ui8> bytecode(
+        reinterpret_cast<const ui8*>(sectionData.data()) + offset,
+        Min<size_t>(100, sectionData.size() - offset)
+    );
+
+    return NAsm::NX86::DecodeAutoTSSKeyAddress(
+        elf,
+        pyGILStateCheckAddress,
+        bytecode
+    );
+}
+
+TMaybe<ui64> TPythonAnalyzer::ParseAutoTSSKeyAddress() {
+    ParseGlobalsAddresses();
+
+    if (!GlobalsAddresses_) {
+        return Nothing();
+    }
+
+    #define TRY_ELF_TYPE(ELFT) \
+    if (auto res = NPerforator::NLinguist::NPython::ParseAutoTSSKeyAddress<ELFT>(File_, *GlobalsAddresses_.Get())) { \
+        return res; \
+    }
+
+    Y_LLVM_FOR_EACH_ELF_TYPE(TRY_ELF_TYPE)
+
+#undef TRY_ELF_TYPE
+    return Nothing();
 }
 
 } // namespace NPerforator::NLinguist::NPython

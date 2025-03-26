@@ -32,6 +32,7 @@ PEERDIR(
 
     perforator/lib/tls/parser
     perforator/lib/llvmex
+    perforator/lib/python/asm/x86-64
 )
 
 SRCS(
@@ -41,5 +42,6 @@ SRCS(
 END()
 
 RECURSE(
+    asm
     cli
 )
