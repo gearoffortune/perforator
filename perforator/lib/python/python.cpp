@@ -186,7 +186,7 @@ TMaybe<TPythonVersion> TryParsePyGetVersion(
         Min<size_t>(64, sectionData.size() - offset)  // Limit to first 64 bytes
     );
 
-    auto versionAddress = NAsm::NX86::DecodePyGetVersion(elf, pyGetVersionAddress, bytecode);
+    auto versionAddress = NAsm::NX86::DecodePyGetVersion(elf->makeTriple(), pyGetVersionAddress, bytecode);
     if (!versionAddress) {
         return Nothing();
     }
@@ -305,10 +305,10 @@ TMaybe<NAsm::ThreadImageOffsetType> ParseTLSPyThreadState(
     );
 
     if (addresses->CurrentFastGetAddress != 0) {
-        return NAsm::NX86::DecodeCurrentFastGet(elf, bytecode);
+        return NAsm::NX86::DecodeCurrentFastGet(elf->makeTriple(), bytecode);
     }
 
-    return NAsm::NX86::DecodePyThreadStateGetCurrent(elf, bytecode);
+    return NAsm::NX86::DecodePyThreadStateGetCurrent(elf->makeTriple(), bytecode);
 }
 
 TMaybe<NAsm::ThreadImageOffsetType> TPythonAnalyzer::ParseTLSPyThreadState() {
@@ -421,7 +421,7 @@ TMaybe<ui64> ParseAutoTSSKeyAddress(
     );
 
     return NAsm::NX86::DecodeAutoTSSKeyAddress(
-        elf,
+        elf->makeTriple(),
         pyGILStateCheckAddress,
         bytecode
     );
