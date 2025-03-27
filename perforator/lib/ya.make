@@ -1,5 +1,6 @@
 RECURSE(
     asm
+    elf
     llvmex
     permutation
     profile

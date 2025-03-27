@@ -7,6 +7,7 @@
 #include <llvm/Object/ELFObjectFile.h>
 #include <llvm/Object/ObjectFile.h>
 
+#include <perforator/lib/elf/elf.h>
 #include <perforator/lib/llvmex/llvm_elf.h>
 #include <perforator/lib/llvmex/llvm_exception.h>
 
@@ -25,79 +26,35 @@ constexpr ui64 kMaxPyThreadStateGetCurrentBytecodeLength = 64;
 
 TPythonAnalyzer::TPythonAnalyzer(llvm::object::ObjectFile* file) : File_(file) {}
 
-template <typename ELFT>
-THolder<TPythonAnalyzer::TGlobalsAddresses> ParseGlobalsAddresses(llvm::object::ObjectFile* file) {
-    llvm::object::ELFObjectFile<ELFT>* elf = llvm::dyn_cast<llvm::object::ELFObjectFile<ELFT>>(file);
-    if (!elf) {
-        return nullptr;
-    }
-
-    THolder<TPythonAnalyzer::TGlobalsAddresses> res = MakeHolder<TPythonAnalyzer::TGlobalsAddresses>();
-
-    for (auto&& symbol : elf->getDynamicSymbolIterators()) {
-        Y_LLVM_UNWRAP(name, symbol.getName(), { continue; });
-        Y_LLVM_UNWRAP(address, symbol.getAddress(), { continue; });
-
-        if (TStringBuf{name.data(), name.size()} == kPyVersionSymbol) {
-            res->PyVersionAddress = address;
-        }
-
-        if (TStringBuf{name.data(), name.size()} == kPyThreadStateGetCurrentSymbol) {
-            res->GetCurrentThreadStateAddress = address;
-        }
-
-        if (TStringBuf{name.data(), name.size()} == kPyGetVersionSymbol) {
-            res->PyGetVersionAddress = address;
-        }
-
-        if (TStringBuf{name.data(), name.size()} == kPyRuntimeSymbol) {
-            res->PyRuntimeAddress = address;
-        }
-    }
-
-    for (auto&& symbol : elf->symbols()) {
-        Y_LLVM_UNWRAP(name, symbol.getName(), { continue; });
-        Y_LLVM_UNWRAP(address, symbol.getAddress(), { continue; });
-
-        if (TStringBuf{name.data(), name.size()} == kCurrentFastGetSymbol) {
-            res->CurrentFastGetAddress = address;
-        }
-    }
-
-    return res;
-}
-
-void TPythonAnalyzer::ParseGlobalsAddresses() {
-    if (GlobalsAddresses_ != nullptr) {
+void TPythonAnalyzer::ParseSymbolsAddresses() {
+    if (SymbolsAddresses_ != nullptr) {
         return;
     }
 
-    #define TRY_ELF_TYPE(ELFT) \
-    if (auto res = NPerforator::NLinguist::NPython::ParseGlobalsAddresses<ELFT>(File_)) { \
-        GlobalsAddresses_ = std::move(res); \
-        return; \
+    SymbolsAddresses_ = MakeHolder<TSymbolsAddresses>();
+
+    auto dynamicSymbols = NELF::RetrieveDynamicSymbols(File_,
+        kPyVersionSymbol,
+        kPyThreadStateGetCurrentSymbol,
+        kPyGetVersionSymbol,
+        kPyRuntimeSymbol,
+        kPyGILStateCheckSymbol
+    );
+
+    if (dynamicSymbols) {
+        SymbolsAddresses_->PyVersion = (*dynamicSymbols)[kPyVersionSymbol];
+        SymbolsAddresses_->GetCurrentThreadState = (*dynamicSymbols)[kPyThreadStateGetCurrentSymbol];
+        SymbolsAddresses_->PyGetVersion = (*dynamicSymbols)[kPyGetVersionSymbol];
+        SymbolsAddresses_->PyRuntime = (*dynamicSymbols)[kPyRuntimeSymbol];
+        SymbolsAddresses_->PyGILStateCheck = (*dynamicSymbols)[kPyGILStateCheckSymbol];
     }
 
-    Y_LLVM_FOR_EACH_ELF_TYPE(TRY_ELF_TYPE)
+    auto symbols = NELF::RetrieveSymbols(File_, kCurrentFastGetSymbol);
+    if (symbols) {
+        SymbolsAddresses_->CurrentFastGet = (*symbols)[kCurrentFastGetSymbol];
+    }
 
-#undef TRY_ELF_TYPE
     return;
-}
-
-template <typename ELFT>
-TMaybe<llvm::object::SectionRef> LookForSection(
-    llvm::object::ELFObjectFile<ELFT>* elf,
-    TStringBuf name
-) {
-    for (auto&& section : elf->sections()) {
-        Y_LLVM_UNWRAP(sectionName, section.getName(), { continue; });
-
-        if (TStringBuf{sectionName.data(), sectionName.size()} == name) {
-            return section;
-        }
-    }
-
-    return Nothing();
 }
 
 template <typename ELFT>
@@ -166,7 +123,7 @@ TMaybe<TPythonVersion> TryParsePyGetVersion(
     llvm::object::ELFObjectFile<ELFT>* elf,
     ui64 pyGetVersionAddress
 ) {
-    auto textSection = LookForSection(elf, kTextSectionName);
+    auto textSection = NELF::GetSection(*elf, NELF::NSections::kTextSectionName);
     if (!textSection) {
         return Nothing();
     }
@@ -191,7 +148,7 @@ TMaybe<TPythonVersion> TryParsePyGetVersion(
         return Nothing();
     }
 
-    auto rodataSection = LookForSection(elf, kRoDataSectionName);
+    auto rodataSection = NELF::GetSection(*elf, NELF::NSections::kRoDataSectionName);
     if (!rodataSection) {
         return Nothing();
     }
@@ -215,7 +172,7 @@ TMaybe<TPythonVersion> TryParsePyGetVersion(
 template <typename ELFT>
 TMaybe<TParsedPythonVersion> ParseVersion(
     llvm::object::ObjectFile* file,
-    const TPythonAnalyzer::TGlobalsAddresses& addresses
+    const TPythonAnalyzer::TSymbolsAddresses& addresses
 ) {
     llvm::object::ELFObjectFile<ELFT>* elf = llvm::dyn_cast<llvm::object::ELFObjectFile<ELFT>>(file);
     if (!elf) {
@@ -223,11 +180,11 @@ TMaybe<TParsedPythonVersion> ParseVersion(
     }
 
     // First try Py_Version symbol if available
-    if (addresses.PyVersionAddress != 0) {
-        auto section = LookForSection(elf, kRoDataSectionName);
+    if (addresses.PyVersion != 0) {
+        auto section = NELF::GetSection(*elf, NELF::NSections::kRoDataSectionName);
         if (section) {
             Y_LLVM_UNWRAP(sectionData, section->getContents(), { return Nothing(); });
-            if (auto version = TryParseVersionFromPyVersionSymbol<ELFT>(*section, sectionData, addresses.PyVersionAddress)) {
+            if (auto version = TryParseVersionFromPyVersionSymbol<ELFT>(*section, sectionData, addresses.PyVersion)) {
                 return MakeMaybe(TParsedPythonVersion{
                     .Version = *version,
                     .Source = EPythonVersionSource::PyVersionSymbol
@@ -237,8 +194,8 @@ TMaybe<TParsedPythonVersion> ParseVersion(
     }
 
     // Try to find PY_VERSION string through Py_GetVersion disassembly
-    if (addresses.PyGetVersionAddress != 0) {
-        if (auto version = TryParsePyGetVersion(elf, addresses.PyGetVersionAddress)) {
+    if (addresses.PyGetVersion != 0) {
+        if (auto version = TryParsePyGetVersion(elf, addresses.PyGetVersion)) {
             return MakeMaybe(TParsedPythonVersion{
                 .Version = *version,
                 .Source = EPythonVersionSource::PyGetVersionDisassembly
@@ -250,10 +207,10 @@ TMaybe<TParsedPythonVersion> ParseVersion(
 }
 
 TMaybe<TParsedPythonVersion> TPythonAnalyzer::ParseVersion() {
-    ParseGlobalsAddresses();
+    ParseSymbolsAddresses();
 
     #define TRY_ELF_TYPE(ELFT) \
-    if (auto res = NPerforator::NLinguist::NPython::ParseVersion<ELFT>(File_, *GlobalsAddresses_.Get())) { \
+    if (auto res = NPerforator::NLinguist::NPython::ParseVersion<ELFT>(File_, *SymbolsAddresses_.Get())) { \
         return res; \
     }
 
@@ -266,7 +223,7 @@ TMaybe<TParsedPythonVersion> TPythonAnalyzer::ParseVersion() {
 template <typename ELFT>
 TMaybe<NAsm::ThreadImageOffsetType> ParseTLSPyThreadState(
     llvm::object::ObjectFile* file,
-    TPythonAnalyzer::TGlobalsAddresses* addresses
+    TPythonAnalyzer::TSymbolsAddresses* addresses
 ) {
     llvm::object::ELFObjectFile<ELFT>* elf = llvm::dyn_cast<llvm::object::ELFObjectFile<ELFT>>(file);
     if (!elf) {
@@ -277,14 +234,14 @@ TMaybe<NAsm::ThreadImageOffsetType> ParseTLSPyThreadState(
         return Nothing();
     }
 
-    if (addresses->GetCurrentThreadStateAddress == 0) {
+    if (addresses->GetCurrentThreadState == 0) {
         return Nothing();
     }
 
     // current_fast_get might not be inlined into GetCurrentThreadState, so we should disassemble it instead of PyThreadState_GetCurrent.
-    ui64 getterAddress = (addresses->CurrentFastGetAddress != 0) ? addresses->CurrentFastGetAddress : addresses->GetCurrentThreadStateAddress;
+    ui64 getterAddress = (addresses->CurrentFastGet != 0) ? addresses->CurrentFastGet : addresses->GetCurrentThreadState;
 
-    auto textSection = LookForSection(elf, kTextSectionName);
+    auto textSection = NELF::GetSection(*elf, NELF::NSections::kTextSectionName);
     if (!textSection) {
         return Nothing();
     }
@@ -304,7 +261,7 @@ TMaybe<NAsm::ThreadImageOffsetType> ParseTLSPyThreadState(
         Min(kMaxPyThreadStateGetCurrentBytecodeLength, sectionData.size() - offset)
     );
 
-    if (addresses->CurrentFastGetAddress != 0) {
+    if (addresses->CurrentFastGet != 0) {
         return NAsm::NX86::DecodeCurrentFastGet(elf->makeTriple(), bytecode);
     }
 
@@ -312,10 +269,10 @@ TMaybe<NAsm::ThreadImageOffsetType> ParseTLSPyThreadState(
 }
 
 TMaybe<NAsm::ThreadImageOffsetType> TPythonAnalyzer::ParseTLSPyThreadState() {
-    ParseGlobalsAddresses();
+    ParseSymbolsAddresses();
 
     #define TRY_ELF_TYPE(ELFT) \
-    if (auto res = NPerforator::NLinguist::NPython::ParseTLSPyThreadState<ELFT>(File_, GlobalsAddresses_.Get())) { \
+    if (auto res = NPerforator::NLinguist::NPython::ParseTLSPyThreadState<ELFT>(File_, SymbolsAddresses_.Get())) { \
         return res; \
     }
 
@@ -325,91 +282,54 @@ TMaybe<NAsm::ThreadImageOffsetType> TPythonAnalyzer::ParseTLSPyThreadState() {
     return Nothing();
 }
 
-template <typename ELFT>
 bool IsPythonBinary(llvm::object::ObjectFile* file) {
-    llvm::object::ELFObjectFile<ELFT>* elf = llvm::dyn_cast<llvm::object::ELFObjectFile<ELFT>>(file);
-    if (!elf) {
-        return false;
-    }
-
-    for (auto&& symbol : elf->getDynamicSymbolIterators()) {
-        Y_LLVM_UNWRAP(name, symbol.getName(), { continue; });
-
-        if (TStringBuf{name.data(), name.size()} == kPyGetVersionSymbol) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-bool IsPythonBinary(llvm::object::ObjectFile* file) {
-    #define TRY_ELF_TYPE(ELFT) \
-    if (NPerforator::NLinguist::NPython::IsPythonBinary<ELFT>(file)) { \
-        return true; \
-    }
-
-    Y_LLVM_FOR_EACH_ELF_TYPE(TRY_ELF_TYPE)
-
-    #undef TRY_ELF_TYPE
-    return false;
+    auto dynamicSymbols = NELF::RetrieveDynamicSymbols(file, kPyGetVersionSymbol);
+    return (dynamicSymbols && !dynamicSymbols->empty());
 }
 
 TMaybe<ui64> TPythonAnalyzer::ParsePyRuntimeAddress() {
-    ParseGlobalsAddresses();
+    ParseSymbolsAddresses();
 
-    if (!GlobalsAddresses_) {
+    if (!SymbolsAddresses_) {
         return Nothing();
     }
 
-    if (GlobalsAddresses_->PyRuntimeAddress == 0) {
+    if (SymbolsAddresses_->PyRuntime == 0) {
         return Nothing();
     }
 
-    return MakeMaybe(GlobalsAddresses_->PyRuntimeAddress);
+    return MakeMaybe(SymbolsAddresses_->PyRuntime);
 }
 
 template <typename ELFT>
 TMaybe<ui64> ParseAutoTSSKeyAddress(
     llvm::object::ObjectFile* file,
-    const TPythonAnalyzer::TGlobalsAddresses& addresses
+    const TPythonAnalyzer::TSymbolsAddresses& addresses
 ) {
     llvm::object::ELFObjectFile<ELFT>* elf = llvm::dyn_cast<llvm::object::ELFObjectFile<ELFT>>(file);
     if (!elf) {
         return Nothing();
     }
 
-    if (addresses.PyRuntimeAddress == 0) {
+    if (addresses.PyRuntime == 0) {
         return Nothing();
     }
 
-    // Look for PyGILState_Check symbol
-    ui64 pyGILStateCheckAddress = 0;
-    for (auto&& symbol : elf->getDynamicSymbolIterators()) {
-        Y_LLVM_UNWRAP(name, symbol.getName(), { continue; });
-        Y_LLVM_UNWRAP(address, symbol.getAddress(), { continue; });
-
-        if (TStringBuf{name.data(), name.size()} == "PyGILState_Check") {
-            pyGILStateCheckAddress = address;
-            break;
-        }
-    }
-
-    if (pyGILStateCheckAddress == 0) {
+    if (addresses.PyGILStateCheck == 0) {
         return Nothing();
     }
 
-    auto textSection = LookForSection(elf, kTextSectionName);
+    auto textSection = NELF::GetSection(*elf, NELF::NSections::kTextSectionName);
     if (!textSection) {
         return Nothing();
     }
 
     Y_LLVM_UNWRAP(sectionData, textSection->getContents(), { return Nothing(); });
-    if (pyGILStateCheckAddress < textSection->getAddress()) {
+    if (addresses.PyGILStateCheck < textSection->getAddress()) {
         return Nothing();
     }
 
-    ui64 offset = pyGILStateCheckAddress - textSection->getAddress();
+    ui64 offset = addresses.PyGILStateCheck - textSection->getAddress();
     if (offset >= sectionData.size()) {
         return Nothing();
     }
@@ -422,20 +342,20 @@ TMaybe<ui64> ParseAutoTSSKeyAddress(
 
     return NAsm::NX86::DecodeAutoTSSKeyAddress(
         elf->makeTriple(),
-        pyGILStateCheckAddress,
+        addresses.PyGILStateCheck,
         bytecode
     );
 }
 
 TMaybe<ui64> TPythonAnalyzer::ParseAutoTSSKeyAddress() {
-    ParseGlobalsAddresses();
+    ParseSymbolsAddresses();
 
-    if (!GlobalsAddresses_) {
+    if (!SymbolsAddresses_) {
         return Nothing();
     }
 
     #define TRY_ELF_TYPE(ELFT) \
-    if (auto res = NPerforator::NLinguist::NPython::ParseAutoTSSKeyAddress<ELFT>(File_, *GlobalsAddresses_.Get())) { \
+    if (auto res = NPerforator::NLinguist::NPython::ParseAutoTSSKeyAddress<ELFT>(File_, *SymbolsAddresses_.Get())) { \
         return res; \
     }
 

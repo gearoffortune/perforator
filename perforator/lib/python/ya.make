@@ -30,6 +30,7 @@ PEERDIR(
     contrib/libs/llvm18/lib/Target/X86
     contrib/libs/re2
 
+    perforator/lib/elf
     perforator/lib/tls/parser
     perforator/lib/llvmex
     perforator/lib/python/asm/x86-64

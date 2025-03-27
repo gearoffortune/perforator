@@ -18,9 +18,8 @@ constexpr TStringBuf kCurrentFastGetSymbol = "current_fast_get";
 constexpr TStringBuf kPyThreadStateGetCurrentSymbol = "_PyThreadState_GetCurrent";
 constexpr TStringBuf kPyVersionSymbol = "Py_Version";
 constexpr TStringBuf kPyGetVersionSymbol = "Py_GetVersion";
-constexpr TStringBuf kRoDataSectionName = ".rodata";
-constexpr TStringBuf kTextSectionName = ".text";
 constexpr TStringBuf kPyRuntimeSymbol = "_PyRuntime";
+constexpr TStringBuf kPyGILStateCheckSymbol = "PyGILState_Check";
 
 const re2::RE2 kPythonVersionRegex(R"(([23])\.(\d)(?:\.(\d{1,2}))?([^\.]|$))");
 
@@ -49,12 +48,13 @@ struct TParsedPythonVersion {
 
 class TPythonAnalyzer {
 public:
-    struct TGlobalsAddresses {
-        ui64 GetCurrentThreadStateAddress = 0;
-        ui64 CurrentFastGetAddress = 0;
-        ui64 PyVersionAddress = 0;
-        ui64 PyGetVersionAddress = 0;
-        ui64 PyRuntimeAddress = 0;
+    struct TSymbolsAddresses {
+        ui64 GetCurrentThreadState = 0;
+        ui64 CurrentFastGet = 0;
+        ui64 PyVersion = 0;
+        ui64 PyGetVersion = 0;
+        ui64 PyRuntime = 0;
+        ui64 PyGILStateCheck = 0;
     };
 
 public:
@@ -73,11 +73,11 @@ public:
     TMaybe<ui64> ParseAutoTSSKeyAddress();
 
 private:
-    void ParseGlobalsAddresses();
+    void ParseSymbolsAddresses();
 
 private:
     llvm::object::ObjectFile* File_;
-    THolder<TGlobalsAddresses> GlobalsAddresses_;
+    THolder<TSymbolsAddresses> SymbolsAddresses_;
 };
 
 bool IsPythonBinary(llvm::object::ObjectFile* file);
