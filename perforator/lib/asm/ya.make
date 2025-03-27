@@ -1,3 +1,7 @@
+LIBRARY()
+
+END()
+
 RECURSE(
     x86
 )
