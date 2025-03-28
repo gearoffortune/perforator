@@ -15,4 +15,4 @@ version: 0.2.7
 
 # Perforator version installed by default.
 # It can be overriden via Helm values.
-appVersion: "v0.0.4"
+appVersion: "v0.0.5"

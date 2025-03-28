@@ -21,6 +21,13 @@ Internal changes:
 
 1: If you are sending patch to GitHub, specify PR. Otherwise (if you are sending patch to internal monorepo), leave unset and then specify Git commit.
 -->
+# Unreleased
+
+Enhancements:
++ Add ingress for storage (94d33c1)
++ Add plain-http, TLS and mTLS for agent-storage communication (d6ce345)
++ Make agent-storage communication use plain-http by default (d6ce345)
++ Upgrade perforator to [v0.0.5](https://github.com/yandex/perforator/releases/tag/v0.0.5)
 
 # 0.2.7
 
