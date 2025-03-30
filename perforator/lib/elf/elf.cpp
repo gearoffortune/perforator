@@ -39,14 +39,14 @@ THashMap<TStringBuf, ui64> ParseSymbols(const llvm::object::ELFObjectFile<ELFT>&
     return ParseSymbolsImpl(elf.symbols(), symbols);
 }
 
-TMaybe<THashMap<TStringBuf, ui64>> RetrieveDynamicSymbols(llvm::object::ObjectFile* file, std::initializer_list<TStringBuf> symbols) {
-    return NLLVM::VisitELF(file, [&symbols](const auto& elf) {
+TMaybe<THashMap<TStringBuf, ui64>> RetrieveDynamicSymbols(const llvm::object::ObjectFile& file, std::initializer_list<TStringBuf> symbols) {
+    return NLLVM::VisitELF(&file, [&symbols](const auto& elf) {
         return ParseDynamicSymbols(elf, symbols);
     });
 }
 
-TMaybe<THashMap<TStringBuf, ui64>> RetrieveSymbols(llvm::object::ObjectFile* file, std::initializer_list<TStringBuf> symbols) {
-    return NLLVM::VisitELF(file, [&symbols](const auto& elf) {
+TMaybe<THashMap<TStringBuf, ui64>> RetrieveSymbols(const llvm::object::ObjectFile& file, std::initializer_list<TStringBuf> symbols) {
+    return NLLVM::VisitELF(&file, [&symbols](const auto& elf) {
         return ParseSymbols(elf, symbols);
     });
 }

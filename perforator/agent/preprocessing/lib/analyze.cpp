@@ -32,7 +32,7 @@ NPerforator::NBinaryProcessing::NTls::TLSConfig BuildTlsConfig(llvm::object::Obj
 namespace NPerforator::NBinaryProcessing::NPython {
 
 NPerforator::NBinaryProcessing::NPython::PythonConfig BuildPythonConfig(llvm::object::ObjectFile* objectFile) {
-    auto analyzer = NPerforator::NLinguist::NPython::TPythonAnalyzer{objectFile};
+    auto analyzer = NPerforator::NLinguist::NPython::TPythonAnalyzer{*objectFile};
     NPerforator::NBinaryProcessing::NPython::PythonConfig conf;
     auto version = analyzer.ParseVersion();
     if (!version) {

@@ -58,7 +58,7 @@ public:
     };
 
 public:
-    explicit TPythonAnalyzer(llvm::object::ObjectFile* file);
+    explicit TPythonAnalyzer(const llvm::object::ObjectFile& file);
 
     TMaybe<TParsedPythonVersion> ParseVersion();
 
@@ -76,10 +76,10 @@ private:
     void ParseSymbolsAddresses();
 
 private:
-    llvm::object::ObjectFile* File_;
+    const llvm::object::ObjectFile& File_;
     THolder<TSymbolsAddresses> SymbolsAddresses_;
 };
 
-bool IsPythonBinary(llvm::object::ObjectFile* file);
+bool IsPythonBinary(const llvm::object::ObjectFile& file);
 
 } // namespace NPerforator::NLinguist::NPython

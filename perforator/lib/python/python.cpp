@@ -24,7 +24,7 @@ namespace NPerforator::NLinguist::NPython {
 // Some limit for decoding of instructions of `_PyThreadState_GetCurrent` function
 constexpr ui64 kMaxPyThreadStateGetCurrentBytecodeLength = 64;
 
-TPythonAnalyzer::TPythonAnalyzer(llvm::object::ObjectFile* file) : File_(file) {}
+TPythonAnalyzer::TPythonAnalyzer(const llvm::object::ObjectFile& file) : File_(file) {}
 
 void TPythonAnalyzer::ParseSymbolsAddresses() {
     if (SymbolsAddresses_ != nullptr) {
@@ -120,10 +120,10 @@ TMaybe<TPythonVersion> TryScanVersion(
 
 template <typename ELFT>
 TMaybe<TPythonVersion> TryParsePyGetVersion(
-    llvm::object::ELFObjectFile<ELFT>* elf,
+    const llvm::object::ELFObjectFile<ELFT>& elf,
     ui64 pyGetVersionAddress
 ) {
-    auto textSection = NELF::GetSection(*elf, NELF::NSections::kTextSectionName);
+    auto textSection = NELF::GetSection(elf, NELF::NSections::kTextSectionName);
     if (!textSection) {
         return Nothing();
     }
@@ -143,12 +143,12 @@ TMaybe<TPythonVersion> TryParsePyGetVersion(
         Min<size_t>(64, sectionData.size() - offset)  // Limit to first 64 bytes
     );
 
-    auto versionAddress = NAsm::NX86::DecodePyGetVersion(elf->makeTriple(), pyGetVersionAddress, bytecode);
+    auto versionAddress = NAsm::NX86::DecodePyGetVersion(elf.makeTriple(), pyGetVersionAddress, bytecode);
     if (!versionAddress) {
         return Nothing();
     }
 
-    auto rodataSection = NELF::GetSection(*elf, NELF::NSections::kRoDataSectionName);
+    auto rodataSection = NELF::GetSection(elf, NELF::NSections::kRoDataSectionName);
     if (!rodataSection) {
         return Nothing();
     }
@@ -171,10 +171,10 @@ TMaybe<TPythonVersion> TryParsePyGetVersion(
 
 template <typename ELFT>
 TMaybe<TParsedPythonVersion> ParseVersion(
-    llvm::object::ObjectFile* file,
+    const llvm::object::ObjectFile& file,
     const TPythonAnalyzer::TSymbolsAddresses& addresses
 ) {
-    llvm::object::ELFObjectFile<ELFT>* elf = llvm::dyn_cast<llvm::object::ELFObjectFile<ELFT>>(file);
+    const llvm::object::ELFObjectFile<ELFT>* elf = llvm::dyn_cast<llvm::object::ELFObjectFile<ELFT>>(&file);
     if (!elf) {
         return Nothing();
     }
@@ -195,7 +195,7 @@ TMaybe<TParsedPythonVersion> ParseVersion(
 
     // Try to find PY_VERSION string through Py_GetVersion disassembly
     if (addresses.PyGetVersion != 0) {
-        if (auto version = TryParsePyGetVersion(elf, addresses.PyGetVersion)) {
+        if (auto version = TryParsePyGetVersion(*elf, addresses.PyGetVersion)) {
             return MakeMaybe(TParsedPythonVersion{
                 .Version = *version,
                 .Source = EPythonVersionSource::PyGetVersionDisassembly
@@ -222,10 +222,10 @@ TMaybe<TParsedPythonVersion> TPythonAnalyzer::ParseVersion() {
 
 template <typename ELFT>
 TMaybe<NAsm::ThreadImageOffsetType> ParseTLSPyThreadState(
-    llvm::object::ObjectFile* file,
+    const llvm::object::ObjectFile& file,
     TPythonAnalyzer::TSymbolsAddresses* addresses
 ) {
-    llvm::object::ELFObjectFile<ELFT>* elf = llvm::dyn_cast<llvm::object::ELFObjectFile<ELFT>>(file);
+    const llvm::object::ELFObjectFile<ELFT>* elf = llvm::dyn_cast<llvm::object::ELFObjectFile<ELFT>>(&file);
     if (!elf) {
         return Nothing();
     }
@@ -282,7 +282,7 @@ TMaybe<NAsm::ThreadImageOffsetType> TPythonAnalyzer::ParseTLSPyThreadState() {
     return Nothing();
 }
 
-bool IsPythonBinary(llvm::object::ObjectFile* file) {
+bool IsPythonBinary(const llvm::object::ObjectFile& file) {
     auto dynamicSymbols = NELF::RetrieveDynamicSymbols(file, kPyGetVersionSymbol);
     return (dynamicSymbols && !dynamicSymbols->empty());
 }
@@ -303,10 +303,10 @@ TMaybe<ui64> TPythonAnalyzer::ParsePyRuntimeAddress() {
 
 template <typename ELFT>
 TMaybe<ui64> ParseAutoTSSKeyAddress(
-    llvm::object::ObjectFile* file,
+    const llvm::object::ObjectFile& file,
     const TPythonAnalyzer::TSymbolsAddresses& addresses
 ) {
-    llvm::object::ELFObjectFile<ELFT>* elf = llvm::dyn_cast<llvm::object::ELFObjectFile<ELFT>>(file);
+    const llvm::object::ELFObjectFile<ELFT>* elf = llvm::dyn_cast<llvm::object::ELFObjectFile<ELFT>>(&file);
     if (!elf) {
         return Nothing();
     }

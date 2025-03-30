@@ -14,14 +14,14 @@ int main(int argc, const char* argv[]) {
     Y_THROW_UNLESS(argc == 2);
     auto objectFile = Y_LLVM_RAISE(llvm::object::ObjectFile::createObjectFile(argv[1]));
 
-    if (!NPerforator::NLinguist::NPython::IsPythonBinary(objectFile.getBinary())) {
+    if (!NPerforator::NLinguist::NPython::IsPythonBinary(*objectFile.getBinary())) {
         Cout << "Does not seem like python binary" << Endl;
         return 0;
     }
 
     Cout << "Detected Python binary" << Endl;
 
-    NPerforator::NLinguist::NPython::TPythonAnalyzer analyzer{objectFile.getBinary()};
+    NPerforator::NLinguist::NPython::TPythonAnalyzer analyzer{*objectFile.getBinary()};
     TMaybe<NPerforator::NLinguist::NPython::TParsedPythonVersion> version = analyzer.ParseVersion();
     if (version) {
         Cout << "Parsed python binary version "
