@@ -30,7 +30,7 @@
     "@gravity-ui/navigation": "^2.22.0",
     "@gravity-ui/uikit": "6.34.0",
     "@perforator/flamegraph": "workspace:../packages/flamegraph",
-    "axios": "1.6.7",
+    "axios": "1.8.3",
     "culori": "4.0.1",
     "js-cookie": "3.0.5",
     "monaco-editor": "0.52.0",
