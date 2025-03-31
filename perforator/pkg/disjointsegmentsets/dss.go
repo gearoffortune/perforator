@@ -7,12 +7,12 @@ type Item interface {
 	GenerationNumber() int
 }
 
-// Prune removes all items which overlap with newer (as determined by Generation()) once.
+// Prune removes all items which overlap with newer (as determined by Generation()) ones.
 // Precondition: input slice must be sorted by Start().
 // Note that input slice is modified by the call.
 // Return values: (items that were retained, items that were pruned)
 func Prune[T Item](items []T) ([]T, []T) {
-	// Indices of maps to prune
+	// Indices of items to prune
 	invalidated := make(map[int]struct{})
 
 	// The index of the leftmost item such that for the current item i holds
