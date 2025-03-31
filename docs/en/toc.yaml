@@ -50,16 +50,20 @@ items:
       items:
         - name: Diffs
           href: guides/diff.md
+    - name: Kubernetes
+      items:
+        - name: Inter-Cluster Perforator Setup
+          href: guides/kubernetes/inter-cluster-communication.md
+        - name: Deploy Perforator in Kubernetes via Helm
+          href: guides/kubernetes/helm-chart.md
+        - name: Setup databases for testing via docker compose
+          href: guides/kubernetes/docker-compose.md
     - name: Profiling JVM applications
       href: guides/jvm.md
     - name: Using Perforator for continuous profile-guided optimization (PGO)
       href: guides/autofdo.md
     - name: Migrating database schema
       href: guides/migrate-schema.md
-    - name: Deploy Perforator in Kubernetes via Helm
-      href: guides/helm-chart.md
-    - name: Setup databases for testing via docker compose
-      href: guides/docker-compose.md
   - name: Reference
     labeled: true
     items:

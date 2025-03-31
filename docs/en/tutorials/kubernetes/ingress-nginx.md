@@ -88,7 +88,7 @@ kubectl create secret tls grpc-tls-secret \
 ## Deploy Perforator Using Helm 
 {% note info %}
 
-If you haven't installed the Perforator Helm chart yet, see [this guide](../../guides/helm-chart.md) for step-by-step instructions
+If you haven't installed the Perforator Helm chart yet, see [this guide](../../guides/kubernetes/helm-chart.md) for step-by-step instructions
 
 {% endnote %}
 

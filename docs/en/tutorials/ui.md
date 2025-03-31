@@ -8,7 +8,7 @@ This article will guide you through basic operations related to the UI. You will
 
 ## Prerequisites
 
-- App deployed into k8s cluster(for example, according to the [guide](../guides/helm-chart.md)) network access to Perforator
+- App deployed into k8s cluster(for example, according to the [guide](../guides/kubernetes/helm-chart.md)) network access to Perforator
 - some kind of a cpu-heavy workload that is being monitored by perforator agent, for example perforator `cpu_burner`
 
 ## Navigating the UI

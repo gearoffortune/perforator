@@ -9,7 +9,7 @@ The profiler is designed to be as non-invasive as possible using beautiful techn
 Perforator is developed by Yandex and used inside Yandex as the main cluster-wide profiling service.
 
 ## Quick start
-You can start with [tutorial on local usage](./tutorials/native-profiling.md) or delve into [architecture overview](./explanation/architecture/overview.md). Alternatively see a [guide to deploy Perforator on a Kubernetes cluster](guides/helm-chart.md).
+You can start with [tutorial on local usage](./tutorials/native-profiling.md) or delve into [architecture overview](./explanation/architecture/overview.md). Alternatively see a [guide to deploy Perforator on a Kubernetes cluster](guides/kubernetes/helm-chart.md).
 
 ## Useful links
 - [GitHub repository](https://github.com/yandex/perforator)

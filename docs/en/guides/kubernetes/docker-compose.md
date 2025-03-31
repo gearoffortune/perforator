@@ -25,4 +25,4 @@ After starting, you can verify which containers are running.
 docker ps
 ```
 
-After deploying DBs, you should run migrations manually via [migrate tool](migrate-schema.md).
+After deploying DBs, you should run migrations manually via [migrate tool](../migrate-schema.md).
