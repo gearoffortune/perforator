@@ -25,8 +25,8 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/balancer"
+	"google.golang.org/grpc/balancer/pickfirst"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
@@ -34,6 +34,7 @@ import (
 	"google.golang.org/grpc/internal/grpctest"
 	"google.golang.org/grpc/internal/hierarchy"
 	"google.golang.org/grpc/internal/testutils"
+	"google.golang.org/grpc/internal/testutils/stats"
 	"google.golang.org/grpc/resolver"
 	"google.golang.org/grpc/status"
 )
@@ -607,6 +608,7 @@ func TestClusterGracefulSwitch(t *testing.T) {
 	builder := balancer.Get(balancerName)
 	parser := builder.(balancer.ConfigParser)
 	bal := builder.Build(cc, balancer.BuildOptions{})
+	defer bal.Close()
 
 	configJSON1 := `{
 "children": {
@@ -642,7 +644,11 @@ func TestClusterGracefulSwitch(t *testing.T) {
 	childPolicyName := t.Name()
 	stub.Register(childPolicyName, stub.BalancerFuncs{
 		Init: func(bd *stub.BalancerData) {
-			bd.Data = balancer.Get(grpc.PickFirstBalancerName).Build(bd.ClientConn, bd.BuildOptions)
+			bd.BuildOptions.MetricsRecorder = &stats.NoopMetricsRecorder{}
+			bd.Data = balancer.Get(pickfirst.Name).Build(bd.ClientConn, bd.BuildOptions)
+		},
+		Close: func(bd *stub.BalancerData) {
+			bd.Data.(balancer.Balancer).Close()
 		},
 		UpdateClientConnState: func(bd *stub.BalancerData, ccs balancer.ClientConnState) error {
 			bal := bd.Data.(balancer.Balancer)
@@ -719,7 +725,7 @@ func (s) TestUpdateStatePauses(t *testing.T) {
 	cc := &tcc{BalancerClientConn: testutils.NewBalancerClientConn(t)}
 
 	balFuncs := stub.BalancerFuncs{
-		UpdateClientConnState: func(bd *stub.BalancerData, s balancer.ClientConnState) error {
+		UpdateClientConnState: func(bd *stub.BalancerData, _ balancer.ClientConnState) error {
 			bd.ClientConn.UpdateState(balancer.State{ConnectivityState: connectivity.TransientFailure, Picker: nil})
 			bd.ClientConn.UpdateState(balancer.State{ConnectivityState: connectivity.Ready, Picker: nil})
 			return nil
@@ -730,6 +736,7 @@ func (s) TestUpdateStatePauses(t *testing.T) {
 	builder := balancer.Get(balancerName)
 	parser := builder.(balancer.ConfigParser)
 	bal := builder.Build(cc, balancer.BuildOptions{})
+	defer bal.Close()
 
 	configJSON1 := `{
 "children": {

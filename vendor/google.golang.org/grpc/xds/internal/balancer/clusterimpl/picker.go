@@ -19,15 +19,16 @@
 package clusterimpl
 
 import (
+	"context"
+
+	v3orcapb "github.com/cncf/xds/go/xds/data/orca/v3"
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/internal/stats"
 	"google.golang.org/grpc/internal/wrr"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/xds/internal/xdsclient"
-	"google.golang.org/grpc/xds/internal/xdsclient/load"
-
-	v3orcapb "github.com/cncf/xds/go/xds/data/orca/v3"
 )
 
 // NewRandomWRR is used when calculating drops. It's exported so that tests can
@@ -78,24 +79,34 @@ type loadReporter interface {
 
 // Picker implements RPC drop, circuit breaking drop and load reporting.
 type picker struct {
-	drops     []*dropper
-	s         balancer.State
-	loadStore loadReporter
-	counter   *xdsclient.ClusterRequestsCounter
-	countMax  uint32
+	drops           []*dropper
+	s               balancer.State
+	loadStore       loadReporter
+	counter         *xdsclient.ClusterRequestsCounter
+	countMax        uint32
+	telemetryLabels map[string]string
 }
 
-func newPicker(s balancer.State, config *dropConfigs, loadStore load.PerClusterReporter) *picker {
-	return &picker{
-		drops:     config.drops,
-		s:         s,
-		loadStore: loadStore,
-		counter:   config.requestCounter,
-		countMax:  config.requestCountMax,
+func telemetryLabels(ctx context.Context) map[string]string {
+	if ctx == nil {
+		return nil
 	}
+	labels := stats.GetLabels(ctx)
+	if labels == nil {
+		return nil
+	}
+	return labels.TelemetryLabels
 }
 
 func (d *picker) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
+	// Unconditionally set labels if present, even dropped or queued RPC's can
+	// use these labels.
+	if labels := telemetryLabels(info.Ctx); labels != nil {
+		for key, value := range d.telemetryLabels {
+			labels[key] = value
+		}
+	}
+
 	// Don't drop unless the inner picker is READY. Similar to
 	// https://github.com/grpc/grpc-go/issues/2622.
 	if d.s.ConnectivityState == connectivity.Ready {
@@ -143,6 +154,10 @@ func (d *picker) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
 			d.counter.EndRequest()
 		}
 		return pr, err
+	}
+
+	if labels := telemetryLabels(info.Ctx); labels != nil {
+		labels["grpc.lb.locality"] = lIDStr
 	}
 
 	if d.loadStore != nil {

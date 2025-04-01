@@ -20,6 +20,7 @@ package resolver_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -34,8 +35,8 @@ import (
 	"google.golang.org/grpc/internal/grpcsync"
 	iresolver "google.golang.org/grpc/internal/resolver"
 	"google.golang.org/grpc/internal/testutils"
-	xdsbootstrap "google.golang.org/grpc/internal/testutils/xds/bootstrap"
 	"google.golang.org/grpc/internal/testutils/xds/e2e"
+	"google.golang.org/grpc/internal/xds/bootstrap"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/resolver"
 	"google.golang.org/grpc/serviceconfig"
@@ -45,9 +46,7 @@ import (
 	"google.golang.org/grpc/xds/internal/httpfilter"
 	xdsresolver "google.golang.org/grpc/xds/internal/resolver"
 	rinternal "google.golang.org/grpc/xds/internal/resolver/internal"
-	xdstestutils "google.golang.org/grpc/xds/internal/testutils"
 	"google.golang.org/grpc/xds/internal/xdsclient"
-	"google.golang.org/grpc/xds/internal/xdsclient/bootstrap"
 	"google.golang.org/grpc/xds/internal/xdsclient/xdsresource/version"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -70,7 +69,7 @@ import (
 // Tests the case where xDS client creation is expected to fail because the
 // bootstrap configuration is not specified. The test verifies that xDS resolver
 // build fails as well.
-func (s) TestResolverBuilder_ClientCreationFails_NoBootstap(t *testing.T) {
+func (s) TestResolverBuilder_ClientCreationFails_NoBootstrap(t *testing.T) {
 	// Build an xDS resolver without specifying bootstrap env vars.
 	builder := resolver.Get(xdsresolver.Scheme)
 	if builder == nil {
@@ -87,14 +86,8 @@ func (s) TestResolverBuilder_ClientCreationFails_NoBootstap(t *testing.T) {
 // not specified in the bootstrap file. Verifies that the resolver.Build method
 // fails with the expected error string.
 func (s) TestResolverBuilder_AuthorityNotDefinedInBootstrap(t *testing.T) {
-	bootstrapCleanup, err := xdsbootstrap.CreateFile(xdsbootstrap.Options{
-		NodeID:    "node-id",
-		ServerURI: "dummy-management-server",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer bootstrapCleanup()
+	contents := e2e.DefaultBootstrapContents(t, "node-id", "dummy-management-server")
+	testutils.CreateBootstrapFileForTesting(t, contents)
 
 	builder := resolver.Get(xdsresolver.Scheme)
 	if builder == nil {
@@ -167,23 +160,30 @@ func (s) TestResolverResourceName(t *testing.T) {
 			mgmtServer, lisCh, _ := setupManagementServerForTest(ctx, t, nodeID)
 
 			// Create a bootstrap configuration with test options.
-			opts := xdsbootstrap.Options{
-				ServerURI: mgmtServer.Address,
+			opts := bootstrap.ConfigOptionsForTesting{
+				Servers: []byte(fmt.Sprintf(`[{
+					"server_uri": %q,
+					"channel_creds": [{"type": "insecure"}]
+				}]`, mgmtServer.Address)),
 				ClientDefaultListenerResourceNameTemplate: tt.listenerResourceNameTemplate,
+				Node: []byte(fmt.Sprintf(`{"id": "%s"}`, nodeID)),
 			}
 			if tt.extraAuthority != "" {
 				// In this test, we really don't care about having multiple
 				// management servers. All we need to verify is whether the
 				// resource name matches expectation.
-				opts.Authorities = map[string]string{
-					tt.extraAuthority: mgmtServer.Address,
+				opts.Authorities = map[string]json.RawMessage{
+					tt.extraAuthority: []byte(fmt.Sprintf(`{
+						"server_uri": %q,
+						"channel_creds": [{"type": "insecure"}]
+					}`, mgmtServer.Address)),
 				}
 			}
-			cleanup, err := xdsbootstrap.CreateFile(opts)
+			contents, err := bootstrap.NewContentsForTesting(opts)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatalf("Failed to create bootstrap configuration: %v", err)
 			}
-			defer cleanup()
+			testutils.CreateBootstrapFileForTesting(t, contents)
 
 			buildResolverForTarget(t, resolver.Target{URL: *testutils.MustParseURL(tt.dialTarget)})
 			waitForResourceNames(ctx, t, lisCh, tt.wantResourceNames)
@@ -202,7 +202,7 @@ func (s) TestResolverWatchCallbackAfterClose(t *testing.T) {
 	// closed.
 	routeConfigResourceNamesCh := make(chan []string, 1)
 	waitForResolverCloseCh := make(chan struct{})
-	mgmtServer, err := e2e.StartManagementServer(e2e.ManagementServerOptions{
+	mgmtServer := e2e.StartManagementServer(t, e2e.ManagementServerOptions{
 		OnStreamRequest: func(_ int64, req *v3discoverypb.DiscoveryRequest) error {
 			if req.GetTypeUrl() == version.V3RouteConfigURL {
 				select {
@@ -218,21 +218,11 @@ func (s) TestResolverWatchCallbackAfterClose(t *testing.T) {
 			return nil
 		},
 	})
-	if err != nil {
-		t.Fatalf("Failed to start xDS management server: %v", err)
-	}
-	defer mgmtServer.Stop()
 
 	// Create a bootstrap configuration specifying the above management server.
 	nodeID := uuid.New().String()
-	cleanup, err := xdsbootstrap.CreateFile(xdsbootstrap.Options{
-		NodeID:    nodeID,
-		ServerURI: mgmtServer.Address,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cleanup()
+	contents := e2e.DefaultBootstrapContents(t, nodeID, mgmtServer.Address)
+	testutils.CreateBootstrapFileForTesting(t, contents)
 
 	// Configure resources on the management server.
 	listeners := []*v3listenerpb.Listener{e2e.DefaultClientListener(defaultTestServiceName, defaultTestRouteConfigName)}
@@ -257,17 +247,18 @@ func (s) TestResolverWatchCallbackAfterClose(t *testing.T) {
 
 // Tests that the xDS resolver's Close method closes the xDS client.
 func (s) TestResolverCloseClosesXDSClient(t *testing.T) {
-	bootstrapCfg := &bootstrap.Config{
-		XDSServer: xdstestutils.ServerConfigForAddress(t, "dummy-management-server-address"),
-	}
-
 	// Override xDS client creation to use bootstrap configuration pointing to a
 	// dummy management server. Also close a channel when the returned xDS
 	// client is closed.
 	origNewClient := rinternal.NewXDSClient
 	closeCh := make(chan struct{})
-	rinternal.NewXDSClient = func() (xdsclient.XDSClient, func(), error) {
-		c, cancel, err := xdsclient.NewWithConfigForTesting(bootstrapCfg, defaultTestTimeout, defaultTestTimeout)
+	rinternal.NewXDSClient = func(string) (xdsclient.XDSClient, func(), error) {
+		bc := e2e.DefaultBootstrapContents(t, uuid.New().String(), "dummy-management-server-address")
+		c, cancel, err := xdsclient.NewForTesting(xdsclient.OptionsForTesting{
+			Name:               t.Name(),
+			Contents:           bc,
+			WatchExpiryTimeout: defaultTestTimeout,
+		})
 		return c, grpcsync.OnceFunc(func() {
 			close(closeCh)
 			cancel()
@@ -557,10 +548,39 @@ func (s) TestResolverRemovedWithRPCs(t *testing.T) {
 		}
 	}
 
-	// Re-add the listener and expect everything to work again.
-	configureResourcesOnManagementServer(ctx, t, mgmtServer, nodeID, listeners, routes)
-	// Read the update pushed by the resolver to the ClientConn.
-	cs = verifyUpdateFromResolver(ctx, t, stateCh, wantDefaultServiceConfig)
+	// Workaround for https://github.com/envoyproxy/go-control-plane/issues/431.
+	//
+	// The xDS client can miss route configurations due to a race condition
+	// between resource removal and re-addition. To avoid this, continuously
+	// push new versions of the resources to the server, ensuring the client
+	// eventually receives the configuration.
+	//
+	// TODO(https://github.com/grpc/grpc-go/issues/7807): Remove this workaround
+	// once the issue is fixed.
+waitForStateUpdate:
+	for {
+		sCtx, sCancel := context.WithTimeout(ctx, defaultTestShortTimeout)
+		defer sCancel()
+
+		configureResourcesOnManagementServer(ctx, t, mgmtServer, nodeID, listeners, routes)
+
+		select {
+		case state = <-stateCh:
+			if err := state.ServiceConfig.Err; err != nil {
+				t.Fatalf("Received error in service config: %v", state.ServiceConfig.Err)
+			}
+			wantSCParsed := internal.ParseServiceConfig.(func(string) *serviceconfig.ParseResult)(wantDefaultServiceConfig)
+			if !internal.EqualServiceConfigForTesting(state.ServiceConfig.Config, wantSCParsed.Config) {
+				t.Fatalf("Got service config:\n%s \nWant service config:\n%s", cmp.Diff(nil, state.ServiceConfig.Config), cmp.Diff(nil, wantSCParsed.Config))
+			}
+			break waitForStateUpdate
+		case <-sCtx.Done():
+		}
+	}
+	cs = iresolver.GetConfigSelector(state)
+	if cs == nil {
+		t.Fatal("Received nil config selector in update from resolver")
+	}
 
 	res, err = cs.SelectConfig(iresolver.RPCInfo{Context: ctx, Method: "/service/method"})
 	if err != nil {

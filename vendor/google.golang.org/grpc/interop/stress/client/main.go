@@ -23,7 +23,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"math/rand"
+	rand "math/rand/v2"
 	"net"
 	"os"
 	"strconv"
@@ -126,12 +126,11 @@ func newWeightedRandomTestSelector(tests []testCaseWithWeight) *weightedRandomTe
 	for _, t := range tests {
 		totalWeight += t.weight
 	}
-	rand.Seed(time.Now().UnixNano())
 	return &weightedRandomTestSelector{tests, totalWeight}
 }
 
 func (selector weightedRandomTestSelector) getNextTest() string {
-	random := rand.Intn(selector.totalWeight)
+	random := rand.IntN(selector.totalWeight)
 	var weightSofar int
 	for _, test := range selector.tests {
 		weightSofar += test.weight
@@ -174,7 +173,7 @@ func newMetricsServer() *server {
 }
 
 // GetAllGauges returns all gauges.
-func (s *server) GetAllGauges(in *metricspb.EmptyMessage, stream metricspb.MetricsService_GetAllGaugesServer) error {
+func (s *server) GetAllGauges(_ *metricspb.EmptyMessage, stream metricspb.MetricsService_GetAllGaugesServer) error {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
@@ -187,7 +186,7 @@ func (s *server) GetAllGauges(in *metricspb.EmptyMessage, stream metricspb.Metri
 }
 
 // GetGauge returns the gauge for the given name.
-func (s *server) GetGauge(ctx context.Context, in *metricspb.GaugeRequest) (*metricspb.GaugeResponse, error) {
+func (s *server) GetGauge(_ context.Context, in *metricspb.GaugeRequest) (*metricspb.GaugeResponse, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 

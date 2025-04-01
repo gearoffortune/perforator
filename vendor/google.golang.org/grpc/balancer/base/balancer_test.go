@@ -41,10 +41,11 @@ func (c *testClientConn) NewSubConn(addrs []resolver.Address, opts balancer.NewS
 func (c *testClientConn) UpdateState(balancer.State) {}
 
 type testSubConn struct {
+	balancer.SubConn
 	updateState func(balancer.SubConnState)
 }
 
-func (sc *testSubConn) UpdateAddresses(addresses []resolver.Address) {}
+func (sc *testSubConn) UpdateAddresses([]resolver.Address) {}
 
 func (sc *testSubConn) Connect() {}
 
@@ -53,6 +54,9 @@ func (sc *testSubConn) Shutdown() {}
 func (sc *testSubConn) GetOrBuildProducer(balancer.ProducerBuilder) (balancer.Producer, func()) {
 	return nil, nil
 }
+
+// RegisterHealthListener is a no-op.
+func (*testSubConn) RegisterHealthListener(func(balancer.SubConnState)) {}
 
 // testPickBuilder creates balancer.Picker for test.
 type testPickBuilder struct {
@@ -88,7 +92,7 @@ func TestBaseBalancerReserveAttributes(t *testing.T) {
 	}
 	pickBuilder := &testPickBuilder{validate: v}
 	b := (&baseBuilder{pickerBuilder: pickBuilder}).Build(&testClientConn{
-		newSubConn: func(addrs []resolver.Address, opts balancer.NewSubConnOptions) (balancer.SubConn, error) {
+		newSubConn: func(_ []resolver.Address, opts balancer.NewSubConnOptions) (balancer.SubConn, error) {
 			return &testSubConn{updateState: opts.StateListener}, nil
 		},
 	}, balancer.BuildOptions{}).(*baseBalancer)

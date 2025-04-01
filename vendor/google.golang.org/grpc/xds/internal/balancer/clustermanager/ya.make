@@ -2,7 +2,7 @@ GO_LIBRARY()
 
 LICENSE(Apache-2.0)
 
-VERSION(v1.63.2)
+VERSION(v1.69.4)
 
 SRCS(
     balancerstateaggregator.go
@@ -19,5 +19,6 @@ GO_TEST_SRCS(
 END()
 
 RECURSE(
+    e2e_test
     gotest
 )

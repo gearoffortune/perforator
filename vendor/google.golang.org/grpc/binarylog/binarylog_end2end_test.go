@@ -78,7 +78,7 @@ func (s *testBinLogSink) Write(e *binlogpb.GrpcLogEntry) error {
 
 func (s *testBinLogSink) Close() error { return nil }
 
-// Returns all client entris if client is true, otherwise return all server
+// Returns all client entries if client is true, otherwise return all server
 // entries.
 func (s *testBinLogSink) logEntries(client bool) []*binlogpb.GrpcLogEntry {
 	logger := binlogpb.GrpcLogEntry_LOGGER_SERVER
@@ -316,7 +316,7 @@ func (te *test) clientConn() *grpc.ClientConn {
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock()}
 
 	var err error
-	te.cc, err = grpc.Dial(te.srvAddr, opts...)
+	te.cc, err = grpc.NewClient(te.srvAddr, opts...)
 	if err != nil {
 		te.t.Fatalf("Dial(%q) = %v", te.srvAddr, err)
 	}

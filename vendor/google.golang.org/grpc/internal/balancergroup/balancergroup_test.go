@@ -18,12 +18,13 @@ package balancergroup
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
 
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/balancer"
+	"google.golang.org/grpc/balancer/pickfirst"
 	"google.golang.org/grpc/balancer/roundrobin"
 	"google.golang.org/grpc/balancer/weightedtarget/weightedaggregator"
 	"google.golang.org/grpc/connectivity"
@@ -32,6 +33,7 @@ import (
 	"google.golang.org/grpc/internal/channelz"
 	"google.golang.org/grpc/internal/grpctest"
 	"google.golang.org/grpc/internal/testutils"
+	"google.golang.org/grpc/internal/testutils/stats"
 	"google.golang.org/grpc/resolver"
 )
 
@@ -164,10 +166,10 @@ func (s) TestBalancerGroup_start_close(t *testing.T) {
 //   - hold a lock and send updates to balancer (e.g. update resolved addresses)
 //   - the balancer calls back (NewSubConn or update picker) in line
 //
-// The callback will try to hold hte same lock again, which will cause a
+// The callback will try to hold the same lock again, which will cause a
 // deadlock.
 //
-// This test starts the balancer group with a test balancer, will updates picker
+// This test starts the balancer group with a test balancer, will update picker
 // whenever it gets an address update. It's expected that start() doesn't block
 // because of deadlock.
 func (s) TestBalancerGroup_start_close_deadlock(t *testing.T) {
@@ -314,7 +316,7 @@ func (s) TestBalancerGroup_locality_caching(t *testing.T) {
 }
 
 // Sub-balancers are put in cache when they are shut down. If balancer group is
-// closed within close timeout, all subconns should still be rmeoved
+// closed within close timeout, all subconns should still be removed
 // immediately.
 func (s) TestBalancerGroup_locality_caching_close_group(t *testing.T) {
 	_, bg, cc, addrToSC := initBalancerGroupForCachingTest(t, defaultTestTimeout)
@@ -344,7 +346,7 @@ func (s) TestBalancerGroup_locality_caching_close_group(t *testing.T) {
 
 // Sub-balancers in cache will be closed if not re-added within timeout, and
 // subConns will be shut down.
-func (s) TestBalancerGroup_locality_caching_not_readd_within_timeout(t *testing.T) {
+func (s) TestBalancerGroup_locality_caching_not_read_within_timeout(t *testing.T) {
 	_, _, cc, addrToSC := initBalancerGroupForCachingTest(t, time.Second)
 
 	// The sub-balancer is not re-added within timeout. The subconns should be
@@ -384,11 +386,11 @@ func (*noopBalancerBuilderWrapper) Name() string {
 
 // After removing a sub-balancer, re-add with same ID, but different balancer
 // builder. Old subconns should be shut down, and new subconns should be created.
-func (s) TestBalancerGroup_locality_caching_readd_with_different_builder(t *testing.T) {
+func (s) TestBalancerGroup_locality_caching_read_with_different_builder(t *testing.T) {
 	gator, bg, cc, addrToSC := initBalancerGroupForCachingTest(t, defaultTestTimeout)
 
 	// Re-add sub-balancer-1, but with a different balancer builder. The
-	// sub-balancer was still in cache, but cann't be reused. This should cause
+	// sub-balancer was still in cache, but can't be reused. This should cause
 	// old sub-balancer's subconns to be shut down immediately, and new
 	// subconns to be created.
 	gator.Add(testBalancerIDs[1], 1)
@@ -574,6 +576,7 @@ func (s) TestBalancerGracefulSwitch(t *testing.T) {
 	bg.UpdateClientConnState(testBalancerIDs[0], balancer.ClientConnState{ResolverState: resolver.State{Addresses: testBackendAddrs[0:2]}})
 
 	bg.Start()
+	defer bg.Close()
 
 	m1 := make(map[resolver.Address]balancer.SubConn)
 	scs := make(map[balancer.SubConn]bool)
@@ -601,7 +604,11 @@ func (s) TestBalancerGracefulSwitch(t *testing.T) {
 	childPolicyName := t.Name()
 	stub.Register(childPolicyName, stub.BalancerFuncs{
 		Init: func(bd *stub.BalancerData) {
-			bd.Data = balancer.Get(grpc.PickFirstBalancerName).Build(bd.ClientConn, bd.BuildOptions)
+			bd.BuildOptions.MetricsRecorder = &stats.NoopMetricsRecorder{}
+			bd.Data = balancer.Get(pickfirst.Name).Build(bd.ClientConn, bd.BuildOptions)
+		},
+		Close: func(bd *stub.BalancerData) {
+			bd.Data.(balancer.Balancer).Close()
 		},
 		UpdateClientConnState: func(bd *stub.BalancerData, ccs balancer.ClientConnState) error {
 			ccs.ResolverState.Addresses = ccs.ResolverState.Addresses[1:]
@@ -609,9 +616,15 @@ func (s) TestBalancerGracefulSwitch(t *testing.T) {
 			return bal.UpdateClientConnState(ccs)
 		},
 	})
-	builder := balancer.Get(childPolicyName)
-	bg.UpdateBuilder(testBalancerIDs[0], builder)
-	if err := bg.UpdateClientConnState(testBalancerIDs[0], balancer.ClientConnState{ResolverState: resolver.State{Addresses: testBackendAddrs[2:4]}}); err != nil {
+	cfgJSON := json.RawMessage(fmt.Sprintf(`[{%q: {}}]`, t.Name()))
+	lbCfg, err := ParseConfig(cfgJSON)
+	if err != nil {
+		t.Fatalf("ParseConfig(%s) failed: %v", string(cfgJSON), err)
+	}
+	if err := bg.UpdateClientConnState(testBalancerIDs[0], balancer.ClientConnState{
+		ResolverState:  resolver.State{Addresses: testBackendAddrs[2:4]},
+		BalancerConfig: lbCfg,
+	}); err != nil {
 		t.Fatalf("error updating ClientConn state: %v", err)
 	}
 

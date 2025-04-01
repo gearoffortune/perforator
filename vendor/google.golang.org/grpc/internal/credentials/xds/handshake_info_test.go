@@ -21,12 +21,18 @@ package xds
 import (
 	"crypto/x509"
 	"net"
+	"net/netip"
 	"net/url"
 	"regexp"
 	"testing"
 
+	"google.golang.org/grpc/credentials/tls/certprovider"
 	"google.golang.org/grpc/internal/xds/matcher"
 )
+
+type testCertProvider struct {
+	certprovider.Provider
+}
 
 func TestDNSMatch(t *testing.T) {
 	tests := []struct {
@@ -137,8 +143,11 @@ func TestMatchingSANExists_FailureCases(t *testing.T) {
 	inputCert := &x509.Certificate{
 		DNSNames:       []string{"foo.bar.example.com", "bar.baz.test.com", "*.example.com"},
 		EmailAddresses: []string{"foobar@example.com", "barbaz@test.com"},
-		IPAddresses:    []net.IP{net.ParseIP("192.0.0.1"), net.ParseIP("2001:db8::68")},
-		URIs:           []*url.URL{url1, url2},
+		IPAddresses: []net.IP{
+			netip.MustParseAddr("192.0.0.1").AsSlice(),
+			netip.MustParseAddr("2001:db8::68").AsSlice(),
+		},
+		URIs: []*url.URL{url1, url2},
 	}
 
 	tests := []struct {
@@ -209,8 +218,11 @@ func TestMatchingSANExists_Success(t *testing.T) {
 	inputCert := &x509.Certificate{
 		DNSNames:       []string{"baz.test.com", "*.example.com"},
 		EmailAddresses: []string{"foobar@example.com", "barbaz@test.com"},
-		IPAddresses:    []net.IP{net.ParseIP("192.0.0.1"), net.ParseIP("2001:db8::68")},
-		URIs:           []*url.URL{url1, url2},
+		IPAddresses: []net.IP{
+			netip.MustParseAddr("192.0.0.1").AsSlice(),
+			netip.MustParseAddr("2001:db8::68").AsSlice(),
+		},
+		URIs: []*url.URL{url1, url2},
 	}
 
 	tests := []struct {
@@ -299,4 +311,89 @@ func TestMatchingSANExists_Success(t *testing.T) {
 
 func newStringP(s string) *string {
 	return &s
+}
+
+func TestEqual(t *testing.T) {
+	tests := []struct {
+		desc      string
+		hi1       *HandshakeInfo
+		hi2       *HandshakeInfo
+		wantMatch bool
+	}{
+		{
+			desc:      "both HandshakeInfo are nil",
+			hi1:       nil,
+			hi2:       nil,
+			wantMatch: true,
+		},
+		{
+			desc:      "one HandshakeInfo is nil",
+			hi1:       nil,
+			hi2:       NewHandshakeInfo(&testCertProvider{}, nil, nil, false),
+			wantMatch: false,
+		},
+		{
+			desc:      "different root providers",
+			hi1:       NewHandshakeInfo(&testCertProvider{}, nil, nil, false),
+			hi2:       NewHandshakeInfo(&testCertProvider{}, nil, nil, false),
+			wantMatch: false,
+		},
+		{
+			desc: "same providers, same SAN matchers",
+			hi1: NewHandshakeInfo(testCertProvider{}, testCertProvider{}, []matcher.StringMatcher{
+				matcher.StringMatcherForTesting(newStringP("foo.com"), nil, nil, nil, nil, false),
+			}, false),
+			hi2: NewHandshakeInfo(testCertProvider{}, testCertProvider{}, []matcher.StringMatcher{
+				matcher.StringMatcherForTesting(newStringP("foo.com"), nil, nil, nil, nil, false),
+			}, false),
+			wantMatch: true,
+		},
+		{
+			desc: "same providers, different SAN matchers",
+			hi1: NewHandshakeInfo(testCertProvider{}, testCertProvider{}, []matcher.StringMatcher{
+				matcher.StringMatcherForTesting(newStringP("foo.com"), nil, nil, nil, nil, false),
+			}, false),
+			hi2: NewHandshakeInfo(testCertProvider{}, testCertProvider{}, []matcher.StringMatcher{
+				matcher.StringMatcherForTesting(newStringP("bar.com"), nil, nil, nil, nil, false),
+			}, false),
+			wantMatch: false,
+		},
+		{
+			desc: "same SAN matchers with different content",
+			hi1: NewHandshakeInfo(&testCertProvider{}, &testCertProvider{}, []matcher.StringMatcher{
+				matcher.StringMatcherForTesting(newStringP("foo.com"), nil, nil, nil, nil, false),
+			}, false),
+			hi2: NewHandshakeInfo(&testCertProvider{}, &testCertProvider{}, []matcher.StringMatcher{
+				matcher.StringMatcherForTesting(newStringP("foo.com"), nil, nil, nil, nil, false),
+				matcher.StringMatcherForTesting(newStringP("bar.com"), nil, nil, nil, nil, false),
+			}, false),
+			wantMatch: false,
+		},
+		{
+			desc:      "different requireClientCert flags",
+			hi1:       NewHandshakeInfo(&testCertProvider{}, &testCertProvider{}, nil, true),
+			hi2:       NewHandshakeInfo(&testCertProvider{}, &testCertProvider{}, nil, false),
+			wantMatch: false,
+		},
+		{
+			desc:      "same identity provider, different root provider",
+			hi1:       NewHandshakeInfo(&testCertProvider{}, testCertProvider{}, nil, false),
+			hi2:       NewHandshakeInfo(&testCertProvider{}, testCertProvider{}, nil, false),
+			wantMatch: false,
+		},
+		{
+			desc:      "different identity provider, same root provider",
+			hi1:       NewHandshakeInfo(testCertProvider{}, &testCertProvider{}, nil, false),
+			hi2:       NewHandshakeInfo(testCertProvider{}, &testCertProvider{}, nil, false),
+			wantMatch: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			if gotMatch := test.hi1.Equal(test.hi2); gotMatch != test.wantMatch {
+				t.Errorf("hi1.Equal(hi2) = %v; wantMatch %v", gotMatch, test.wantMatch)
+			}
+		})
+	}
 }

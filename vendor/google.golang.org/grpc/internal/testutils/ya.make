@@ -2,10 +2,11 @@ GO_LIBRARY()
 
 LICENSE(Apache-2.0)
 
-VERSION(v1.63.2)
+VERSION(v1.69.4)
 
 SRCS(
     balancer.go
+    blocking_context_dialer.go
     channel.go
     http_client.go
     local_listener.go
@@ -18,11 +19,16 @@ SRCS(
     state.go
     status_equal.go
     stubstatshandler.go
+    tls_creds.go
     wrappers.go
     wrr.go
+    xds_bootstrap.go
 )
 
-GO_TEST_SRCS(status_equal_test.go)
+GO_TEST_SRCS(
+    blocking_context_dialer_test.go
+    status_equal_test.go
+)
 
 GO_XTEST_SRCS(pipe_listener_test.go)
 
@@ -34,5 +40,6 @@ RECURSE(
     pickfirst
     rls
     roundrobin
+    stats
     xds
 )

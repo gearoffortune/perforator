@@ -1223,7 +1223,7 @@ func (s) TestUnmarshalListener_ServerSide(t *testing.T) {
 				},
 			}),
 			wantName: v3LDSTarget,
-			wantErr:  "failed unmarshaling of network filter",
+			wantErr:  "failed unmarshalling of network filter",
 		},
 		{
 			name: "unexpected transport socket name",
@@ -1746,11 +1746,11 @@ type errHTTPFilter struct {
 
 func (errHTTPFilter) TypeURLs() []string { return []string{"err.custom.filter"} }
 
-func (errHTTPFilter) ParseFilterConfig(cfg proto.Message) (httpfilter.FilterConfig, error) {
+func (errHTTPFilter) ParseFilterConfig(proto.Message) (httpfilter.FilterConfig, error) {
 	return nil, fmt.Errorf("error from ParseFilterConfig")
 }
 
-func (errHTTPFilter) ParseFilterConfigOverride(override proto.Message) (httpfilter.FilterConfig, error) {
+func (errHTTPFilter) ParseFilterConfigOverride(proto.Message) (httpfilter.FilterConfig, error) {
 	return nil, fmt.Errorf("error from ParseFilterConfigOverride")
 }
 

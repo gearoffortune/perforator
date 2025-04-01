@@ -39,7 +39,7 @@ func unmarshalListenerResource(r *anypb.Any) (string, ListenerUpdate, error) {
 	}
 
 	if !IsListenerResource(r.GetTypeUrl()) {
-		return "", ListenerUpdate{}, fmt.Errorf("unexpected resource type: %q ", r.GetTypeUrl())
+		return "", ListenerUpdate{}, fmt.Errorf("unexpected listener resource type: %q ", r.GetTypeUrl())
 	}
 	lis := &v3listenerpb.Listener{}
 	if err := proto.Unmarshal(r.GetValue(), lis); err != nil {
@@ -68,11 +68,11 @@ func processClientSideListener(lis *v3listenerpb.Listener) (*ListenerUpdate, err
 
 	apiLisAny := lis.GetApiListener().GetApiListener()
 	if !IsHTTPConnManagerResource(apiLisAny.GetTypeUrl()) {
-		return nil, fmt.Errorf("unexpected resource type: %q", apiLisAny.GetTypeUrl())
+		return nil, fmt.Errorf("unexpected http connection manager resource type: %q", apiLisAny.GetTypeUrl())
 	}
 	apiLis := &v3httppb.HttpConnectionManager{}
 	if err := proto.Unmarshal(apiLisAny.GetValue(), apiLis); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal api_listner: %v", err)
+		return nil, fmt.Errorf("failed to unmarshal api_listener: %v", err)
 	}
 	// "HttpConnectionManager.xff_num_trusted_hops must be unset or zero and
 	// HttpConnectionManager.original_ip_detection_extensions must be empty. If

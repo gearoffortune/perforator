@@ -63,7 +63,7 @@ const (
 	// is required. Only the server presents an identity certificate in this
 	// configuration.
 	SecurityLevelTLS
-	// SecurityLevelMTLS is used when security ocnfiguration corresponding to
+	// SecurityLevelMTLS is used when security configuration corresponding to
 	// mTLS is required. Both client and server present identity certificates in
 	// this configuration.
 	SecurityLevelMTLS
@@ -667,6 +667,13 @@ func ClusterResourceWithOptions(opts ClusterOptions) *v3clusterpb.Cluster {
 	return cluster
 }
 
+// LocalityID represents a locality identifier.
+type LocalityID struct {
+	Region  string
+	Zone    string
+	SubZone string
+}
+
 // LocalityOptions contains options to configure a Locality.
 type LocalityOptions struct {
 	// Name is the unique locality name.
@@ -675,6 +682,11 @@ type LocalityOptions struct {
 	Weight uint32
 	// Backends is a set of backends belonging to this locality.
 	Backends []BackendOptions
+	// Priority is the priority of the locality. Defaults to 0.
+	Priority uint32
+	// Locality is the locality identifier. If not specified, a random
+	// identifier is generated.
+	Locality LocalityID
 }
 
 // BackendOptions contains options to configure individual backends in a
@@ -686,6 +698,8 @@ type BackendOptions struct {
 	// Health status of the backend. Default is UNKNOWN which is treated the
 	// same as HEALTHY.
 	HealthStatus v3corepb.HealthStatus
+	// Weight sets the backend weight. Defaults to 1.
+	Weight uint32
 }
 
 // EndpointOptions contains options to configure an Endpoint (or
@@ -708,7 +722,7 @@ type EndpointOptions struct {
 func DefaultEndpoint(clusterName string, host string, ports []uint32) *v3endpointpb.ClusterLoadAssignment {
 	var bOpts []BackendOptions
 	for _, p := range ports {
-		bOpts = append(bOpts, BackendOptions{Port: p})
+		bOpts = append(bOpts, BackendOptions{Port: p, Weight: 1})
 	}
 	return EndpointResourceWithOptions(EndpointOptions{
 		ClusterName: clusterName,
@@ -729,6 +743,10 @@ func EndpointResourceWithOptions(opts EndpointOptions) *v3endpointpb.ClusterLoad
 	for i, locality := range opts.Localities {
 		var lbEndpoints []*v3endpointpb.LbEndpoint
 		for _, b := range locality.Backends {
+			// Weight defaults to 1.
+			if b.Weight == 0 {
+				b.Weight = 1
+			}
 			lbEndpoints = append(lbEndpoints, &v3endpointpb.LbEndpoint{
 				HostIdentifier: &v3endpointpb.LbEndpoint_Endpoint{Endpoint: &v3endpointpb.Endpoint{
 					Address: &v3corepb.Address{Address: &v3corepb.Address_SocketAddress{
@@ -740,19 +758,23 @@ func EndpointResourceWithOptions(opts EndpointOptions) *v3endpointpb.ClusterLoad
 					}},
 				}},
 				HealthStatus:        b.HealthStatus,
-				LoadBalancingWeight: &wrapperspb.UInt32Value{Value: 1},
+				LoadBalancingWeight: &wrapperspb.UInt32Value{Value: b.Weight},
 			})
 		}
 
-		endpoints = append(endpoints, &v3endpointpb.LocalityLbEndpoints{
-			Locality: &v3corepb.Locality{
+		l := locality.Locality
+		if l == (LocalityID{}) {
+			l = LocalityID{
 				Region:  fmt.Sprintf("region-%d", i+1),
 				Zone:    fmt.Sprintf("zone-%d", i+1),
 				SubZone: fmt.Sprintf("subzone-%d", i+1),
-			},
+			}
+		}
+		endpoints = append(endpoints, &v3endpointpb.LocalityLbEndpoints{
+			Locality:            &v3corepb.Locality{Region: l.Region, Zone: l.Zone, SubZone: l.SubZone},
 			LbEndpoints:         lbEndpoints,
 			LoadBalancingWeight: &wrapperspb.UInt32Value{Value: locality.Weight},
-			Priority:            0,
+			Priority:            locality.Priority,
 		})
 	}
 
@@ -781,7 +803,7 @@ func EndpointResourceWithOptions(opts EndpointOptions) *v3endpointpb.ClusterLoad
 
 // DefaultServerListenerWithRouteConfigName returns a basic xds Listener
 // resource to be used on the server side. The returned Listener resource
-// contains a RouteCongiguration resource name that needs to be resolved.
+// contains a RouteConfiguration resource name that needs to be resolved.
 func DefaultServerListenerWithRouteConfigName(host string, port uint32, secLevel SecurityLevel, routeName string) *v3listenerpb.Listener {
 	return defaultServerListenerCommon(host, port, secLevel, routeName, false)
 }

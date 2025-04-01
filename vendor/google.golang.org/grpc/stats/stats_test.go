@@ -28,6 +28,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/internal"
@@ -38,6 +39,7 @@ import (
 	"google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/testing/protocmp"
 
 	testgrpc "google.golang.org/grpc/interop/grpc_testing"
 	testpb "google.golang.org/grpc/interop/grpc_testing"
@@ -90,6 +92,27 @@ func payloadToID(p *testpb.Payload) int32 {
 		panic("invalid payload")
 	}
 	return int32(p.Body[0]) + int32(p.Body[1])<<8 + int32(p.Body[2])<<16 + int32(p.Body[3])<<24
+}
+
+func setIncomingStats(ctx context.Context, mdKey string, b []byte) context.Context {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		md = metadata.MD{}
+	}
+	md.Set(mdKey, string(b))
+	return metadata.NewIncomingContext(ctx, md)
+}
+
+func getOutgoingStats(ctx context.Context, mdKey string) []byte {
+	md, ok := metadata.FromOutgoingContext(ctx)
+	if !ok {
+		return nil
+	}
+	tagValues := md.Get(mdKey)
+	if len(tagValues) == 0 {
+		return nil
+	}
+	return []byte(tagValues[len(tagValues)-1])
 }
 
 type testServer struct {
@@ -538,40 +561,29 @@ func checkInPayload(t *testing.T, d *gotData, e *expectedData) {
 	if d.ctx == nil {
 		t.Fatalf("d.ctx = nil, want <non-nil>")
 	}
+
+	var idx *int
+	var payloads []proto.Message
 	if d.client {
-		b, err := proto.Marshal(e.responses[e.respIdx])
-		if err != nil {
-			t.Fatalf("failed to marshal message: %v", err)
-		}
-		if reflect.TypeOf(st.Payload) != reflect.TypeOf(e.responses[e.respIdx]) {
-			t.Fatalf("st.Payload = %T, want %T", st.Payload, e.responses[e.respIdx])
-		}
-		e.respIdx++
-		if string(st.Data) != string(b) {
-			t.Fatalf("st.Data = %v, want %v", st.Data, b)
-		}
-		if st.Length != len(b) {
-			t.Fatalf("st.Lenght = %v, want %v", st.Length, len(b))
-		}
+		idx = &e.respIdx
+		payloads = e.responses
 	} else {
-		b, err := proto.Marshal(e.requests[e.reqIdx])
-		if err != nil {
-			t.Fatalf("failed to marshal message: %v", err)
-		}
-		if reflect.TypeOf(st.Payload) != reflect.TypeOf(e.requests[e.reqIdx]) {
-			t.Fatalf("st.Payload = %T, want %T", st.Payload, e.requests[e.reqIdx])
-		}
-		e.reqIdx++
-		if string(st.Data) != string(b) {
-			t.Fatalf("st.Data = %v, want %v", st.Data, b)
-		}
-		if st.Length != len(b) {
-			t.Fatalf("st.Lenght = %v, want %v", st.Length, len(b))
-		}
+		idx = &e.reqIdx
+		payloads = e.requests
 	}
+
+	wantPayload := payloads[*idx]
+	if diff := cmp.Diff(wantPayload, st.Payload.(proto.Message), protocmp.Transform()); diff != "" {
+		t.Fatalf("unexpected difference in st.Payload (-want +got):\n%s", diff)
+	}
+	*idx++
+	if st.Length != proto.Size(wantPayload) {
+		t.Fatalf("st.Length = %v, want %v", st.Length, proto.Size(wantPayload))
+	}
+
 	// Below are sanity checks that WireLength and RecvTime are populated.
 	// TODO: check values of WireLength and RecvTime.
-	if len(st.Data) > 0 && st.CompressedLength == 0 {
+	if st.Length > 0 && st.CompressedLength == 0 {
 		t.Fatalf("st.WireLength = %v with non-empty data, want <non-zero>",
 			st.CompressedLength)
 	}
@@ -657,40 +669,29 @@ func checkOutPayload(t *testing.T, d *gotData, e *expectedData) {
 	if d.ctx == nil {
 		t.Fatalf("d.ctx = nil, want <non-nil>")
 	}
+
+	var idx *int
+	var payloads []proto.Message
 	if d.client {
-		b, err := proto.Marshal(e.requests[e.reqIdx])
-		if err != nil {
-			t.Fatalf("failed to marshal message: %v", err)
-		}
-		if reflect.TypeOf(st.Payload) != reflect.TypeOf(e.requests[e.reqIdx]) {
-			t.Fatalf("st.Payload = %T, want %T", st.Payload, e.requests[e.reqIdx])
-		}
-		e.reqIdx++
-		if string(st.Data) != string(b) {
-			t.Fatalf("st.Data = %v, want %v", st.Data, b)
-		}
-		if st.Length != len(b) {
-			t.Fatalf("st.Lenght = %v, want %v", st.Length, len(b))
-		}
+		idx = &e.reqIdx
+		payloads = e.requests
 	} else {
-		b, err := proto.Marshal(e.responses[e.respIdx])
-		if err != nil {
-			t.Fatalf("failed to marshal message: %v", err)
-		}
-		if reflect.TypeOf(st.Payload) != reflect.TypeOf(e.responses[e.respIdx]) {
-			t.Fatalf("st.Payload = %T, want %T", st.Payload, e.responses[e.respIdx])
-		}
-		e.respIdx++
-		if string(st.Data) != string(b) {
-			t.Fatalf("st.Data = %v, want %v", st.Data, b)
-		}
-		if st.Length != len(b) {
-			t.Fatalf("st.Lenght = %v, want %v", st.Length, len(b))
-		}
+		idx = &e.respIdx
+		payloads = e.responses
 	}
-	// Below are sanity checks that WireLength and SentTime are populated.
+
+	expectedPayload := payloads[*idx]
+	if !proto.Equal(st.Payload.(proto.Message), expectedPayload) {
+		t.Fatalf("st.Payload = %v, want %v", st.Payload, expectedPayload)
+	}
+	*idx++
+	if st.Length != proto.Size(expectedPayload) {
+		t.Fatalf("st.Length = %v, want %v", st.Length, proto.Size(expectedPayload))
+	}
+
+	// Below are sanity checks that Length, CompressedLength and SentTime are populated.
 	// TODO: check values of WireLength and SentTime.
-	if len(st.Data) > 0 && st.WireLength == 0 {
+	if st.Length > 0 && st.WireLength == 0 {
 		t.Fatalf("st.WireLength = %v with non-empty data, want <non-zero>",
 			st.WireLength)
 	}
@@ -1332,19 +1333,19 @@ func (s) TestTags(t *testing.T) {
 	tCtx, cancel := context.WithTimeout(context.Background(), defaultTestTimeout)
 	defer cancel()
 	ctx := stats.SetTags(tCtx, b)
-	if tg := stats.OutgoingTags(ctx); !reflect.DeepEqual(tg, b) {
-		t.Errorf("OutgoingTags(%v) = %v; want %v", ctx, tg, b)
+	if tg := getOutgoingStats(ctx, "grpc-tags-bin"); !reflect.DeepEqual(tg, b) {
+		t.Errorf("getOutgoingStats(%v, grpc-tags-bin) = %v; want %v", ctx, tg, b)
 	}
 	if tg := stats.Tags(ctx); tg != nil {
 		t.Errorf("Tags(%v) = %v; want nil", ctx, tg)
 	}
 
-	ctx = stats.SetIncomingTags(tCtx, b)
+	ctx = setIncomingStats(tCtx, "grpc-tags-bin", b)
 	if tg := stats.Tags(ctx); !reflect.DeepEqual(tg, b) {
 		t.Errorf("Tags(%v) = %v; want %v", ctx, tg, b)
 	}
-	if tg := stats.OutgoingTags(ctx); tg != nil {
-		t.Errorf("OutgoingTags(%v) = %v; want nil", ctx, tg)
+	if tg := getOutgoingStats(ctx, "grpc-tags-bin"); tg != nil {
+		t.Errorf("getOutgoingStats(%v, grpc-tags-bin) = %v; want nil", ctx, tg)
 	}
 }
 
@@ -1353,19 +1354,19 @@ func (s) TestTrace(t *testing.T) {
 	tCtx, cancel := context.WithTimeout(context.Background(), defaultTestTimeout)
 	defer cancel()
 	ctx := stats.SetTrace(tCtx, b)
-	if tr := stats.OutgoingTrace(ctx); !reflect.DeepEqual(tr, b) {
-		t.Errorf("OutgoingTrace(%v) = %v; want %v", ctx, tr, b)
+	if tr := getOutgoingStats(ctx, "grpc-trace-bin"); !reflect.DeepEqual(tr, b) {
+		t.Errorf("getOutgoingStats(%v, grpc-trace-bin) = %v; want %v", ctx, tr, b)
 	}
 	if tr := stats.Trace(ctx); tr != nil {
 		t.Errorf("Trace(%v) = %v; want nil", ctx, tr)
 	}
 
-	ctx = stats.SetIncomingTrace(tCtx, b)
+	ctx = setIncomingStats(tCtx, "grpc-trace-bin", b)
 	if tr := stats.Trace(ctx); !reflect.DeepEqual(tr, b) {
 		t.Errorf("Trace(%v) = %v; want %v", ctx, tr, b)
 	}
-	if tr := stats.OutgoingTrace(ctx); tr != nil {
-		t.Errorf("OutgoingTrace(%v) = %v; want nil", ctx, tr)
+	if tr := getOutgoingStats(ctx, "grpc-trace-bin"); tr != nil {
+		t.Errorf("getOutgoingStats(%v, grpc-trace-bin) = %v; want nil", ctx, tr)
 	}
 }
 

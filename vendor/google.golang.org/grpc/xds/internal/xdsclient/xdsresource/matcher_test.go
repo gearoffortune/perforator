@@ -19,10 +19,10 @@ package xdsresource
 
 import (
 	"context"
+	rand "math/rand/v2"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"google.golang.org/grpc/internal/grpcrand"
 	"google.golang.org/grpc/internal/grpcutil"
 	iresolver "google.golang.org/grpc/internal/resolver"
 	"google.golang.org/grpc/internal/xds/matcher"
@@ -119,11 +119,11 @@ func (s) TestFractionMatcherMatch(t *testing.T) {
 	const fraction = 500000
 	fm := newFractionMatcher(fraction)
 	defer func() {
-		RandInt63n = grpcrand.Int63n
+		RandInt64n = rand.Int64N
 	}()
 
 	// rand > fraction, should return false.
-	RandInt63n = func(n int64) int64 {
+	RandInt64n = func(int64) int64 {
 		return fraction + 1
 	}
 	if matched := fm.match(); matched {
@@ -131,7 +131,7 @@ func (s) TestFractionMatcherMatch(t *testing.T) {
 	}
 
 	// rand == fraction, should return true.
-	RandInt63n = func(n int64) int64 {
+	RandInt64n = func(int64) int64 {
 		return fraction
 	}
 	if matched := fm.match(); !matched {
@@ -139,7 +139,7 @@ func (s) TestFractionMatcherMatch(t *testing.T) {
 	}
 
 	// rand < fraction, should return true.
-	RandInt63n = func(n int64) int64 {
+	RandInt64n = func(int64) int64 {
 		return fraction - 1
 	}
 	if matched := fm.match(); !matched {

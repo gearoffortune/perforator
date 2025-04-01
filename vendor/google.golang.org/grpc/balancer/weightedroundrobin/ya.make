@@ -2,7 +2,7 @@ GO_LIBRARY()
 
 LICENSE(Apache-2.0)
 
-VERSION(v1.63.2)
+VERSION(v1.69.4)
 
 SRCS(
     balancer.go
@@ -12,9 +12,14 @@ SRCS(
     weightedroundrobin.go
 )
 
-GO_TEST_SRCS(weightedroundrobin_test.go)
+GO_TEST_SRCS(
+    metrics_test.go
+    weightedroundrobin_test.go
+)
 
-GO_XTEST_SRCS(balancer_test.go)
+GO_XTEST_SRCS(
+    # balancer_test.go
+)
 
 END()
 

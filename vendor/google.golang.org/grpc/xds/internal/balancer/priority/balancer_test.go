@@ -256,7 +256,7 @@ func (s) TestPriority_SwitchPriority(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
-	t.Log("Add p2, it shouldn't cause any udpates.")
+	t.Log("Add p2, it shouldn't cause any updates.")
 	if err := pb.UpdateClientConnState(balancer.ClientConnState{
 		ResolverState: resolver.State{
 			Addresses: []resolver.Address{
@@ -341,7 +341,7 @@ func (s) TestPriority_SwitchPriority(t *testing.T) {
 
 	sc1.UpdateState(balancer.SubConnState{ConnectivityState: connectivity.Connecting})
 	// Does not change the aggregate state, because round robin does not leave
-	// TRANIENT_FAILURE if a subconn goes CONNECTING.
+	// TRANSIENT_FAILURE if a subconn goes CONNECTING.
 	sc1.UpdateState(balancer.SubConnState{ConnectivityState: connectivity.Ready})
 
 	if err := cc.WaitForRoundRobinPicker(ctx, sc1); err != nil {
@@ -1491,7 +1491,7 @@ var errTestInlineStateUpdate = fmt.Errorf("don't like addresses, empty or not")
 
 func init() {
 	stub.Register(inlineUpdateBalancerName, stub.BalancerFuncs{
-		UpdateClientConnState: func(bd *stub.BalancerData, opts balancer.ClientConnState) error {
+		UpdateClientConnState: func(bd *stub.BalancerData, _ balancer.ClientConnState) error {
 			bd.ClientConn.UpdateState(balancer.State{
 				ConnectivityState: connectivity.Ready,
 				Picker:            &testutils.TestConstPicker{Err: errTestInlineStateUpdate},
@@ -1975,7 +1975,7 @@ func (s) TestPriority_HighPriorityUpdatesWhenLowInUse(t *testing.T) {
 
 	sc1.UpdateState(balancer.SubConnState{ConnectivityState: connectivity.Connecting})
 	// Does not change the aggregate state, because round robin does not leave
-	// TRANIENT_FAILURE if a subconn goes CONNECTING.
+	// TRANSIENT_FAILURE if a subconn goes CONNECTING.
 	sc1.UpdateState(balancer.SubConnState{ConnectivityState: connectivity.Ready})
 
 	if err := cc.WaitForRoundRobinPicker(ctx, sc1); err != nil {
