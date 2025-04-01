@@ -30,7 +30,7 @@
 #include <library/cpp/logger/global/global.h>
 #include <util/generic/function_ref.h>
 
-namespace NPerforator::NLinguist::NPython::NAsm::NX86 {
+namespace NPerforator::NAsm::NX86 {
 
 EDecodeInstructionError DecodeInstructions(
     TLog& log,
@@ -394,4 +394,4 @@ std::expected<TBytecodeEvaluator::TResult, EDecodeInstructionError> TBytecodeEva
     return result;
 }
 
-} // namespace NPerforator::NLinguist::NPython::NAsm::NX86
+} // namespace NPerforator::NAsm::NX86

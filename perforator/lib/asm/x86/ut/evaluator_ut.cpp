@@ -21,7 +21,7 @@
 #include <util/generic/vector.h>
 #include <util/string/builder.h>
 
-using namespace NPerforator::NLinguist::NPython::NAsm::NX86;
+using namespace NPerforator::NAsm::NX86;
 
 class TEvaluatorTest : public TTestBase {
     UNIT_TEST_SUITE(TEvaluatorTest);

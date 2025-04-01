@@ -2,7 +2,7 @@
 
 namespace NPerforator::NLinguist::NPython::NAsm::NX86 {
 
-static TMaybe<ui64> GetRegisterValueOrAddress(const TState& state, unsigned int reg) {
+static TMaybe<ui64> GetRegisterValueOrAddress(const NPerforator::NAsm::NX86::TState& state, unsigned int reg) {
     if (!state.HasKnownValue(reg)) {
         return Nothing();
     }
@@ -36,7 +36,7 @@ TMaybe<ThreadImageOffsetType> DecodePyThreadStateGetCurrent(
     TConstArrayRef<ui8> bytecode
 ) {
     ThreadImageOffsetType result = 0;
-    DecodeInstructions(TLoggerOperator<TGlobalLog>::Log(), triple, bytecode, [&](const llvm::MCInst& inst, ui64 size) {
+    NPerforator::NAsm::NX86::DecodeInstructions(TLoggerOperator<TGlobalLog>::Log(), triple, bytecode, [&](const llvm::MCInst& inst, ui64 size) {
         Y_UNUSED(size);
 
         switch (inst.getOpcode()) {
@@ -95,7 +95,7 @@ TMaybe<ThreadImageOffsetType> DecodeCurrentFastGet(
     TConstArrayRef<ui8> bytecode
 ) {
     ThreadImageOffsetType lastNegativeImm = 0;
-    DecodeInstructions(TLoggerOperator<TGlobalLog>::Log(), triple, bytecode, [&](const llvm::MCInst& inst, ui64 size) {
+    NPerforator::NAsm::NX86::DecodeInstructions(TLoggerOperator<TGlobalLog>::Log(), triple, bytecode, [&](const llvm::MCInst& inst, ui64 size) {
         Y_UNUSED(size);
 
         switch (inst.getOpcode()) {
@@ -188,7 +188,7 @@ TMaybe<ui64> DecodePyGetVersion(
 
     // Look for instructions that load address into the 4th argument argument register (rcx/ecx)
     // Check the implementation of Py_GetVersion: https://github.com/python/cpython/blob/v3.11.0/Python/getversion.c#L12
-    DecodeInstructions(TLoggerOperator<TGlobalLog>::Log(), triple, bytecode, [&](const llvm::MCInst& inst, ui64 size) {
+    NPerforator::NAsm::NX86::DecodeInstructions(TLoggerOperator<TGlobalLog>::Log(), triple, bytecode, [&](const llvm::MCInst& inst, ui64 size) {
         rip += size;
 
         switch (inst.getOpcode()) {
@@ -275,8 +275,14 @@ TMaybe<ui64> DecodeAutoTSSKeyAddress(
     ui64 functionAddress,
     TConstArrayRef<ui8> bytecode
 ) {
-    auto instructionEvaluator = MakeDefaultInstructionEvaluator();
-    TBytecodeEvaluator evaluator(triple, MakeInitialState(functionAddress), bytecode, *instructionEvaluator, MakeStopOnPassControlFlowCondition());
+    auto instructionEvaluator = NPerforator::NAsm::NX86::MakeDefaultInstructionEvaluator();
+    NPerforator::NAsm::NX86::TBytecodeEvaluator evaluator(
+        triple,
+        NPerforator::NAsm::NX86::MakeInitialState(functionAddress),
+        bytecode,
+        *instructionEvaluator,
+        NPerforator::NAsm::NX86::MakeStopOnPassControlFlowCondition()
+    );
 
     auto result = evaluator.Evaluate();
 

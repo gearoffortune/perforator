@@ -16,7 +16,7 @@
 #include <variant>
 
 
-namespace NPerforator::NLinguist::NPython::NAsm::NX86 {
+namespace NPerforator::NAsm::NX86 {
 
 enum class EDecodeInstructionError {
     NoError,
@@ -103,4 +103,4 @@ private:
     TEvaluationStopCondition StopCondition_;
 };
 
-} // namespace NPerforator::NLinguist::NPython::NAsm::NX86
+} // namespace NPerforator::NAsm::NX86
