@@ -25,6 +25,7 @@ enum class EDecodeInstructionError {
     DisassemblyFailed,
 };
 
+// Note: it is caller responsibility to return false from instCallback to stop decoding instructions
 EDecodeInstructionError DecodeInstructions(
     TLog& log,
     const llvm::Triple& triple,
@@ -58,6 +59,7 @@ TState MakeInitialState(ui64 initialRIP);
 using TEvaluationStopCondition = TFunctionRef<bool(const TState&, const llvm::MCInst&)>;
 
 bool IsJumpOrCall(const llvm::MCInst& inst);
+bool IsRet(const llvm::MCInst& inst);
 
 TEvaluationStopCondition MakeStopOnPassControlFlowCondition();
 

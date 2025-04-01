@@ -81,12 +81,6 @@ EDecodeInstructionError DecodeInstructions(
             return EDecodeInstructionError::DisassemblyFailed;
         }
 
-        if (llvm::X86::isRET(inst.getOpcode()) ||
-            llvm::X86::isRETFQ(inst.getOpcode()) ||
-            llvm::X86::isRETF(inst.getOpcode())) {
-            return EDecodeInstructionError::NoError;
-        }
-
         if (!instCallback(inst, size)) {
             return EDecodeInstructionError::NoError;
         }
@@ -110,9 +104,15 @@ bool IsJumpOrCall(const llvm::MCInst& inst) {
            opcode == llvm::X86::JMP32r;
 }
 
+bool IsRet(const llvm::MCInst& inst) {
+    return llvm::X86::isRET(inst.getOpcode()) ||
+            llvm::X86::isRETFQ(inst.getOpcode()) ||
+            llvm::X86::isRETF(inst.getOpcode());
+}
+
 TEvaluationStopCondition MakeStopOnPassControlFlowCondition() {
     return [](const TState&, const llvm::MCInst& inst) -> bool {
-        return IsJumpOrCall(inst);
+        return IsJumpOrCall(inst) || IsRet(inst);
     };
 }
 

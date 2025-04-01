@@ -39,6 +39,10 @@ TMaybe<ThreadImageOffsetType> DecodePyThreadStateGetCurrent(
     NPerforator::NAsm::NX86::DecodeInstructions(TLoggerOperator<TGlobalLog>::Log(), triple, bytecode, [&](const llvm::MCInst& inst, ui64 size) {
         Y_UNUSED(size);
 
+        if (NPerforator::NAsm::NX86::IsRet(inst)) {
+            return false;
+        }
+
         switch (inst.getOpcode()) {
         // Parse `mov %fs:0xfffffffffffffff8,%rax`
         case llvm::X86::MOV64rm:
@@ -97,6 +101,10 @@ TMaybe<ThreadImageOffsetType> DecodeCurrentFastGet(
     ThreadImageOffsetType lastNegativeImm = 0;
     NPerforator::NAsm::NX86::DecodeInstructions(TLoggerOperator<TGlobalLog>::Log(), triple, bytecode, [&](const llvm::MCInst& inst, ui64 size) {
         Y_UNUSED(size);
+
+        if (NPerforator::NAsm::NX86::IsRet(inst)) {
+            return false;
+        }
 
         switch (inst.getOpcode()) {
         case llvm::X86::LEA64r:
@@ -190,6 +198,10 @@ TMaybe<ui64> DecodePyGetVersion(
     // Check the implementation of Py_GetVersion: https://github.com/python/cpython/blob/v3.11.0/Python/getversion.c#L12
     NPerforator::NAsm::NX86::DecodeInstructions(TLoggerOperator<TGlobalLog>::Log(), triple, bytecode, [&](const llvm::MCInst& inst, ui64 size) {
         rip += size;
+
+        if (NPerforator::NAsm::NX86::IsRet(inst)) {
+            return false;
+        }
 
         switch (inst.getOpcode()) {
             // Handle absolute address loading via MOV
