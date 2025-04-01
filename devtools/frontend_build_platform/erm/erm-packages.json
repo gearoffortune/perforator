@@ -1521,7 +1521,7 @@
     "title": "Next.js",
     "description": "Сборщик-бандлер от проекта Next.js\n\nОчень opinionated, но кому-то подходит.\n\nВ tier-0 используется в модуле/макросе [`TS_NEXT()`](https://docs.yandex-team.ru/frontend-in-arcadia/references/TS_NEXT).",
     "type": "NPM_PACKAGE",
-    "default": "15.2.1",
+    "default": "15.2.3",
     "links": {
       "Home": "https://nextjs.org",
       "Sources": "https://github.com/vercel/next.js",
@@ -1530,6 +1530,10 @@
     },
     "useDirectly": true,
     "versions": {
+      "15.2.3": {
+        "add_date": "2025-04-01T05:31:41",
+        "resources": []
+      },
       "15.2.1": {
         "add_date": "2025-03-18T05:30:56",
         "resources": []
@@ -1580,6 +1584,10 @@
       },
       "15.0.0": {
         "add_date": "2024-11-05T05:31:52",
+        "resources": []
+      },
+      "14.2.25": {
+        "add_date": "2025-04-01T05:31:41",
         "resources": []
       },
       "14.2.24": {
@@ -4404,7 +4412,7 @@
     "title": "Stylelint",
     "description": "Инструмент для линтинга файлов стилей.\n\nИспользуется в макросе [TS_STYLELINT()](https://docs.yandex-team.ru/frontend-in-arcadia/references/macros#ts-stylelint).",
     "type": "NPM_PACKAGE",
-    "default": "16.15.0",
+    "default": "16.16.0",
     "links": {
       "Home": "https://stylelint.io/",
       "Sources": "https://github.com/stylelint/stylelint",
@@ -4414,6 +4422,10 @@
     },
     "useDirectly": true,
     "versions": {
+      "16.16.0": {
+        "add_date": "2025-04-01T05:39:04",
+        "resources": []
+      },
       "16.15.0": {
         "add_date": "2025-03-18T05:35:12",
         "resources": []
@@ -4618,7 +4630,7 @@
     "title": "Vite",
     "description": "Современный сборщик frontend проектов\n\nПод капотом используется более низкоуровневый сборщик [rollup](https://rollupjs.org/).\n\nДля транспиляции TypeScript может использовать нативные способы: [esbuild](https://esbuild.github.io/), [SWC](https://swc.rs/)\n\nПоэтому, если требуется использовать `rollup` или `esbuild`/`SWC` на проекте - то `vite` - ваш выбор.\n\nВ tier-0 используется в модуле/макросе [`TS_VITE()`](https://docs.yandex-team.ru/frontend-in-arcadia/references/TS_VITE).",
     "type": "NPM_PACKAGE",
-    "default": "6.2.1",
+    "default": "6.2.2",
     "links": {
       "Home": "https://vitejs.dev/",
       "Sources": "https://github.com/vitejs/vite/tree/main",
@@ -4628,6 +4640,10 @@
     },
     "useDirectly": true,
     "versions": {
+      "6.2.2": {
+        "add_date": "2025-04-01T05:39:22",
+        "resources": []
+      },
       "6.2.1": {
         "add_date": "2025-03-25T05:34:35",
         "resources": []
