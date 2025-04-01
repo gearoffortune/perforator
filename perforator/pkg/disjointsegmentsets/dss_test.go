@@ -41,14 +41,7 @@ func TestPrune(t *testing.T) {
 			},
 			want: []item{
 				{b: 2, e: 400, g: 2},
-				{b: 5, e: 10, g: 1},
 			},
-			// BUG: item 2 can not be retained: it intersects with a higher-generation item 1
-			// correct behavior:
-			/*want: []item{
-				{b: 2, e: 400, g: 2},
-			},*/
-
 		},
 		{
 			name: "regr2",
@@ -59,13 +52,8 @@ func TestPrune(t *testing.T) {
 			},
 			want: []item{
 				{b: 2, e: 10, g: 2},
-			},
-			// BUG: item 2 should be retained: it only intersects with a lower-generation item 0
-			// correct behavior:
-			/*want: []item{
-				{b: 2, e: 10, g: 2},
 				{b: 50, e: 60, g: 1},
-			},*/
+			},
 		},
 	}
 	for _, tt := range tests {
