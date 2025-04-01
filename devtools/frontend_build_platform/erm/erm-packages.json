@@ -4083,7 +4083,7 @@
   "playwright": {
     "description": "Раннер для тестов Playwright, позволяет выполнять end-to-end тесты с учётом специфики различных браузеров и устройств",
     "type": "NPM_PACKAGE",
-    "default": "1.51.0",
+    "default": "1.51.1",
     "links": {
       "Home": "https://playwright.dev/",
       "Sources": "https://github.com/microsoft/playwright",
@@ -4093,6 +4093,10 @@
     "specifier": ">=1.41.2",
     "useDirectly": true,
     "versions": {
+      "1.51.1": {
+        "add_date": "2025-04-01T05:38:53",
+        "resources": []
+      },
       "1.51.0": {
         "add_date": "2025-03-25T05:34:19",
         "resources": []
