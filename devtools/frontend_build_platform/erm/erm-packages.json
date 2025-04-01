@@ -1792,7 +1792,7 @@
     "title": "Node.js",
     "description": "Интерпретатор JS.\n\nНаравне с pnpm является основополагающими ресурсами.\nИменно он запускается во всех процессах сборки, линтинга и тестирования под капотом у `ya tool nots`.",
     "type": "NODE_JS",
-    "default": "20.18.3",
+    "default": "20.19.0",
     "links": {
       "Home": "https://nodejs.org/",
       "Sources": "https://github.com/nodejs/node",
@@ -1801,6 +1801,31 @@
       "Release schedule": "https://github.com/nodejs/Release#release-schedule"
     },
     "versions": {
+      "23.10.0": {
+        "add_date": "2025-04-01T05:35:44",
+        "resources": [
+          {
+            "id": 8401284234,
+            "platform": "linux",
+            "arch": "x64"
+          },
+          {
+            "id": 8401286062,
+            "platform": "linux",
+            "arch": "arm64"
+          },
+          {
+            "id": 8401287654,
+            "platform": "darwin",
+            "arch": "x64"
+          },
+          {
+            "id": 8401289766,
+            "platform": "darwin",
+            "arch": "arm64"
+          }
+        ]
+      },
       "23.9.0": {
         "add_date": "2025-03-18T05:32:08",
         "resources": [
@@ -2547,6 +2572,31 @@
           {
             "id": 6360057114,
             "platform": "linux",
+            "arch": "arm64"
+          }
+        ]
+      },
+      "20.19.0": {
+        "add_date": "2025-04-01T05:32:38",
+        "resources": [
+          {
+            "id": 8401275241,
+            "platform": "linux",
+            "arch": "x64"
+          },
+          {
+            "id": 8401277200,
+            "platform": "linux",
+            "arch": "arm64"
+          },
+          {
+            "id": 8401279227,
+            "platform": "darwin",
+            "arch": "x64"
+          },
+          {
+            "id": 8401281669,
+            "platform": "darwin",
             "arch": "arm64"
           }
         ]
