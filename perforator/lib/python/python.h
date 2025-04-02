@@ -1,8 +1,7 @@
 #pragma once
 
+#include <perforator/lib/elf/elf.h>
 #include <perforator/lib/python/asm/x86-64/decode.h>
-
-#include <perforator/lib/tls/parser/tls.h>
 
 #include <llvm/Object/ObjectFile.h>
 
@@ -48,13 +47,13 @@ struct TParsedPythonVersion {
 
 class TPythonAnalyzer {
 public:
-    struct TSymbolsAddresses {
-        ui64 GetCurrentThreadState = 0;
-        ui64 CurrentFastGet = 0;
-        ui64 PyVersion = 0;
-        ui64 PyGetVersion = 0;
-        ui64 PyRuntime = 0;
-        ui64 PyGILStateCheck = 0;
+    struct TSymbols {
+        TMaybe<NPerforator::NELF::TSymbolLocation> GetCurrentThreadState;
+        TMaybe<NPerforator::NELF::TSymbolLocation> CurrentFastGet;
+        TMaybe<NPerforator::NELF::TSymbolLocation> PyVersion;
+        TMaybe<NPerforator::NELF::TSymbolLocation> PyGetVersion;
+        TMaybe<NPerforator::NELF::TSymbolLocation> PyRuntime;
+        TMaybe<NPerforator::NELF::TSymbolLocation> PyGILStateCheck;
     };
 
 public:
@@ -73,11 +72,11 @@ public:
     TMaybe<ui64> ParseAutoTSSKeyAddress();
 
 private:
-    void ParseSymbolsAddresses();
+    void ParseSymbolLocations();
 
 private:
     const llvm::object::ObjectFile& File_;
-    THolder<TSymbolsAddresses> SymbolsAddresses_;
+    THolder<TSymbols> Symbols_;
 };
 
 bool IsPythonBinary(const llvm::object::ObjectFile& file);

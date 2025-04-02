@@ -8,7 +8,14 @@
 #include <llvm/Object/ObjectFile.h>
 #include <llvm/Object/ELFObjectFile.h>
 
-namespace NPerforator::NELF::NSections {
+namespace NPerforator::NELF {
+
+struct TSymbolLocation {
+    ui64 Address = 0;
+    ui64 Size = 0;
+};
+
+namespace NSections {
 
 constexpr TStringBuf kTextSectionName = ".text";
 constexpr TStringBuf kDataSectionName = ".data";
@@ -17,23 +24,21 @@ constexpr TStringBuf kRoDataSectionName = ".rodata";
 
 } // namespace NPerforator::NELF::NSections
 
-namespace NPerforator::NELF::NPrivate {
+namespace NPrivate {
 
-TMaybe<THashMap<TStringBuf, ui64>> RetrieveDynamicSymbols(const llvm::object::ObjectFile& file, std::initializer_list<TStringBuf> symbols);
+TMaybe<THashMap<TStringBuf, TSymbolLocation>> RetrieveDynamicSymbols(const llvm::object::ObjectFile& file, std::initializer_list<TStringBuf> symbols);
 
-TMaybe<THashMap<TStringBuf, ui64>> RetrieveSymbols(const llvm::object::ObjectFile& file, std::initializer_list<TStringBuf> symbols);
+TMaybe<THashMap<TStringBuf, TSymbolLocation>> RetrieveSymbols(const llvm::object::ObjectFile& file, std::initializer_list<TStringBuf> symbols);
 
 } // namespace NPerforator::NELF::NPrivate
 
-namespace NPerforator::NELF {
-
 template <typename... Args>
-TMaybe<THashMap<TStringBuf, ui64>> RetrieveDynamicSymbols(const llvm::object::ObjectFile& file, Args... symbols) {
+TMaybe<THashMap<TStringBuf, TSymbolLocation>> RetrieveDynamicSymbols(const llvm::object::ObjectFile& file, Args... symbols) {
     return NPerforator::NELF::NPrivate::RetrieveDynamicSymbols(file, {symbols...});
 }
 
 template <typename... Args>
-TMaybe<THashMap<TStringBuf, ui64>> RetrieveSymbols(const llvm::object::ObjectFile& file, Args... symbols) {
+TMaybe<THashMap<TStringBuf, TSymbolLocation>> RetrieveSymbols(const llvm::object::ObjectFile& file, Args... symbols) {
     return NPerforator::NELF::NPrivate::RetrieveSymbols(file, {symbols...});
 }
 
