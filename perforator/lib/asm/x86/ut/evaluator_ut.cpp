@@ -15,7 +15,7 @@
 #include <llvm/Object/ObjectFile.h>
 #include <llvm/MC/MCInstBuilder.h>
 
-#include <library/cpp/testing/unittest/registar.h>
+#include <library/cpp/testing/gtest/gtest.h>
 #include <library/cpp/logger/global/global.h>
 
 #include <util/generic/vector.h>
@@ -23,53 +23,43 @@
 
 using namespace NPerforator::NAsm::NX86;
 
-class TEvaluatorTest : public TTestBase {
-    UNIT_TEST_SUITE(TEvaluatorTest);
-    UNIT_TEST(TestStateBasics);
-    UNIT_TEST(TestStopConditionFunctions);
-    UNIT_TEST(TestBytecodeEvaluator);
-    UNIT_TEST(TestDefaultEvaluator);
-    UNIT_TEST_SUITE_END();
+class EvaluatorTest : public ::testing::Test {
+protected:
+    void SetUp() override {}
 
-private:
-    void TestStateBasics();
-    void TestStopConditionFunctions();
-    void TestBytecodeEvaluator();
-    void TestDefaultEvaluator();
+    void TearDown() override {}
 };
 
-UNIT_TEST_SUITE_REGISTRATION(TEvaluatorTest);
-
-void TEvaluatorTest::TestStateBasics() {
+TEST_F(EvaluatorTest, StateBasics) {
     TState state;
     const unsigned int testReg1 = 123;
     const unsigned int testReg2 = 456;
 
-    UNIT_ASSERT(!state.HasKnownValue(testReg1));
-    UNIT_ASSERT(!state.GetImmediateValue(testReg1).Defined());
-    UNIT_ASSERT(!state.GetMemoryAddress(testReg1).Defined());
+    EXPECT_FALSE(state.HasKnownValue(testReg1));
+    EXPECT_FALSE(state.GetImmediateValue(testReg1).Defined());
+    EXPECT_FALSE(state.GetMemoryAddress(testReg1).Defined());
 
     const i64 immediateValue = 0x12345678;
     state.SetImmediate(testReg1, immediateValue);
-    UNIT_ASSERT(state.HasKnownValue(testReg1));
-    UNIT_ASSERT(state.GetImmediateValue(testReg1).Defined());
-    UNIT_ASSERT_EQUAL(*state.GetImmediateValue(testReg1), immediateValue);
-    UNIT_ASSERT(!state.GetMemoryAddress(testReg1).Defined());
+    EXPECT_TRUE(state.HasKnownValue(testReg1));
+    EXPECT_TRUE(state.GetImmediateValue(testReg1).Defined());
+    EXPECT_EQ(*state.GetImmediateValue(testReg1), immediateValue);
+    EXPECT_FALSE(state.GetMemoryAddress(testReg1).Defined());
 
     const i64 memoryAddress = 0xABCDEF;
     state.SetMemoryRef(testReg2, memoryAddress);
-    UNIT_ASSERT(state.HasKnownValue(testReg2));
-    UNIT_ASSERT(!state.GetImmediateValue(testReg2).Defined());
-    UNIT_ASSERT(state.GetMemoryAddress(testReg2).Defined());
-    UNIT_ASSERT_EQUAL(*state.GetMemoryAddress(testReg2), memoryAddress);
+    EXPECT_TRUE(state.HasKnownValue(testReg2));
+    EXPECT_FALSE(state.GetImmediateValue(testReg2).Defined());
+    EXPECT_TRUE(state.GetMemoryAddress(testReg2).Defined());
+    EXPECT_EQ(*state.GetMemoryAddress(testReg2), memoryAddress);
 
     state.SetImmediate(testReg2, immediateValue);
-    UNIT_ASSERT(state.GetImmediateValue(testReg2).Defined());
-    UNIT_ASSERT(!state.GetMemoryAddress(testReg2).Defined());
-    UNIT_ASSERT_EQUAL(*state.GetImmediateValue(testReg2), immediateValue);
+    EXPECT_TRUE(state.GetImmediateValue(testReg2).Defined());
+    EXPECT_FALSE(state.GetMemoryAddress(testReg2).Defined());
+    EXPECT_EQ(*state.GetImmediateValue(testReg2), immediateValue);
 }
 
-void TEvaluatorTest::TestStopConditionFunctions() {
+TEST_F(EvaluatorTest, StopConditionFunctions) {
     const unsigned int initialRIP = 0x1000;
     TState initialState = MakeInitialState(initialRIP);
 
@@ -77,20 +67,20 @@ void TEvaluatorTest::TestStopConditionFunctions() {
 
     llvm::MCInst callInst = llvm::MCInstBuilder(llvm::X86::CALLpcrel32).addImm(0);
 
-    UNIT_ASSERT(IsJumpOrCall(callInst));
-    UNIT_ASSERT(cfStopCondition(initialState, callInst));
+    EXPECT_TRUE(IsJumpOrCall(callInst));
+    EXPECT_TRUE(cfStopCondition(initialState, callInst));
 
     llvm::MCInst movInst = llvm::MCInstBuilder(llvm::X86::MOV32ri).addReg(llvm::X86::EAX).addImm(1);
-    UNIT_ASSERT(!IsJumpOrCall(movInst));
-    UNIT_ASSERT(!cfStopCondition(initialState, movInst));
+    EXPECT_FALSE(IsJumpOrCall(movInst));
+    EXPECT_FALSE(cfStopCondition(initialState, movInst));
 }
 
-void TEvaluatorTest::TestBytecodeEvaluator() {
+TEST_F(EvaluatorTest, BytecodeEvaluator) {
     const unsigned int initialRIP = 0x1000;
     TState initialState = MakeInitialState(initialRIP);
 
     auto defaultEvaluator = MakeDefaultInstructionEvaluator();
-    UNIT_ASSERT(defaultEvaluator != nullptr);
+    EXPECT_NE(defaultEvaluator, nullptr);
 
     // Using a sequence of x86 instructions with both MOV and LEA:
     // 1. MOV EAX, 42              (B8 2A 00 00 00)
@@ -117,35 +107,35 @@ void TEvaluatorTest::TestBytecodeEvaluator() {
     );
 
     auto result = evaluator.Evaluate();
-    UNIT_ASSERT(result.has_value());
+    EXPECT_TRUE(result.has_value());
 
     auto raxValue = result->State.GetImmediateValue(llvm::X86::RAX);
-    UNIT_ASSERT(raxValue.Defined());
-    UNIT_ASSERT_EQUAL(*raxValue, 42);
+    EXPECT_TRUE(raxValue.Defined());
+    EXPECT_EQ(*raxValue, 42);
 
     auto rbxValue = result->State.GetImmediateValue(llvm::X86::RBX);
-    UNIT_ASSERT(rbxValue.Defined());
-    UNIT_ASSERT_EQUAL(*rbxValue, 10);
+    EXPECT_TRUE(rbxValue.Defined());
+    EXPECT_EQ(*rbxValue, 10);
 
     auto rcxValue = result->State.GetImmediateValue(llvm::X86::RCX);
-    UNIT_ASSERT(rcxValue.Defined());
-    UNIT_ASSERT_EQUAL(*rcxValue, 52);  // RAX(42) + 10 = 52, upper 32 bits zero
+    EXPECT_TRUE(rcxValue.Defined());
+    EXPECT_EQ(*rcxValue, 52);  // RAX(42) + 10 = 52, upper 32 bits zero
 
     auto rdxValue = result->State.GetImmediateValue(llvm::X86::RDX);
-    UNIT_ASSERT(rdxValue.Defined());
-    UNIT_ASSERT_EQUAL(*rdxValue, 72);  // RCX(52) + RBX(10)*2 = 72, upper 32 bits zero
+    EXPECT_TRUE(rdxValue.Defined());
+    EXPECT_EQ(*rdxValue, 72);  // RCX(52) + RBX(10)*2 = 72, upper 32 bits zero
 
     auto ripValue = result->State.GetImmediateValue(llvm::X86::RIP);
-    UNIT_ASSERT(ripValue.Defined());
-    UNIT_ASSERT_EQUAL(*ripValue, initialRIP + static_cast<unsigned int>(bytecode.size()));
+    EXPECT_TRUE(ripValue.Defined());
+    EXPECT_EQ(*ripValue, initialRIP + static_cast<unsigned int>(bytecode.size()));
 }
 
-void TEvaluatorTest::TestDefaultEvaluator() {
+TEST_F(EvaluatorTest, DefaultEvaluator) {
     const unsigned int initialRIP = 0x1000;
     TState initialState = MakeInitialState(initialRIP);
 
     auto defaultEvaluator = MakeDefaultInstructionEvaluator();
-    UNIT_ASSERT(defaultEvaluator != nullptr);
+    EXPECT_NE(defaultEvaluator, nullptr);
 
     TState testState = initialState;
 
@@ -155,12 +145,12 @@ void TEvaluatorTest::TestDefaultEvaluator() {
     defaultEvaluator->Evaluate(testState, movRax1);
 
     auto eaxValue = testState.GetImmediateValue(llvm::X86::EAX);
-    UNIT_ASSERT(eaxValue.Defined());
-    UNIT_ASSERT_EQUAL(*eaxValue, 1);
+    EXPECT_TRUE(eaxValue.Defined());
+    EXPECT_EQ(*eaxValue, 1);
 
     auto raxValue = testState.GetImmediateValue(llvm::X86::RAX);
-    UNIT_ASSERT(raxValue.Defined());
-    UNIT_ASSERT_EQUAL(*raxValue, 1);
+    EXPECT_TRUE(raxValue.Defined());
+    EXPECT_EQ(*raxValue, 1);
 
     llvm::MCInst leaInst = llvm::MCInstBuilder(llvm::X86::LEA32r)
         .addReg(llvm::X86::EBX)
@@ -173,12 +163,12 @@ void TEvaluatorTest::TestDefaultEvaluator() {
     defaultEvaluator->Evaluate(testState, leaInst);
 
     auto ebxValue = testState.GetImmediateValue(llvm::X86::EBX);
-    UNIT_ASSERT(ebxValue.Defined());
-    UNIT_ASSERT_EQUAL(*ebxValue, 0x101);
+    EXPECT_TRUE(ebxValue.Defined());
+    EXPECT_EQ(*ebxValue, 0x101);
 
     auto rbxValue = testState.GetImmediateValue(llvm::X86::RBX);
-    UNIT_ASSERT(rbxValue.Defined());
-    UNIT_ASSERT_EQUAL(*rbxValue, 0x101);
+    EXPECT_TRUE(rbxValue.Defined());
+    EXPECT_EQ(*rbxValue, 0x101);
 
     llvm::MCInst movRcxRax = llvm::MCInstBuilder(llvm::X86::MOV32rr)
         .addReg(llvm::X86::ECX)
@@ -187,12 +177,12 @@ void TEvaluatorTest::TestDefaultEvaluator() {
     defaultEvaluator->Evaluate(testState, movRcxRax);
 
     auto ecxValue = testState.GetImmediateValue(llvm::X86::ECX);
-    UNIT_ASSERT(ecxValue.Defined());
-    UNIT_ASSERT_EQUAL(*ecxValue, 1);
+    EXPECT_TRUE(ecxValue.Defined());
+    EXPECT_EQ(*ecxValue, 1);
 
     auto rcxValue = testState.GetImmediateValue(llvm::X86::RCX);
-    UNIT_ASSERT(rcxValue.Defined());
-    UNIT_ASSERT_EQUAL(*rcxValue, 1);
+    EXPECT_TRUE(rcxValue.Defined());
+    EXPECT_EQ(*rcxValue, 1);
 
     llvm::MCInst lea64_32Inst = llvm::MCInstBuilder(llvm::X86::LEA64_32r)
         .addReg(llvm::X86::EAX)
@@ -207,11 +197,11 @@ void TEvaluatorTest::TestDefaultEvaluator() {
     defaultEvaluator->Evaluate(testState64_32, lea64_32Inst);
 
     auto eaxValue64_32 = testState64_32.GetImmediateValue(llvm::X86::EAX);
-    UNIT_ASSERT(eaxValue64_32.Defined());
-    UNIT_ASSERT_EQUAL(*eaxValue64_32, 0);
+    EXPECT_TRUE(eaxValue64_32.Defined());
+    EXPECT_EQ(*eaxValue64_32, 0);
 
     auto raxValue64_32 = testState64_32.GetImmediateValue(llvm::X86::RAX);
-    UNIT_ASSERT(raxValue64_32.Defined());
-    UNIT_ASSERT_EQUAL(*raxValue64_32, 0);
+    EXPECT_TRUE(raxValue64_32.Defined());
+    EXPECT_EQ(*raxValue64_32, 0);
 }
 
