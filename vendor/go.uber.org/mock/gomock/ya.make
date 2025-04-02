@@ -2,7 +2,7 @@ GO_LIBRARY()
 
 LICENSE(Apache-2.0)
 
-VERSION(v0.4.0)
+VERSION(v0.5.0)
 
 SRCS(
     call.go
@@ -10,6 +10,7 @@ SRCS(
     controller.go
     doc.go
     matchers.go
+    string.go
 )
 
 END()
