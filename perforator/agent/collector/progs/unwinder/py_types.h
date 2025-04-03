@@ -86,6 +86,7 @@ struct python_internals_offsets {
 struct python_config {
     u64 py_thread_state_tls_offset;
     u64 py_runtime_relative_address;
+    u64 auto_tss_key_relative_address;
     u32 version;
 
     struct python_internals_offsets offsets;

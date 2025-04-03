@@ -52,6 +52,11 @@ NPerforator::NBinaryProcessing::NPython::PythonConfig BuildPythonConfig(llvm::ob
         conf.SetRelativePyRuntimeAddress(*pyRuntimeAddress);
     }
 
+    auto autoTSSkeyAddress = analyzer.ParseAutoTSSKeyAddress();
+    if (autoTSSkeyAddress) {
+        conf.SetRelativeAutoTSSkeyAddress(*autoTSSkeyAddress);
+    }
+
     return conf;
 }
 
