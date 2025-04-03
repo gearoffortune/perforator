@@ -1,11 +1,15 @@
 import React from 'react';
 
-import { Button, CopyToClipboard, Popup, type PopupProps } from '@gravity-ui/uikit';
+import CopyCheckIcon from '@gravity-ui/icons/svgs/copy-check.svg?raw';
+import type { MenuItemProps, PopupProps } from '@gravity-ui/uikit';
+import { CopyToClipboard, Icon, Menu, Popup } from '@gravity-ui/uikit';
 
 import { Hotkey } from 'src/components/Hotkey/Hotkey';
 import { uiFactory } from 'src/factory';
 import type { StringifiedNode } from 'src/models/Profile';
+import { createSuccessToast } from 'src/utils/toaster';
 
+import { getAtLessPath } from './file-path';
 import type { GetStateFromQuery, SetStateFromQuery } from './query-utils';
 import { parseStacks, stringifyStacks } from './query-utils';
 import type { QueryKeys } from './renderer';
@@ -32,12 +36,8 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ popupData, anchorRef, 
         popupData.node.frameOrigin !== 'kernel' &&
         href
     );
-    const commonButtonProps = {
-        view: 'flat',
-        width: 'max',
+    const commonButtonProps: Partial<MenuItemProps> = {
         onClick: onClosePopup,
-        pin: 'brick-brick',
-        size: 'l',
     } as const;
 
     return <Popup
@@ -49,44 +49,56 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ popupData, anchorRef, 
         placement={['top-start']}
         onEscapeKeyDown={onClosePopup}
     >
-        <CopyToClipboard text={popupData.node.textId} >
-            {() => <Button
-                {...commonButtonProps}
-            >
+        <Menu>
+            <CopyToClipboard text={popupData.node.textId} >
+                {() => <Menu.Item
+                    {...commonButtonProps}
+                    onClick={() => {
+                        createSuccessToast({ renderIcon: () => <Icon data={CopyCheckIcon}/>, name: 'copy', content: 'Name copied to clipboard' });
+                        onClosePopup();
+                    }}
+                >
 
                 Copy name
-            </Button>}
-        </CopyToClipboard>
-        {/* eslint-disable-next-line no-nested-ternary */}
-        {shouldShowGoTo ? (
-            <Button
-                {...commonButtonProps}
-                href={href}
-                target="_blank"
-            >
-                Go to source
-            </Button>
-
-        ) : hasFile ? (
-            <CopyToClipboard text={popupData.node.file} >
-                {() => <Button
-                    {...commonButtonProps}
-                >
-                    Copy file path
-                </Button>}
+                </Menu.Item>}
             </CopyToClipboard>
-        ) : null}
-        <Button
-            {...commonButtonProps}
-            onClick={() => {
-                const omitted = parseStacks(getQuery('omittedIndexes', '') || '');
-                omitted.push(popupData.coords);
-                setQuery({ omittedIndexes: stringifyStacks(omitted) });
-                onClosePopup();
-            }}
-        >
+            {shouldShowGoTo ? (
+                <Menu.Item
+                    {...commonButtonProps}
+                    href={href}
+                    target="_blank"
+                >
+                Go to source
+                </Menu.Item>
+
+            ) : null}
+            {hasFile ? (
+                <CopyToClipboard text={getAtLessPath(popupData.node)} >
+                    {() => <Menu.Item
+                        {...commonButtonProps}
+                        onClick={() => {
+                            createSuccessToast({ renderIcon: () => <Icon data={CopyCheckIcon}/>, name: 'copy', content: 'File path copied to clipboard' });
+                            onClosePopup();
+                        }}
+                    >
+                    Copy file path
+                    </Menu.Item>}
+                </CopyToClipboard>
+            ) : null}
+            <Menu.Group>
+                <Menu.Item
+                    {...commonButtonProps}
+                    onClick={() => {
+                        const omitted = parseStacks(getQuery('omittedIndexes', '') || '');
+                        omitted.push(popupData.coords);
+                        setQuery({ omittedIndexes: stringifyStacks(omitted) });
+                        onClosePopup();
+                    }}
+                >
             Omit stack
-            <Hotkey value="alt+click" />
-        </Button>
+                    <Hotkey value="alt+click" />
+                </Menu.Item>
+            </Menu.Group>
+        </Menu>
     </Popup>;
 };
