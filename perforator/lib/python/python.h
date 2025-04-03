@@ -48,12 +48,12 @@ struct TParsedPythonVersion {
 class TPythonAnalyzer {
 public:
     struct TSymbols {
-        TMaybe<NPerforator::NELF::TSymbolLocation> GetCurrentThreadState;
-        TMaybe<NPerforator::NELF::TSymbolLocation> CurrentFastGet;
-        TMaybe<NPerforator::NELF::TSymbolLocation> PyVersion;
-        TMaybe<NPerforator::NELF::TSymbolLocation> PyGetVersion;
-        TMaybe<NPerforator::NELF::TSymbolLocation> PyRuntime;
-        TMaybe<NPerforator::NELF::TSymbolLocation> PyGILStateCheck;
+        TMaybe<NPerforator::NELF::TLocation> GetCurrentThreadState;
+        TMaybe<NPerforator::NELF::TLocation> CurrentFastGet;
+        TMaybe<NPerforator::NELF::TLocation> PyVersion;
+        TMaybe<NPerforator::NELF::TLocation> PyGetVersion;
+        TMaybe<NPerforator::NELF::TLocation> PyRuntime;
+        TMaybe<NPerforator::NELF::TLocation> PyGILStateCheck;
     };
 
 public:

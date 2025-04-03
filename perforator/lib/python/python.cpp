@@ -38,7 +38,7 @@ void TPythonAnalyzer::ParseSymbolLocations() {
         kPyGILStateCheckSymbol
     );
 
-    auto setSymbolIfFound = [&](const THashMap<TStringBuf, NPerforator::NELF::TSymbolLocation>& symbols, TStringBuf symbolName, TMaybe<NELF::TSymbolLocation>& target) {
+    auto setSymbolIfFound = [&](const THashMap<TStringBuf, NPerforator::NELF::TLocation>& symbols, TStringBuf symbolName, TMaybe<NELF::TLocation>& target) {
         if (auto it = symbols.find(symbolName); it != symbols.end()) {
             target = it->second;
         }
@@ -62,11 +62,11 @@ void TPythonAnalyzer::ParseSymbolLocations() {
 
 template <typename ELFT>
 TMaybe<TPythonVersion> TryParseVersionFromPyVersionSymbol(
-    const llvm::object::SectionRef& section,
-    llvm::StringRef sectionData,
-    const NPerforator::NELF::TSymbolLocation& pyVersion
+    const llvm::object::ObjectFile& file,
+    const NPerforator::NELF::TLocation& pyVersion
 ) {
-    if (pyVersion.Address < section.getAddress()) {
+
+    if (pyVersion.Address == 0) {
         return Nothing();
     }
 
@@ -74,13 +74,12 @@ TMaybe<TPythonVersion> TryParseVersionFromPyVersionSymbol(
         return Nothing();
     }
 
-    ui64 offset = pyVersion.Address - section.getAddress();
-    if (offset + pyVersion.Size >= sectionData.size()) {
+    auto content = NPerforator::NELF::RetrieveContentFromRodataSection(file, pyVersion);
+    if (!content) {
         return Nothing();
     }
 
-    TStringBuf versionView{sectionData.data() + offset, pyVersion.Size};
-    TVector<char> versionBytes(versionView.begin(), versionView.end());
+    TVector<ui8> versionBytes(content->begin(), content->end());
     if constexpr (ELFT::TargetEndianness == llvm::endianness::little) {
         Reverse(versionBytes.begin(), versionBytes.end());
     }
@@ -128,52 +127,39 @@ TMaybe<TPythonVersion> TryScanVersion(
 
 TMaybe<TPythonVersion> TryParsePyGetVersion(
     const llvm::object::ObjectFile& file,
-    const NPerforator::NELF::TSymbolLocation& pyGetVersion
+    const NPerforator::NELF::TLocation& pyGetVersion
 ) {
-    auto textSection = NELF::GetSection(file, NELF::NSections::kTextSectionName);
-    if (!textSection) {
+    NPerforator::NELF::TLocation symbol = pyGetVersion;
+    if (symbol.Size == 0) {
+        // fallback in case symbol size is not specified in symbol table of ELF
+        symbol.Size = 64;
+    }
+
+    auto bytecode = NPerforator::NELF::RetrieveContentFromTextSection(file, symbol);
+    if (!bytecode) {
         return Nothing();
     }
 
-    Y_LLVM_UNWRAP(sectionData, textSection->getContents(), { return Nothing(); });
-    if (pyGetVersion.Address < textSection->getAddress()) {
-        return Nothing();
-    }
-
-    ui64 offset = pyGetVersion.Address - textSection->getAddress();
-    if (offset >= sectionData.size()) {
-        return Nothing();
-    }
-
-    TConstArrayRef<ui8> bytecode(
-        reinterpret_cast<const ui8*>(sectionData.data()) + offset,
-        Min<size_t>(64, sectionData.size() - offset)  // Limit to first 64 bytes
-    );
-
-    auto versionAddress = NAsm::NX86::DecodePyGetVersion(file.makeTriple(), pyGetVersion.Address, bytecode);
+    auto versionAddress = NAsm::NX86::DecodePyGetVersion(file.makeTriple(), symbol.Address, *bytecode);
     if (!versionAddress) {
         return Nothing();
     }
 
-    auto rodataSection = NELF::GetSection(file, NELF::NSections::kRoDataSectionName);
-    if (!rodataSection) {
+    NPerforator::NELF::TLocation pyVersionLocation{
+        .Address = *versionAddress,
+        .Size = 10
+    };
+    auto pyVersionContent = NPerforator::NELF::RetrieveContentFromRodataSection(file, pyVersionLocation);
+    if (!pyVersionContent) {
         return Nothing();
     }
 
-    Y_LLVM_UNWRAP(rodataData, rodataSection->getContents(), { return Nothing(); });
-    if (*versionAddress < rodataSection->getAddress()) {
-        return Nothing();
-    }
-
-    ui64 versionOffset = *versionAddress - rodataSection->getAddress();
-    if (versionOffset >= rodataData.size()) {
-        return Nothing();
-    }
-
-    return TryScanVersion(TConstArrayRef<char>(
-        rodataData.data() + versionOffset,
-        Min<size_t>(10, rodataData.size() - versionOffset)  // Limit to 10 bytes which is enough for "X.YY.ZZZ"
-    ));
+    return TryScanVersion(
+        TConstArrayRef<char>(
+            reinterpret_cast<const char*>(pyVersionContent->data()),
+            pyVersionContent->size()
+        )
+    );
 }
 
 template <typename ELFT>
@@ -188,15 +174,11 @@ TMaybe<TParsedPythonVersion> ParseVersion(
 
     // First try Py_Version symbol if available
     if (symbols.PyVersion) {
-        auto section = NELF::GetSection(*elf, NELF::NSections::kRoDataSectionName);
-        if (section) {
-            Y_LLVM_UNWRAP(sectionData, section->getContents(), { return Nothing(); });
-            if (auto version = TryParseVersionFromPyVersionSymbol<ELFT>(*section, sectionData, *symbols.PyVersion)) {
-                return MakeMaybe(TParsedPythonVersion{
-                    .Version = *version,
-                    .Source = EPythonVersionSource::PyVersionSymbol
-                });
-            }
+        if (auto version = TryParseVersionFromPyVersionSymbol<ELFT>(file, *symbols.PyVersion)) {
+            return MakeMaybe(TParsedPythonVersion{
+                .Version = *version,
+                .Source = EPythonVersionSource::PyVersionSymbol
+            });
         }
     }
 
@@ -241,37 +223,23 @@ TMaybe<NAsm::ThreadImageOffsetType> TPythonAnalyzer::ParseTLSPyThreadState() {
     }
 
     // current_fast_get might not be inlined into GetCurrentThreadState, so we should disassemble it instead of PyThreadState_GetCurrent.
-    const NPerforator::NELF::TSymbolLocation& getter = Symbols_->CurrentFastGet ? *Symbols_->CurrentFastGet : *Symbols_->GetCurrentThreadState;
-
+    NPerforator::NELF::TLocation& getter = Symbols_->CurrentFastGet ? *Symbols_->CurrentFastGet : *Symbols_->GetCurrentThreadState;
     if (getter.Address == 0) {
         return Nothing();
     }
+    if (getter.Size == 0) {
+        // fallback in case symbol size is not specified in symbol table of ELF
+        getter.Size = 100;
+    }
 
-    auto textSection = NELF::GetSection(File_, NELF::NSections::kTextSectionName);
-    if (!textSection) {
+    auto bytecode = NPerforator::NELF::RetrieveContentFromTextSection(File_, getter);
+    if (!bytecode) {
         return Nothing();
     }
 
-    Y_LLVM_UNWRAP(sectionData, textSection->getContents(), { return Nothing(); });
-    if (getter.Address < textSection->getAddress()) {
-        return Nothing();
-    }
-
-    ui64 offset = getter.Address - textSection->getAddress();
-    if (offset > sectionData.size()) {
-        return Nothing();
-    }
-
-    TConstArrayRef<ui8> bytecode(
-        reinterpret_cast<const ui8*>(sectionData.data()) + offset,
-        Min(getter.Size, sectionData.size() - offset)
-    );
-
-    if (Symbols_->CurrentFastGet) {
-        return NAsm::NX86::DecodeCurrentFastGet(File_.makeTriple(), bytecode);
-    }
-
-    return NAsm::NX86::DecodePyThreadStateGetCurrent(File_.makeTriple(), bytecode);
+    return Symbols_->CurrentFastGet ?
+        NAsm::NX86::DecodeCurrentFastGet(File_.makeTriple(), *bytecode) :
+        NAsm::NX86::DecodePyThreadStateGetCurrent(File_.makeTriple(), *bytecode);
 }
 
 bool IsPythonBinary(const llvm::object::ObjectFile& file) {
@@ -306,38 +274,21 @@ TMaybe<ui64> TPythonAnalyzer::ParseAutoTSSKeyAddress() {
         return Nothing();
     }
 
-    auto textSection = NELF::GetSection(File_, NELF::NSections::kTextSectionName);
-    if (!textSection) {
+    NPerforator::NELF::TLocation& symbol = *Symbols_->PyGILStateCheck;
+    if (symbol.Size == 0) {
+        // fallback in case symbol size is not specified in symbol table of ELF
+        symbol.Size = 100;
+    }
+
+    auto bytecode = NPerforator::NELF::RetrieveContentFromTextSection(File_, symbol);
+    if (!bytecode) {
         return Nothing();
     }
-
-    Y_LLVM_UNWRAP(sectionData, textSection->getContents(), { return Nothing(); });
-    if (Symbols_->PyGILStateCheck->Address < textSection->getAddress()) {
-        return Nothing();
-    }
-
-    ui64 offset = Symbols_->PyGILStateCheck->Address - textSection->getAddress();
-    if (offset >= sectionData.size()) {
-        return Nothing();
-    }
-
-    size_t symbolSize = 0;
-    if (Symbols_->PyGILStateCheck->Size > 0) {
-        symbolSize = Symbols_->PyGILStateCheck->Size;
-    } else {
-        // 100 bytes should be enough for PyGILState_Check
-        symbolSize = 100;
-    }
-
-    TConstArrayRef<ui8> bytecode(
-        reinterpret_cast<const ui8*>(sectionData.data()) + offset,
-        Min<size_t>(symbolSize, sectionData.size() - offset)
-    );
 
     return NAsm::NX86::DecodeAutoTSSKeyAddress(
         File_.makeTriple(),
-        Symbols_->PyGILStateCheck->Address,
-        bytecode
+        symbol.Address,
+        *bytecode
     );
 }
 

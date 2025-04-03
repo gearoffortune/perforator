@@ -7,14 +7,14 @@
 
 namespace NPerforator::NELF::NPrivate {
 
-THashMap<TStringBuf, TSymbolLocation> ParseSymbolsImpl(
+THashMap<TStringBuf, TLocation> ParseSymbolsImpl(
     const llvm::object::ELFObjectFileBase::elf_symbol_iterator_range& symbols,
     std::initializer_list<TStringBuf> targetSymbols
 ) {
-    THashMap<TStringBuf, TSymbolLocation> result;
+    THashMap<TStringBuf, TLocation> result;
 
     for (const auto& symbol : symbols) {
-        TSymbolLocation location;
+        TLocation location;
 
         Y_LLVM_UNWRAP(name, symbol.getName(), { continue; });
         Y_LLVM_UNWRAP(address, symbol.getAddress(), { continue; });
@@ -35,22 +35,22 @@ THashMap<TStringBuf, TSymbolLocation> ParseSymbolsImpl(
 }
 
 template <typename ELFT>
-THashMap<TStringBuf, TSymbolLocation> ParseDynamicSymbols(const llvm::object::ELFObjectFile<ELFT>& elf, std::initializer_list<TStringBuf> symbols) {
+THashMap<TStringBuf, TLocation> ParseDynamicSymbols(const llvm::object::ELFObjectFile<ELFT>& elf, std::initializer_list<TStringBuf> symbols) {
     return ParseSymbolsImpl(elf.getDynamicSymbolIterators(), symbols);
 }
 
 template <typename ELFT>
-THashMap<TStringBuf, TSymbolLocation> ParseSymbols(const llvm::object::ELFObjectFile<ELFT>& elf, std::initializer_list<TStringBuf> symbols) {
+THashMap<TStringBuf, TLocation> ParseSymbols(const llvm::object::ELFObjectFile<ELFT>& elf, std::initializer_list<TStringBuf> symbols) {
     return ParseSymbolsImpl(elf.symbols(), symbols);
 }
 
-TMaybe<THashMap<TStringBuf, TSymbolLocation>> RetrieveDynamicSymbols(const llvm::object::ObjectFile& file, std::initializer_list<TStringBuf> symbols) {
+TMaybe<THashMap<TStringBuf, TLocation>> RetrieveDynamicSymbols(const llvm::object::ObjectFile& file, std::initializer_list<TStringBuf> symbols) {
     return NLLVM::VisitELF(&file, [&symbols](const auto& elf) {
         return ParseDynamicSymbols(elf, symbols);
     });
 }
 
-TMaybe<THashMap<TStringBuf, TSymbolLocation>> RetrieveSymbols(const llvm::object::ObjectFile& file, std::initializer_list<TStringBuf> symbols) {
+TMaybe<THashMap<TStringBuf, TLocation>> RetrieveSymbols(const llvm::object::ObjectFile& file, std::initializer_list<TStringBuf> symbols) {
     return NLLVM::VisitELF(&file, [&symbols](const auto& elf) {
         return ParseSymbols(elf, symbols);
     });
@@ -69,6 +69,49 @@ TMaybe<llvm::object::SectionRef> GetSection(const llvm::object::ObjectFile& file
     }
 
     return Nothing();
+}
+
+TMaybe<TConstArrayRef<ui8>> RetrieveContentFromSection(
+    const llvm::object::ObjectFile& file,
+    const TLocation& location,
+    TStringBuf sectionName
+) {
+    auto section = GetSection(file, sectionName);
+    if (!section) {
+        return Nothing();
+    }
+
+    Y_LLVM_UNWRAP(sectionData, section->getContents(), { return Nothing(); });
+
+    if (location.Address < section->getAddress()) {
+        return Nothing();
+    }
+
+    ui64 offset = location.Address - section->getAddress();
+    if (offset >= sectionData.size()) {
+        return Nothing();
+    }
+
+    size_t contentSize = Min<size_t>(location.Size, sectionData.size() - offset);
+
+    return MakeMaybe(TConstArrayRef<ui8>(
+        static_cast<const ui8*>(reinterpret_cast<const unsigned char*>(sectionData.data()) + offset),
+        contentSize
+    ));
+}
+
+TMaybe<TConstArrayRef<ui8>> RetrieveContentFromTextSection(
+    const llvm::object::ObjectFile& file,
+    const TLocation& location
+) {
+    return RetrieveContentFromSection(file, location, NSections::kTextSectionName);
+}
+
+TMaybe<TConstArrayRef<ui8>> RetrieveContentFromRodataSection(
+    const llvm::object::ObjectFile& file,
+    const TLocation& location
+) {
+    return RetrieveContentFromSection(file, location, NSections::kRoDataSectionName);
 }
 
 } // namespace NPerforator::NELF

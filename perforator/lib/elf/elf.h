@@ -4,13 +4,14 @@
 #include <util/generic/hash.h>
 #include <util/generic/vector.h>
 #include <util/generic/maybe.h>
+#include <util/generic/array_ref.h>
 
 #include <llvm/Object/ObjectFile.h>
 #include <llvm/Object/ELFObjectFile.h>
 
 namespace NPerforator::NELF {
 
-struct TSymbolLocation {
+struct TLocation {
     ui64 Address = 0;
     ui64 Size = 0;
 };
@@ -26,22 +27,38 @@ constexpr TStringBuf kRoDataSectionName = ".rodata";
 
 namespace NPrivate {
 
-TMaybe<THashMap<TStringBuf, TSymbolLocation>> RetrieveDynamicSymbols(const llvm::object::ObjectFile& file, std::initializer_list<TStringBuf> symbols);
+TMaybe<THashMap<TStringBuf, TLocation>> RetrieveDynamicSymbols(const llvm::object::ObjectFile& file, std::initializer_list<TStringBuf> symbols);
 
-TMaybe<THashMap<TStringBuf, TSymbolLocation>> RetrieveSymbols(const llvm::object::ObjectFile& file, std::initializer_list<TStringBuf> symbols);
+TMaybe<THashMap<TStringBuf, TLocation>> RetrieveSymbols(const llvm::object::ObjectFile& file, std::initializer_list<TStringBuf> symbols);
 
 } // namespace NPerforator::NELF::NPrivate
 
 template <typename... Args>
-TMaybe<THashMap<TStringBuf, TSymbolLocation>> RetrieveDynamicSymbols(const llvm::object::ObjectFile& file, Args... symbols) {
+TMaybe<THashMap<TStringBuf, TLocation>> RetrieveDynamicSymbols(const llvm::object::ObjectFile& file, Args... symbols) {
     return NPerforator::NELF::NPrivate::RetrieveDynamicSymbols(file, {symbols...});
 }
 
 template <typename... Args>
-TMaybe<THashMap<TStringBuf, TSymbolLocation>> RetrieveSymbols(const llvm::object::ObjectFile& file, Args... symbols) {
+TMaybe<THashMap<TStringBuf, TLocation>> RetrieveSymbols(const llvm::object::ObjectFile& file, Args... symbols) {
     return NPerforator::NELF::NPrivate::RetrieveSymbols(file, {symbols...});
 }
 
 TMaybe<llvm::object::SectionRef> GetSection(const llvm::object::ObjectFile& file, TStringBuf sectionName);
+
+TMaybe<TConstArrayRef<ui8>> RetrieveContentFromSection(
+    const llvm::object::ObjectFile& file,
+    const TLocation& location,
+    TStringBuf sectionName
+);
+
+TMaybe<TConstArrayRef<ui8>> RetrieveContentFromTextSection(
+    const llvm::object::ObjectFile& file,
+    const TLocation& location
+);
+
+TMaybe<TConstArrayRef<ui8>> RetrieveContentFromRodataSection(
+    const llvm::object::ObjectFile& file,
+    const TLocation& location
+);
 
 } // namespace NPerforator::NELF
