@@ -26,7 +26,7 @@ import { shorten } from './shorten/shorten.ts';
 import { getCanvasTitleFull, getStatusTitleFull, renderTitleFull } from './title.ts';
 import { darken, DARKEN_FACTOR, diffcolor } from './utils/colors.ts';
 import { getNodeTitleFull } from './utils/node-title.ts';
-import { search as outerSearch } from './utils/search.ts';
+import { escapeRegex, search as outerSearch } from './utils/search.ts';
 
 
 const dw = Math.floor(255 * (1 - DARKEN_FACTOR)).toString(16);
@@ -47,6 +47,7 @@ export type QueryKeys =
     | 'flamegraphQuery'
     | 'omittedIndexes'
     | 'keepOnlyFound'
+    | 'exactMatch'
     | 'frameDepth'
     | 'framePos';
 export type RenderFlamegraphOptions = {
@@ -55,7 +56,7 @@ export type RenderFlamegraphOptions = {
     theme: RealTheme;
     isDiff: boolean;
     userSettings: UserSettings;
-    searchPattern: RegExp | null;
+    searchPattern: RegExp | string | null;
     reverse: boolean;
     keepOnlyFound: boolean;
 }
@@ -72,7 +73,7 @@ function makeByH(coords: Coordinate[]): Record<H, Set<I>> {
 }
 
 interface RenderOpts {
-    pattern?: RegExp | null;
+    pattern?: RegExp | string | null;
 }
 
 
@@ -487,7 +488,7 @@ export const renderFlamegraph: RenderFlamegraphType = (
 
     const search = outerSearch.bind(null, readString, maybeShorten, profileData.rows);
 
-    const maybeSearch = (query: RegExp | null): Coordinate[] | null => {
+    const maybeSearch = (query: RegExp | string | null): Coordinate[] | null => {
         let foundCoords: Coordinate[] | null;
         if (keepOnlyFound && query) {
             foundCoords = search(query);
@@ -601,7 +602,8 @@ export const renderFlamegraph: RenderFlamegraphType = (
                 const width = fg.countWidth(node);
                 const nodeTitle = getNodeTitle(node);
 
-                const isMarked = opts?.pattern?.test(nodeTitle);
+                const pattern = opts?.pattern;
+                const isMarked = typeof pattern === 'string' ? (new RegExp(escapeRegex(pattern))).test(nodeTitle) : pattern?.test(nodeTitle);
                 if (isMarked) {
                     mark(node);
                 }

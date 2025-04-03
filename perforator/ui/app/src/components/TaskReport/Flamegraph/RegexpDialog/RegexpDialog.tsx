@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import MagnifierIcon from '@gravity-ui/icons/svgs/magnifier.svg?raw';
-import { Dialog, Icon, TextInput } from '@gravity-ui/uikit';
+import { Checkbox, Dialog, Icon, TextInput } from '@gravity-ui/uikit';
+
+import { useRegexError } from './useRegexError';
 
 import './RegexpDialog.scss';
 
@@ -10,41 +12,28 @@ interface RegexpDialogProps {
     showDialog: boolean;
      onCloseDialog: () => void;
      initialSearch?: string | null;
-     onSearchUpdate: (str: string) => void;
+     initialExact?: boolean | null;
+     onSearchUpdate: (str: string, exactMatch?: boolean) => void;
 }
 
-export function RegexpDialog({ showDialog, onCloseDialog, onSearchUpdate, initialSearch }: RegexpDialogProps) {
+export function RegexpDialog({ showDialog, onCloseDialog, onSearchUpdate, initialExact, initialSearch }: RegexpDialogProps) {
     const [searchQuery, setSearchQuery] = useState(initialSearch ?? '');
+    const [exact, setExact] = useState(initialExact ?? false);
 
-    const regexError = useMemo(() => {
-        try {
-            RegExp(searchQuery);
-            return null;
-        } catch (error: unknown) {
-            if (typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string') {
-                return error.message;
-            }
-            else if (typeof error === 'string') {
-                return error;
-            }
-            else {
-                return 'Unknown error in regexp';
-            }
-        }
-    }, [searchQuery]);
+    const regexError = useRegexError(searchQuery);
 
     const handleKeyDown = useCallback((e: KeyboardEvent) => {
         if (e.key === 'Enter' && !regexError) {
-            onSearchUpdate(searchQuery);
+            onSearchUpdate(searchQuery, exact);
         }
-    }, [onSearchUpdate, regexError, searchQuery]);
+    }, [exact, onSearchUpdate, regexError, searchQuery]);
 
     const handleApply = () => {
         if (regexError) {
             return;
         }
 
-        onSearchUpdate(searchQuery);
+        onSearchUpdate(searchQuery, exact);
 
     };
 
@@ -67,6 +56,7 @@ export function RegexpDialog({ showDialog, onCloseDialog, onSearchUpdate, initia
                     onUpdate={handleSearchUpdate}
                     error={Boolean(regexError)}
                     errorMessage={regexError} />
+                <Checkbox title="Disable regex parsing, literal mode" checked={exact} onUpdate={setExact}>Exact match</Checkbox>
             </Dialog.Body>
             <Dialog.Footer
                 onClickButtonCancel={onCloseDialog}

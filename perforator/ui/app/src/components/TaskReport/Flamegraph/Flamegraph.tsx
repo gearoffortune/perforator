@@ -71,10 +71,11 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
         setQuery({ omittedIndexes: false });
     }, [setQuery]);
 
-    const handleSearchUpdate = (text: string) => {
-        setQuery({ 'flamegraphQuery': encodeURIComponent(text) });
+    const handleSearchUpdate = (text: string, exactMatch?: boolean) => {
+        setQuery({ 'flamegraphQuery': encodeURIComponent(text), exactMatch: exactMatch ? 'true' : undefined });
         setShowDialog(false);
     };
+    const exactMatch = getQuery('exactMatch');
 
 
     React.useEffect(() => {
@@ -87,7 +88,7 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
                 theme,
                 userSettings,
                 isDiff,
-                searchPattern: search ? RegExp(decodeURIComponent(search)) : null,
+                searchPattern: search ? exactMatch === 'true' ? decodeURIComponent(search) : RegExp(decodeURIComponent(search)) : null,
                 reverse,
                 keepOnlyFound,
             };
@@ -95,7 +96,7 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
             return newFlame(flamegraphContainer.current, profileData, flamegraphOffsets.current, renderOptions);
         }
         return () => {};
-    }, [getQuery, isDiff, keepOnlyFound, profileData, reverse, search, setQuery, theme, userSettings]);
+    }, [exactMatch, getQuery, isDiff, keepOnlyFound, profileData, reverse, search, setQuery, theme, userSettings]);
 
     const handleContextMenu = React.useCallback((event: React.MouseEvent) => {
         if (!flamegraphContainer.current || !profileData || !flamegraphOffsets.current) {
@@ -156,6 +157,7 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
                     onCloseDialog={() => setShowDialog(false)}
                     onSearchUpdate={handleSearchUpdate}
                     initialSearch={search}
+                    initialExact={getQuery('exactMatch') === 'true'}
                 />
                 <div className="flamegraph__header">
                     <h3 className="flamegraph__title">Flame Graph</h3>
