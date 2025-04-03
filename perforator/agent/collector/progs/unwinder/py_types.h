@@ -73,6 +73,11 @@ struct python_cframe_offsets {
     u32 current_frame;
 };
 
+struct python_tss_t_offsets {
+    u32 is_initialized;
+    u32 key;
+};
+
 struct python_internals_offsets {
     struct python_runtime_state_offsets py_runtime_state_offsets;
     struct python_thread_state_offsets py_thread_state_offsets;
@@ -81,6 +86,7 @@ struct python_internals_offsets {
     struct python_interpreter_state_offsets py_interpreter_state_offsets;
     struct python_code_object_offsets py_code_object_offsets;
     struct python_ascii_object_offsets py_ascii_object_offsets;
+    struct python_tss_t_offsets py_tss_t_offsets;
 };
 
 struct python_config {

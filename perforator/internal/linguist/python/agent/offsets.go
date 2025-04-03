@@ -33,6 +33,7 @@ type jsonOffsets struct {
 	PyCFrame           map[string]int `json:"_PyCFrame,omitempty"`
 	PyInterpreterFrame map[string]int `json:"_PyInterpreterFrame,omitempty"`
 	PyASCIIObject      map[string]int `json:"PyASCIIObject"`
+	PyTssT             map[string]int `json:"Py_tss_t,omitempty"`
 }
 
 // Convert a version string (major.minor.micro) to an encoded uint32
@@ -299,6 +300,25 @@ func extractPyASCIIObjectOffsets(data map[string]int) unwinder.PythonAsciiObject
 	return offsets
 }
 
+// Extract Py_tss_t offsets from JSON data
+func extractPyTssTOffsets(data map[string]int) unwinder.PythonTssTOffsets {
+	var offsets unwinder.PythonTssTOffsets
+
+	if val, ok := data["_is_initialized"]; ok {
+		offsets.IsInitialized = uint32(val)
+	} else {
+		offsets.IsInitialized = UnspecifiedOffset
+	}
+
+	if val, ok := data["_key"]; ok {
+		offsets.Key = uint32(val)
+	} else {
+		offsets.Key = UnspecifiedOffset
+	}
+
+	return offsets
+}
+
 // Convert JSON offsets to PythonInternalsOffsets
 func convertToPythonInternalsOffsets(data jsonOffsets) *unwinder.PythonInternalsOffsets {
 	offsets := &unwinder.PythonInternalsOffsets{}
@@ -330,6 +350,10 @@ func convertToPythonInternalsOffsets(data jsonOffsets) *unwinder.PythonInternals
 
 	if data.PyASCIIObject != nil {
 		offsets.PyAsciiObjectOffsets = extractPyASCIIObjectOffsets(data.PyASCIIObject)
+	}
+
+	if data.PyTssT != nil {
+		offsets.PyTssTOffsets = extractPyTssTOffsets(data.PyTssT)
 	}
 
 	return offsets

@@ -31,5 +31,9 @@
     "co_firstlineno": 72,
     "co_filename": 112,
     "co_qualname": 128
+  },
+  "Py_tss_t": {
+    "_is_initialized": 0,
+    "_key": 4
   }
 }
