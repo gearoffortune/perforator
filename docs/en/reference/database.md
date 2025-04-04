@@ -36,7 +36,21 @@ Perforator stores profiles metadata in a ClickHouse table named `profiles`. Perf
 
 ## Object storage {#object-storage}
 
-Additionally, Perforator requires S3-compatible object storage buckets to store profiles, GSYM data and binaries.
+Additionally, Perforator requires the following S3-compatible object storage buckets:
+
+* `profiles` - stores raw profiles referenced by metadata stored in the ClickHouse database
+
+* `binaries` - contains the actual binary files referenced by metadata in the PostgreSQL database
+
+* `taskResults` - stores the outcomes of user-requested tasks
+
+* `binariesGSYM` - contains processed binaries in GSYM format for faster symbolization
+
+{% note warning %}
+
+You'll need to set up at least two separate buckets for your Perforator deployment to store binaries and binariesGSYM files separately, due to their collision when placed in the same bucket
+
+{% endnote %}
 
 ## Compatibility
 

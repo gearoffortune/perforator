@@ -4,4 +4,7 @@ common:
 en:
   - from: /howto/cli/
     to: /guides/cli/
+  - from: /tutorials/helm-chart.md
+    to: /tutorials/kubernetes/helm-chart.md
+
 

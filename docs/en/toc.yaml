@@ -11,12 +11,12 @@ items:
       href: tutorials/native-profiling.md
     - name: Optimizing Python applications
       href: tutorials/python-profiling.md
-    - name: Setup Perforator test deployment in Kubernetes via Helm
-      href: tutorials/helm-chart.md
     - name: Building your first profile with UI
       href: tutorials/ui.md
     - name: Kubernetes
       items:
+        - name: Setup Perforator test deployment in Kubernetes via Helm
+          href: tutorials/kubernetes/helm-chart.md
         - name: Installing NGINX Ingress Controller for Perforator
           href: tutorials/kubernetes/ingress-nginx
   - name: Explanation
@@ -52,12 +52,10 @@ items:
           href: guides/diff.md
     - name: Kubernetes
       items:
-        - name: Inter-Cluster Perforator Setup
-          href: guides/kubernetes/inter-cluster-communication.md
         - name: Deploy Perforator in Kubernetes via Helm
           href: guides/kubernetes/helm-chart.md
-        - name: Setup databases for testing via docker compose
-          href: guides/kubernetes/docker-compose.md
+        - name: Inter-Cluster Perforator Setup
+          href: guides/kubernetes/inter-cluster-communication.md
     - name: Profiling JVM applications
       href: guides/jvm.md
     - name: Using Perforator for continuous profile-guided optimization (PGO)

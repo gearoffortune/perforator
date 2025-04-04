@@ -11,13 +11,13 @@ This guide provides instructions on how to deploy Perforator on a Kubernetes clu
 
 {% note warning %}
 
-Make sure you have necessary [buckets](https://github.com/yandex/perforator/blob/be7ed14b5b875217984d3aab5d93ca10289cb134/perforator/deploy/db/docker-compose/compose.yaml#L86-L90) in your S3 storage.
+Make sure you have necessary buckets in your [S3 storage](../../reference/database.md#object-storage)
 
 {% endnote %}
 
 {% note info %}
 
-For testing purposes, you can set up databases using [docker compose](docker-compose.md).
+For testing purposes, you can use this [tutorial](../../tutorials/kubernetes/helm-chart.md) to set up a Perforator deployment with all databases inside your Kubernetes cluster
 
 {% endnote %}
 
@@ -36,6 +36,8 @@ my-values.yaml example
 ```yaml
 databases:
   postgresql:
+    migrations:
+      enabled: true # Creates necessary migrations in your PostgreSQL database.
     endpoints:
       - host: "<host>"
         port: <port>
@@ -43,6 +45,8 @@ databases:
     user: "<user>"
     password: "<password>"
   clickhouse:
+    migrations:
+      enabled: true # Creates necessary migrations in your Clickhouse database.
     replicas:
       - "<host>:<port>"
     db: "<db>"
