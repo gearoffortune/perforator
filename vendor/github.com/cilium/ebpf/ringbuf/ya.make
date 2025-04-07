@@ -2,13 +2,18 @@ GO_LIBRARY()
 
 LICENSE(MIT)
 
-VERSION(v0.17.1)
+VERSION(v0.17.3)
 
 SRCS(
     doc.go
-    reader.go
-    ring.go
 )
+
+IF (OS_LINUX)
+    SRCS(
+        reader.go
+        ring.go
+    )
+ENDIF()
 
 END()
 

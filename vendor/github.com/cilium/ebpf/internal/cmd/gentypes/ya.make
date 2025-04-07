@@ -2,7 +2,7 @@ GO_PROGRAM()
 
 LICENSE(MIT)
 
-VERSION(v0.17.1)
+VERSION(v0.17.3)
 
 SRCS(
     main.go

@@ -2,15 +2,20 @@ GO_LIBRARY()
 
 LICENSE(MIT)
 
-VERSION(v0.17.1)
+VERSION(v0.17.3)
 
 SRCS(
     doc.go
-    map.go
-    misc.go
-    prog.go
-    version.go
 )
+
+IF (OS_LINUX)
+    SRCS(
+        map.go
+        misc.go
+        prog.go
+        version.go
+    )
+ENDIF()
 
 END()
 

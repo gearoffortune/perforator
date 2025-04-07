@@ -2,7 +2,7 @@ GO_LIBRARY()
 
 LICENSE(MIT)
 
-VERSION(v0.17.1)
+VERSION(v0.17.3)
 
 SRCS(
     buffer.go
@@ -11,6 +11,7 @@ SRCS(
     endian_le.go
     errors.go
     feature.go
+    goos.go
     io.go
     math.go
     output.go
@@ -22,7 +23,6 @@ END()
 
 RECURSE(
     cmd
-    epoll
     kallsyms
     kconfig
     linux
@@ -35,6 +35,7 @@ RECURSE(
 IF (OS_LINUX)
     RECURSE(
         unix
+        epoll
     )
 ENDIF()
 
