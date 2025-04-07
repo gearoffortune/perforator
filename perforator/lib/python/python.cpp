@@ -244,7 +244,8 @@ TMaybe<NAsm::ThreadImageOffsetType> TPythonAnalyzer::ParseTLSPyThreadState() {
 
 bool IsPythonBinary(const llvm::object::ObjectFile& file) {
     auto dynamicSymbols = NELF::RetrieveDynamicSymbols(file, kPyGetVersionSymbol);
-    return (dynamicSymbols && !dynamicSymbols->empty());
+    // Also check that the address is not null, because symbols can be imported from dynamic libraries
+    return (dynamicSymbols && dynamicSymbols->size() == 1 && (*dynamicSymbols)[kPyGetVersionSymbol].Address != 0);
 }
 
 TMaybe<ui64> TPythonAnalyzer::ParsePyRuntimeAddress() {
