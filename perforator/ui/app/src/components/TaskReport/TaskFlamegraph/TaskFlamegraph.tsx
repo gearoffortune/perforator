@@ -10,8 +10,10 @@ import type { ProfileData } from 'src/models/Profile';
 import { useUserSettings } from 'src/providers/UserSettingsProvider/UserSettingsContext.ts';
 import { withMeasureTime } from 'src/utils/logging';
 
-import { Flamegraph } from '../Flamegraph/Flamegraph';
+import { useTypedQuery } from '../Flamegraph/query-utils';
+import type { QueryKeys } from '../Flamegraph/renderer';
 import { prerenderColors as prerenderColorsOriginal } from '../Flamegraph/utils/colors';
+import { Visualisation } from '../Visualisation/Visualisation';
 
 
 const prerenderColors = withMeasureTime(prerenderColorsOriginal);
@@ -25,6 +27,9 @@ export interface TaskFlamegraphProps {
     format?: SupportedRenderFormats;
 }
 
+
+export type Tab = 'flame' | 'top'
+
 export const TaskFlamegraph: React.FC<TaskFlamegraphProps> = (props) => {
     const isMounted = React.useRef(false);
     const theme = useThemeType();
@@ -33,6 +38,9 @@ export const TaskFlamegraph: React.FC<TaskFlamegraphProps> = (props) => {
 
     const [profileData, setProfileData] = React.useState<ProfileData | undefined>();
     const [error, setError] = React.useState<Error | undefined>();
+    const [getQuery] = useTypedQuery<QueryKeys>();
+    const tab = getQuery('tab') ?? 'flame' as Tab;
+    const pageName = tab === 'flame' ? 'task-flamegraph' : 'top-table';
 
     const getProfileData = async () => {
 
@@ -49,7 +57,7 @@ export const TaskFlamegraph: React.FC<TaskFlamegraphProps> = (props) => {
             const data = await req.text();
             setProfileData(uiFactory()?.parseLegacyFormat?.(data));
         }
-        uiFactory().rum()?.finishDataLoading?.('task-flamegraph');
+        uiFactory().rum()?.finishDataLoading?.(pageName);
     };
 
     const getProfileDataWithCatch = async () => {
@@ -61,18 +69,19 @@ export const TaskFlamegraph: React.FC<TaskFlamegraphProps> = (props) => {
     };
 
     const prerenderedNewData = React.useMemo(() => {
-        uiFactory().rum()?.startDataRendering?.('task-flamegraph', '', false);
+        uiFactory().rum()?.startDataRendering?.(pageName, '', false);
         if (profileData) {
             return prerenderColors(profileData, { theme });
         }
         return null;
     }, [profileData, theme]);
 
+
     const loading = !prerenderedNewData;
 
     React.useEffect(() => {
         if (!isMounted.current) {
-            uiFactory().rum()?.makeSpaSubPage?.('task-flamegraph');
+            uiFactory().rum()?.makeSpaSubPage?.(pageName);
             isMounted.current = true;
             getProfileDataWithCatch();
 
@@ -83,13 +92,6 @@ export const TaskFlamegraph: React.FC<TaskFlamegraphProps> = (props) => {
         return <ErrorPanel message={error.message}/>;
     }
 
-    return (
-        <Flamegraph
-            isDiff={props.isDiff}
-            theme={theme}
-            userSettings={userSettings}
-            profileData={prerenderedNewData}
-            loading={loading}
-        />
-    );
+    return <Visualisation loading={loading} isDiff={props.isDiff} theme={theme} userSettings={userSettings} profileData={prerenderedNewData} />;
+
 };

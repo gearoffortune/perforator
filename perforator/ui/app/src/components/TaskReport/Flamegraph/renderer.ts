@@ -49,6 +49,8 @@ export type QueryKeys =
     | 'keepOnlyFound'
     | 'exactMatch'
     | 'frameDepth'
+    | 'tab'
+    | 'topQuery'
     | 'framePos';
 export type RenderFlamegraphOptions = {
     getState: GetStateFromQuery<QueryKeys>;

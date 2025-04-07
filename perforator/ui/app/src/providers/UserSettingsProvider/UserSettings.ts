@@ -7,8 +7,11 @@ const THEME_PARAM = '_theme';
 
 export type ShortenMode = 'true' | 'false' | 'hover';
 
+export type NumTemplatingFormat = 'exponent' | 'hugenum';
+
 export interface UserSettings {
     monospace: 'default' | 'system';
+    numTemplating: NumTemplatingFormat;
     theme: Theme;
     shortenFrameTexts: ShortenMode;
     reverseFlameByDefault: boolean;
@@ -35,6 +38,7 @@ export const initialUserSettings = (): UserSettings => {
         shortenFrameTexts: 'false',
         monospace: 'default',
         reverseFlameByDefault: true,
+        numTemplating: 'hugenum',
         ...userSettings,
         theme,
     };

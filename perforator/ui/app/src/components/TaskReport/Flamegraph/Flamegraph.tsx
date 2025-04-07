@@ -6,7 +6,7 @@ import BarsDescendingAlignLeftArrowDownIcon from '@gravity-ui/icons/svgs/bars-de
 import FunnelIcon from '@gravity-ui/icons/svgs/funnel.svg?raw';
 import FunnelXmarkIcon from '@gravity-ui/icons/svgs/funnel-xmark.svg?raw';
 import MagnifierIcon from '@gravity-ui/icons/svgs/magnifier.svg?raw';
-import { Button, Icon, Loader } from '@gravity-ui/uikit';
+import { Button, Icon } from '@gravity-ui/uikit';
 
 import { Hotkey } from 'src/components/Hotkey/Hotkey';
 import type { ProfileData } from 'src/models/Profile';
@@ -28,10 +28,9 @@ export interface FlamegraphProps {
     theme: 'light' | 'dark';
     userSettings: UserSettings;
     profileData: ProfileData | null;
-    loading: boolean;
 }
 
-export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSettings, profileData, loading }) => {
+export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSettings, profileData }) => {
     const flamegraphContainer = React.useRef<HTMLDivElement | null>(null);
     const canvasRef = React.useRef<HTMLDivElement | null>(null);
     const [getQuery, setQuery] = useTypedQuery<QueryKeys>();
@@ -142,10 +141,6 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
             window.removeEventListener('keydown', handleKeyDown);
         };
     }, [handleKeyDown]);
-
-    if (loading) {
-        return <Loader />;
-    }
 
     const framesCount = profileData?.rows?.reduce((acc, row) => acc + row.length, 0);
 

@@ -1,0 +1,50 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`top should work for example data 1`] = `
+[
+  {
+    "all.eventCount": 50,
+    "all.sampleCount": 50,
+    "file": undefined,
+    "frameOrigin": undefined,
+    "inlined": undefined,
+    "kind": undefined,
+    "self.eventCount": 50,
+    "self.sampleCount": 50,
+    "textId": 3,
+  },
+  {
+    "all.eventCount": 50,
+    "all.sampleCount": 50,
+    "file": undefined,
+    "frameOrigin": undefined,
+    "inlined": undefined,
+    "kind": undefined,
+    "self.eventCount": 50,
+    "self.sampleCount": 50,
+    "textId": 2,
+  },
+  {
+    "all.eventCount": 50,
+    "all.sampleCount": 50,
+    "file": undefined,
+    "frameOrigin": undefined,
+    "inlined": undefined,
+    "kind": undefined,
+    "self.eventCount": 0,
+    "self.sampleCount": 0,
+    "textId": 1,
+  },
+  {
+    "all.eventCount": 100,
+    "all.sampleCount": 100,
+    "file": undefined,
+    "frameOrigin": undefined,
+    "inlined": undefined,
+    "kind": undefined,
+    "self.eventCount": 0,
+    "self.sampleCount": 0,
+    "textId": 0,
+  },
+]
+`;

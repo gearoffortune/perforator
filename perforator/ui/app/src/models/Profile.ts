@@ -3,6 +3,10 @@ type StringTableIndex = number
 export interface FormatNode {
     parentIndex: number;
     textId: StringTableIndex;
+    /** added during render */
+    selfSampleCount?: number;
+    /** added during render */
+    selfEventCount?: number;
     sampleCount: number;
     eventCount: number;
     /**
@@ -24,6 +28,7 @@ export interface FormatNode {
     omittedEventCount?: number;
     omittedSampleCount?: number;
     inlined?: boolean;
+    childrenIndices?: Set<number>;
 }
 
 export type ProfileData = {
@@ -40,7 +45,7 @@ export type ProfileMeta = {
 }
 
 
-type StringifiableFields = 'frameOrigin' | 'file' | 'kind' | 'textId';
+export type StringifiableFields = 'frameOrigin' | 'file' | 'kind' | 'textId';
 export type StringifiedNode = Omit<FormatNode, StringifiableFields> & {
     [key in StringifiableFields]: string;
 };

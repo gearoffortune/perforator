@@ -5,7 +5,7 @@ import { Settings } from '@gravity-ui/navigation';
 import { Switch, type Theme } from '@gravity-ui/uikit';
 
 import { useUserSettings } from 'src/providers/UserSettingsProvider';
-import type { ShortenMode } from 'src/providers/UserSettingsProvider/UserSettings';
+import type { NumTemplatingFormat, ShortenMode } from 'src/providers/UserSettingsProvider/UserSettings';
 
 import { Switcher } from './Switcher/Switcher';
 
@@ -37,6 +37,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = () => {
                                 { value: 'false', title: 'Always' },
                                 { value: 'hover', title: 'On hover' },
                                 { value: 'true', title: 'Never' },
+                            ]}
+                        />
+                    </Settings.Item>
+                    <Settings.Item title="Compact number representation">
+                        <Switcher
+                            value={userSettings.numTemplating}
+                            onUpdate={numTemplating => setUserSettings({ ...userSettings, numTemplating: numTemplating as NumTemplatingFormat })}
+                            options={[
+                                { value: 'exponent', title: 'Exponent' },
+                                { value: 'hugenum', title: 'Metric prefix' },
                             ]}
                         />
                     </Settings.Item>
