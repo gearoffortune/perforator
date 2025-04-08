@@ -13,6 +13,7 @@ import (
 	"github.com/yandex/perforator/library/go/core/log/zap"
 	"github.com/yandex/perforator/perforator/internal/buildinfo/cobrabuildinfo"
 	"github.com/yandex/perforator/perforator/internal/xmetrics"
+	"github.com/yandex/perforator/perforator/pkg/maxprocs"
 	"github.com/yandex/perforator/perforator/pkg/mlock"
 	"github.com/yandex/perforator/perforator/pkg/must"
 	storageserver "github.com/yandex/perforator/perforator/pkg/storage/server"
@@ -149,6 +150,7 @@ func init() {
 }
 
 func main() {
+	maxprocs.Adjust()
 	if err := storageCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %+v\n", err)
 		os.Exit(1)
