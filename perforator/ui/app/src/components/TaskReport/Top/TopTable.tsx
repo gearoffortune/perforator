@@ -54,7 +54,7 @@ function createNewQueryForSwitch(name: string) {
     return `?${query.toString()}`;
 }
 
-const TTable = withTableSettings(withTableSorting(Table<TableFunctionTop>));
+const TTable = React.memo(withTableSettings(withTableSorting(Table<TableFunctionTop>)));
 function compareFields(field: string) {
     return function (l: any, r: any) {
         return (l[field] ?? 0) - (r[field] ?? 0);
@@ -261,15 +261,17 @@ export const TopTable: React.FC<TopTableProps> = ({
                 hasClear
                 error={regexError ?? false}
             />
-            <TTable
-                settings={settings}
-                updateSettings={setSettings}
-                className={b('table', { search: isSeaching })}
-                sortState={sort}
-                onSortStateChange={handleSortChange}
-                columns={columns}
-                data={topSlice}
-            />
+            <div className={b('table-wrapper', { search: isSeaching })}>
+                <TTable
+                    settings={settings}
+                    updateSettings={setSettings}
+                    className={b('table')}
+                    sortState={sort}
+                    onSortStateChange={handleSortChange}
+                    columns={columns}
+                    data={topSlice}
+                />
+            </div>
         </div>
     );
 };

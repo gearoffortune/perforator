@@ -47,7 +47,7 @@ export const Visualisation: React.FC<VisualisationProps> = ({ profileData, ...pr
         <Tabs
             className={'visualisation_tabs'}
             activeTab={tab}
-            wrapTo={(item, node) => <Link href={`?tab=${item?.id}`}>{node}</Link>}
+            wrapTo={(item, node) => <Link key={item.id} href={`?tab=${item?.id}`}>{node}</Link>}
             items={[
                 { id: 'flame', title: 'Flamegraph' },
                 { id: 'top', title: 'Top' },

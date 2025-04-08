@@ -10,7 +10,6 @@ export function calculateTopForTable(data: ProfileData['rows'], stringTableLengt
 
     const res: (TableFunctionTop)[] = [];
     for (const value of topData.values()) {
-        delete value.coords;
         delete value.shortestPath;
         res.push(value);
     }
@@ -54,7 +53,6 @@ type CountType = 'self' | 'all'
 type TopKeys = `${CountType}.${Field}`;
 
 type FunctionTop = Record<TopKeys, number> & Pick<FormatNode, StringifiableFields | 'inlined'> &
-{ coords?: Record<H, Set<I> | undefined> } &
 { shortestPath?: I[] }
 
 function getNodeKeyFull(len: number, n: FormatNode) {
@@ -86,7 +84,6 @@ export function calculateTop(rows: ProfileData['rows'], stringTableLength: numbe
                     frameOrigin: node.frameOrigin,
                     inlined: node.inlined,
                     kind: node.kind,
-                    coords: {},
                 });
             }
             const funcTopData = res.get(funcKey)!;
