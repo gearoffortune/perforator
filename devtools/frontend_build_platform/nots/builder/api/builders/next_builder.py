@@ -1,3 +1,6 @@
+import itertools
+import os
+import shutil
 from dataclasses import dataclass
 
 from devtools.frontend_build_platform.libraries.logging import timeit
@@ -38,3 +41,23 @@ class NextBuilder(BaseTsBuilder):
 
     def _config_filename(self):
         return self.options.bundler_config
+
+    def _move_cache_out_of_bundle(self):
+        """
+        Move `cache` directory from the `.next` (output dir).
+
+        `libray.archive` doesn't have options to ignore/exclude some directories/patterns.
+        So, it's a workaround to ignore `.next/cache` directory bundling.
+        """
+        for output_dir_name, ignore_item in itertools.product(self.output_dirs, ['cache', 'trace']):
+            ignore_src = os.path.join(self.options.bindir, output_dir_name, ignore_item)
+            ignore_dst = os.path.join(self.options.bindir, f'{output_dir_name}.{ignore_item}')
+
+            if os.path.exists(ignore_src):
+                shutil.rmtree(ignore_dst, ignore_errors=True)
+                shutil.move(ignore_src, ignore_dst)
+
+    def bundle(self):
+        self._move_cache_out_of_bundle()
+
+        return super().bundle()

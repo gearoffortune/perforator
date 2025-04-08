@@ -1,24 +1,24 @@
 {
   "info": {
-    "created": "2025-03-07T10:00:02.082Z",
+    "created": "2025-04-08T15:28:05.585Z",
     "pr": {
-      "id": 8136782,
-      "author": "zaverden",
-      "summary": "fix(builder): run pnpm install with clean env"
+      "id": 7792938,
+      "author": "khoden",
+      "summary": "FBP-1954: nots/builder: не упаковывать в output.tar папку `.next/cache`"
     }
   },
   "by_platform": {
     "darwin": {
-      "uri": "sbr:8207448776"
+      "uri": "sbr:8467050617"
     },
     "darwin-arm64": {
-      "uri": "sbr:8207445998"
+      "uri": "sbr:8467048249"
     },
     "linux": {
-      "uri": "sbr:8207454202"
+      "uri": "sbr:8467054946"
     },
     "linux-aarch64": {
-      "uri": "sbr:8207451732"
+      "uri": "sbr:8467052632"
     }
   }
 }
