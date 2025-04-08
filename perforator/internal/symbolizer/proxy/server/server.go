@@ -1531,7 +1531,7 @@ type RunConfig struct {
 func (s *PerforatorServer) runMetricsServer(ctx context.Context, port uint32) error {
 	s.l.Info(ctx, "Starting metrics server", log.UInt32("port", port))
 	http.Handle("/metrics", s.reg.HTTPHandler(ctx, s.l))
-	http.HandleFunc("/debug/pprof/polyheap", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("GET /debug/pprof/polyheap", func(w http.ResponseWriter, r *http.Request) {
 		p, err := polyheapprof.ReadCurrentHeapProfile()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
