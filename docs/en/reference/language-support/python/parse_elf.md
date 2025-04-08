@@ -5,6 +5,7 @@
 * `.dynsym`, `.rodata`, `.text` sections
 * `Py_Version` or `Py_GetVersion` symbol available in `.dynsym`
 * `_PyThreadState_GetCurrent` or `_PyRuntime` symbol available in `.dynsym`
+* `_PyGILState_Check` symbol available in `.dynsym` for CPython before 3.12
 
 ## Python Version
 

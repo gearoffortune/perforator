@@ -1,8 +1,15 @@
 # Python Profiling
 
-Perforator supports stack unwinding for the latest releases of Python - 3.12 and 3.13 executing with CPython.
+Perforator supports stack unwinding for the latest releases of Python executing with CPython.
 
-Cython is not supported yet. Previous versions of CPython will be supported soon.
+| СPython Version | Support Status | Requirements for the executable | Note |
+|----------------|----------------|-------------|-------|
+| 3.12 - 3.13           | ✅             | Vanilla build | 
+| 3.11           | ✅             | Vanilla build and glibc libpthread.so linked | Python and native stack merging not adapted yet
+| 3.10 and older | ❌             | Will be supported soon |
+| Cython         | ❌             | Not supported yet |
+
+See [ELF Parsing Requirements](./parse_elf.md#requirements-for-elf-cpython-binary) for detailed binary requirements.
 
 ## Problem
 
