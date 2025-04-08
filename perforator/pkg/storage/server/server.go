@@ -413,7 +413,7 @@ func (s *StorageServer) doAnnounceBinaries(
 	return unknownBinaries, nil
 }
 
-// implemenets storage.PerforatorStorage/AnnounceBinaries
+// implements storage.PerforatorStorage/AnnounceBinaries
 func (s *StorageServer) AnnounceBinaries(
 	ctx context.Context,
 	req *perforatorstorage.AnnounceBinariesRequest,
