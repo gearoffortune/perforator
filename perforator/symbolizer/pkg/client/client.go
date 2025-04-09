@@ -585,7 +585,7 @@ func (c *Client) UploadRenderedProfile(ctx context.Context, meta *perforator.Pro
 			},
 		},
 		Query: &perforator.ProfileQuery{
-			Selector: fmt.Sprintf(`{id="%s"}`, profileID),
+			Selector: fmt.Sprintf(`{system_name = "uploads", id="%s"}`, profileID),
 			TimeInterval: &perforator.TimeInterval{
 				From: timestamppb.New(meta.GetTimestamp().AsTime().Add(-time.Minute)),
 			},
