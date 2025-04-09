@@ -67,11 +67,11 @@ TEST_F(EvaluatorTest, StopConditionFunctions) {
 
     llvm::MCInst callInst = llvm::MCInstBuilder(llvm::X86::CALLpcrel32).addImm(0);
 
-    EXPECT_TRUE(IsJumpOrCall(callInst));
+    EXPECT_TRUE(IsJump(callInst) || IsCall(callInst));
     EXPECT_TRUE(cfStopCondition(initialState, callInst));
 
     llvm::MCInst movInst = llvm::MCInstBuilder(llvm::X86::MOV32ri).addReg(llvm::X86::EAX).addImm(1);
-    EXPECT_FALSE(IsJumpOrCall(movInst));
+    EXPECT_FALSE(IsJump(movInst) || IsCall(movInst));
     EXPECT_FALSE(cfStopCondition(initialState, movInst));
 }
 

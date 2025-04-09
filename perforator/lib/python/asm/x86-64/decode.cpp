@@ -263,6 +263,7 @@ TMaybe<ui64> DecodePyGetVersion(
 /*
  * Disassembles PyGILState_Check function to find the address of autoTSSkey field on _PyRuntime.
 
+Example 1:
 0000000000296e50 <PyGILState_Check>:
   296e50:       f3 0f 1e fa             endbr64
   296e54:       8b 05 5e cd 2d 00       mov    0x2dcd5e(%rip),%eax        # 573bb8 <_PyRuntime+0x238>
@@ -271,29 +272,33 @@ TMaybe<ui64> DecodePyGetVersion(
   296e5d:       0f 84 34 b0 ef ff       je     191e97 <PyGILState_Check.cold>
   296e63:       48 8d 3d 66 cd 2d 00    lea    0x2dcd66(%rip),%rdi        # 573bd0 <_PyRuntime+0x250>
   296e6a:       e8 b1 49 00 00          callq  29b820 <PyThread_tss_is_created>
-  296e6f:       85 c0                   test   %eax,%eax
-  296e71:       0f 84 20 b0 ef ff       je     191e97 <PyGILState_Check.cold>
-  296e77:       48 8b 1d 42 cd 2d 00    mov    0x2dcd42(%rip),%rbx        # 573bc0 <_PyRuntime+0x240>
-  296e7e:       48 85 db                test   %rbx,%rbx
-  296e81:       0f 84 21 b0 ef ff       je     191ea8 <PyGILState_Check.cold+0x11>
-  296e87:       48 83 3d 39 cd 2d 00    cmpq   $0x0,0x2dcd39(%rip)        # 573bc8 <_PyRuntime+0x248>
-  296e8e:       00
-  296e8f:       0f 84 0c b0 ef ff       je     191ea1 <PyGILState_Check.cold+0xa>
-  296e95:       48 8d 3d 34 cd 2d 00    lea    0x2dcd34(%rip),%rdi        # 573bd0 <_PyRuntime+0x250>
-  296e9c:       e8 4f 49 00 00          callq  29b7f0 <PyThread_tss_get>
+
+Example 2:
+0000000000165570 <PyGILState_Check>:
+  165570:       f3 0f 1e fa             endbr64
+  165574:       8b 05 16 5d 1f 00       mov    0x1f5d16(%rip),%eax        # 35b290 <_PyRuntime+0x550>
+  16557a:       85 c0                   test   %eax,%eax
+  16557c:       75 0a                   jne    165588 <PyGILState_Check+0x18>
+  16557e:       b8 01 00 00 00          mov    $0x1,%eax
+  165583:       c3                      retq
+  165584:       0f 1f 40 00             nopl   0x0(%rax)
+  165588:       53                      push   %rbx
+  165589:       48 8d 3d 20 5d 1f 00    lea    0x1f5d20(%rip),%rdi        # 35b2b0 <_PyRuntime+0x570>
+  165590:       e8 8b 21 01 00          callq  177720 <PyThread_tss_is_created>
+
  */
 TMaybe<ui64> DecodeAutoTSSKeyAddress(
     const llvm::Triple& triple,
-    ui64 functionAddress,
+    ui64 pyGILStateCheckAddress,
     TConstArrayRef<ui8> bytecode
 ) {
     auto instructionEvaluator = NPerforator::NAsm::NX86::MakeDefaultInstructionEvaluator();
     NPerforator::NAsm::NX86::TBytecodeEvaluator evaluator(
         triple,
-        NPerforator::NAsm::NX86::MakeInitialState(functionAddress),
+        NPerforator::NAsm::NX86::MakeInitialState(pyGILStateCheckAddress),
         bytecode,
         *instructionEvaluator,
-        NPerforator::NAsm::NX86::MakeStopOnPassControlFlowCondition()
+        NPerforator::NAsm::NX86::MakeStopOnCallCondition()
     );
 
     auto result = evaluator.Evaluate();

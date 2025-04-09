@@ -92,16 +92,18 @@ EDecodeInstructionError DecodeInstructions(
     return EDecodeInstructionError::NoError;
 }
 
-bool IsJumpOrCall(const llvm::MCInst& inst) {
-    auto opcode = inst.getOpcode();
-    return opcode == llvm::X86::CALL64pcrel32 ||
-           opcode == llvm::X86::CALL64r ||
-           opcode == llvm::X86::CALL64m ||
-           opcode == llvm::X86::JMP64r ||
-           opcode == llvm::X86::JMP64m ||
-           opcode == llvm::X86::CALLpcrel32 ||
-           opcode == llvm::X86::JMP32m ||
-           opcode == llvm::X86::JMP32r;
+bool IsCall(const llvm::MCInst& inst) {
+    return inst.getOpcode() == llvm::X86::CALL64pcrel32 ||
+           inst.getOpcode() == llvm::X86::CALL64r ||
+           inst.getOpcode() == llvm::X86::CALL64m ||
+           inst.getOpcode() == llvm::X86::CALLpcrel32;
+}
+
+bool IsJump(const llvm::MCInst& inst) {
+    return inst.getOpcode() == llvm::X86::JMP64r ||
+           inst.getOpcode() == llvm::X86::JMP64m ||
+           inst.getOpcode() == llvm::X86::JMP32r ||
+           inst.getOpcode() == llvm::X86::JMP32m;
 }
 
 bool IsRet(const llvm::MCInst& inst) {
@@ -112,7 +114,13 @@ bool IsRet(const llvm::MCInst& inst) {
 
 TEvaluationStopCondition MakeStopOnPassControlFlowCondition() {
     return [](const TState&, const llvm::MCInst& inst) -> bool {
-        return IsJumpOrCall(inst) || IsRet(inst);
+        return IsJump(inst) || IsCall(inst) || IsRet(inst);
+    };
+}
+
+TEvaluationStopCondition MakeStopOnCallCondition() {
+    return [](const TState&, const llvm::MCInst& inst) -> bool {
+        return IsCall(inst);
     };
 }
 

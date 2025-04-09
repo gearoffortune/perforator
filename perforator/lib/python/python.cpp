@@ -271,20 +271,20 @@ TMaybe<ui64> TPythonAnalyzer::ParseAutoTSSKeyAddress() {
         return Nothing();
     }
 
-    NPerforator::NELF::TLocation& symbol = *Symbols_->PyGILStateCheck;
-    if (symbol.Size == 0) {
+    NPerforator::NELF::TLocation& pyGILStateCheckSymbol = *Symbols_->PyGILStateCheck;
+    if (pyGILStateCheckSymbol.Size == 0) {
         // fallback in case symbol size is not specified in symbol table of ELF
-        symbol.Size = 100;
+        pyGILStateCheckSymbol.Size = 100;
     }
 
-    auto bytecode = NPerforator::NELF::RetrieveContentFromTextSection(File_, symbol);
+    auto bytecode = NPerforator::NELF::RetrieveContentFromTextSection(File_, pyGILStateCheckSymbol);
     if (!bytecode) {
         return Nothing();
     }
 
     return NAsm::NX86::DecodeAutoTSSKeyAddress(
         File_.makeTriple(),
-        symbol.Address,
+        pyGILStateCheckSymbol.Address,
         *bytecode
     );
 }

@@ -58,10 +58,12 @@ TState MakeInitialState(ui64 initialRIP);
 
 using TEvaluationStopCondition = TFunctionRef<bool(const TState&, const llvm::MCInst&)>;
 
-bool IsJumpOrCall(const llvm::MCInst& inst);
+bool IsJump(const llvm::MCInst& inst);
+bool IsCall(const llvm::MCInst& inst);
 bool IsRet(const llvm::MCInst& inst);
 
 TEvaluationStopCondition MakeStopOnPassControlFlowCondition();
+TEvaluationStopCondition MakeStopOnCallCondition();
 
 
 class IInstructionEvaluator {
