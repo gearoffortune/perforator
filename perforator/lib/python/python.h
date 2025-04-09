@@ -20,7 +20,7 @@ constexpr TStringBuf kPyGetVersionSymbol = "Py_GetVersion";
 constexpr TStringBuf kPyRuntimeSymbol = "_PyRuntime";
 constexpr TStringBuf kPyGILStateCheckSymbol = "PyGILState_Check";
 
-const re2::RE2 kPythonVersionRegex(R"(([23])\.(\d)(?:\.(\d{1,2}))?([^\.]|$))");
+const re2::RE2 kPythonVersionRegex(R"(([23])\.(\d+)(?:\.(\d{1,2}))?([^\.]|$))");
 
 struct TPythonVersion {
     ui8 MajorVersion = 0;

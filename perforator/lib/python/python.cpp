@@ -1,9 +1,5 @@
 #include "python.h"
 
-#include <llvm/MC/MCContext.h>
-#include <llvm/MC/MCTargetOptions.h>
-#include <llvm/MC/TargetRegistry.h>
-#include <llvm/Object/ELF.h>
 #include <llvm/Object/ELFObjectFile.h>
 #include <llvm/Object/ObjectFile.h>
 
