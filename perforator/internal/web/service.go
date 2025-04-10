@@ -23,6 +23,7 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"github.com/yandex/perforator/library/go/core/log"
+	"github.com/yandex/perforator/library/go/core/metrics/nop"
 	"github.com/yandex/perforator/perforator/internal/xmetrics"
 	"github.com/yandex/perforator/perforator/pkg/grpcutil/grpclog"
 	"github.com/yandex/perforator/perforator/pkg/grpcutil/grpcmetrics"
@@ -172,7 +173,7 @@ func getFileFromS3AndWrite(w http.ResponseWriter, client *s3.S3, bucket, key str
 }
 
 func s3Handler(cfg *Config) (http.HandlerFunc, error) {
-	s3Client, err := s3client.NewClient(cfg.S3Config)
+	s3Client, err := s3client.NewClient(cfg.S3Config, &nop.Registry{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to init s3: %w", err)
 	}

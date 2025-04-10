@@ -6,18 +6,22 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+
+	"github.com/yandex/perforator/library/go/core/metrics"
 )
 
 const (
 	defaultRegion       = "us-east-1"
 	defaultAccessKeyEnv = "S3_ACCESS_KEY"
 	defaultSecretKeyEnv = "S3_SECRET_KEY"
-	defaultMaxRetries   = 10
+	defaultMaxRetries   = 5
 )
 
 type Config struct {
@@ -68,7 +72,26 @@ func loadKey(path, env string) (string, error) {
 	return "", fmt.Errorf("no key path or environment variable provided")
 }
 
-func NewClient(c *Config) (*s3.S3, error) {
+func addRetryObserver(s3Client *s3.S3, registry metrics.Registry) {
+	s3Client.Handlers.AfterRetry.PushBack(func(r *request.Request) {
+		statusCode := 0
+		if r.HTTPResponse != nil {
+			statusCode = r.HTTPResponse.StatusCode
+		}
+
+		operation := ""
+		if r.Operation != nil {
+			operation = r.Operation.Name
+		}
+
+		registry.WithTags(map[string]string{
+			"status_code": strconv.Itoa(statusCode),
+			"operation":   operation,
+		}).Counter("s3.client.retries").Inc()
+	})
+}
+
+func NewClient(c *Config, reg metrics.Registry) (*s3.S3, error) {
 	c.fillDefault()
 
 	secretKey, err := loadKey(c.SecretKeyPath, c.SecretKeyEnv)
@@ -119,5 +142,8 @@ func NewClient(c *Config) (*s3.S3, error) {
 		return nil, fmt.Errorf("failed to create new session: %w", err)
 	}
 
-	return s3.New(session), nil
+	s3Client := s3.New(session)
+	addRetryObserver(s3Client, reg)
+
+	return s3Client, nil
 }

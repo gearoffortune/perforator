@@ -51,7 +51,7 @@ func NewStorageBundle(ctx context.Context, l xlog.Logger, reg metrics.Registry, 
 	}
 	var err error
 
-	res.DBs, err = databases.NewDatabases(ctx, l, &c.DBs)
+	res.DBs, err = databases.NewDatabases(ctx, l, &c.DBs, reg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init dbs: %w", err)
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	hasql "golang.yandex/hasql/sqlx"
 
+	"github.com/yandex/perforator/library/go/core/metrics"
 	"github.com/yandex/perforator/perforator/pkg/clickhouse"
 	"github.com/yandex/perforator/perforator/pkg/postgres"
 	s3client "github.com/yandex/perforator/perforator/pkg/s3"
@@ -22,12 +23,12 @@ type Databases struct {
 	S3Client *s3.S3
 }
 
-func NewDatabases(ctx context.Context, l xlog.Logger, c *Config) (*Databases, error) {
+func NewDatabases(ctx context.Context, l xlog.Logger, c *Config, reg metrics.Registry) (*Databases, error) {
 	res := &Databases{}
 	var err error
 
 	if c.S3Config != nil {
-		res.S3Client, err = s3client.NewClient(c.S3Config)
+		res.S3Client, err = s3client.NewClient(c.S3Config, reg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to init s3: %w", err)
 		}
