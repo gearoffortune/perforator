@@ -2,7 +2,7 @@ GO_TEST()
 
 LICENSE(Apache-2.0)
 
-VERSION(v1.69.4)
+VERSION(v1.71.0)
 
 GO_SKIP_TESTS(Test)
 
@@ -20,6 +20,7 @@ GO_XTEST_SRCS(
     ads_stream_watch_test.go
     authority_test.go
     cds_watchers_test.go
+    client_custom_dialopts_test.go
     dump_test.go
     eds_watchers_test.go
     fallback_test.go

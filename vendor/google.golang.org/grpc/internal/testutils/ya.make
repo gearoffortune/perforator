@@ -2,7 +2,7 @@ GO_LIBRARY()
 
 LICENSE(Apache-2.0)
 
-VERSION(v1.69.4)
+VERSION(v1.71.0)
 
 SRCS(
     balancer.go
@@ -38,6 +38,7 @@ RECURSE(
     fakegrpclb
     gotest
     pickfirst
+    proxyserver
     rls
     roundrobin
     stats

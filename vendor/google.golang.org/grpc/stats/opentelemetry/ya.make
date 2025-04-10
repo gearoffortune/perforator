@@ -2,13 +2,16 @@ GO_LIBRARY()
 
 LICENSE(Apache-2.0)
 
-VERSION(v1.69.4)
+VERSION(v1.71.0)
 
 SRCS(
     client_metrics.go
+    client_tracing.go
     grpc_trace_bin_propagator.go
     opentelemetry.go
     server_metrics.go
+    server_tracing.go
+    trace.go
 )
 
 GO_TEST_SRCS(

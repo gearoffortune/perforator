@@ -2,7 +2,7 @@ GO_LIBRARY()
 
 LICENSE(Apache-2.0)
 
-VERSION(v1.31.0)
+VERSION(v1.34.0)
 
 SRCS(
     cloud-function.go
@@ -19,6 +19,8 @@ GO_TEST_SRCS(
     cloud-run_test.go
     detector_test.go
 )
+
+GO_XTEST_SRCS(version_test.go)
 
 END()
 

@@ -2,9 +2,10 @@ GO_LIBRARY()
 
 LICENSE(Apache-2.0)
 
-VERSION(v0.5.2)
+VERSION(v0.6.0)
 
 SRCS(
+    log.go
     metadata.go
     retry.go
 )
