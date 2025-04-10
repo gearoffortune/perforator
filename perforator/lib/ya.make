@@ -4,6 +4,7 @@ RECURSE(
     llvmex
     permutation
     profile
+    pthread
     python
     tls
 )

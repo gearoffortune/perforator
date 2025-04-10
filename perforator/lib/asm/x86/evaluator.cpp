@@ -112,9 +112,13 @@ bool IsRet(const llvm::MCInst& inst) {
             llvm::X86::isRETF(inst.getOpcode());
 }
 
+bool IsPassControlFlow(const llvm::MCInst& inst) {
+    return IsJump(inst) || IsCall(inst) || IsRet(inst);
+}
+
 TEvaluationStopCondition MakeStopOnPassControlFlowCondition() {
     return [](const TState&, const llvm::MCInst& inst) -> bool {
-        return IsJump(inst) || IsCall(inst) || IsRet(inst);
+        return IsPassControlFlow(inst);
     };
 }
 

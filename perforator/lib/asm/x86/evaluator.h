@@ -61,6 +61,7 @@ using TEvaluationStopCondition = TFunctionRef<bool(const TState&, const llvm::MC
 bool IsJump(const llvm::MCInst& inst);
 bool IsCall(const llvm::MCInst& inst);
 bool IsRet(const llvm::MCInst& inst);
+bool IsPassControlFlow(const llvm::MCInst& inst);
 
 TEvaluationStopCondition MakeStopOnPassControlFlowCondition();
 TEvaluationStopCondition MakeStopOnCallCondition();
