@@ -78,10 +78,6 @@ func TestParser(t *testing.T) {
 			ExpectedRepr: `"x" != "a" AND "x" !glob "abc*"`,
 		},
 		{
-			Query:        `{x !~ "a|b"}`,
-			ExpectedRepr: `"x" !regex "a" AND "x" !regex "b"`,
-		},
-		{
 			Query:        `{x = "a|*|-"}`,
 			ExpectedRepr: `("x" = "a" OR "x" exists OR "x" !exists)`,
 		},
@@ -186,6 +182,14 @@ func TestParser(t *testing.T) {
 		{
 			Query:         `{x = 1EE}`,
 			ExpectedError: `syntax error`,
+		},
+		{
+			Query:        `{a =~ "1|2"}`,
+			ExpectedRepr: `"a" regex "1|2"`,
+		},
+		{
+			Query:        `{x !~ "a|b"}`,
+			ExpectedRepr: `"x" !regex "a|b"`,
 		},
 	} {
 		t.Run(tc.Query, func(t *testing.T) {

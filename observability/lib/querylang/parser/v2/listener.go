@@ -182,6 +182,11 @@ func (l *listener) handleStringSelector(opCtx parser.ISelectorOpStringContext, r
 		return
 	}
 
+	if opCtx.REGEX() != nil || opCtx.NOT_REGEX() != nil {
+		l.handleStringRegexSelector(opCtx, right)
+		return
+	}
+
 	right = unquote(right)
 	rightVariants := strings.Split(right, "|")
 
@@ -223,6 +228,14 @@ func (l *listener) handleStringExactSelector(opCtx parser.ISelectorOpStringConte
 	l.appendCondition(&querylang.Condition{
 		Operator: operator.Eq,
 		Inverse:  opCtx.NOT_EQUIV() != nil,
+		Value:    querylang.String{Value: unquote(right)},
+	})
+}
+
+func (l *listener) handleStringRegexSelector(opCtx parser.ISelectorOpStringContext, right string) {
+	l.appendCondition(&querylang.Condition{
+		Operator: operator.Regex,
+		Inverse:  opCtx.NOT_REGEX() != nil,
 		Value:    querylang.String{Value: unquote(right)},
 	})
 }
