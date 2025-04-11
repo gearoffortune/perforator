@@ -2,13 +2,17 @@ GO_LIBRARY()
 
 LICENSE(MIT)
 
-VERSION(v5.7.2)
+VERSION(v5.7.4)
 
 SRCS(
     sanitize.go
 )
 
-GO_XTEST_SRCS(sanitize_test.go)
+GO_XTEST_SRCS(
+    sanitize_bench_test.go
+    sanitize_fuzz_test.go
+    sanitize_test.go
+)
 
 END()
 

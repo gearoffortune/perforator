@@ -2,6 +2,6 @@ GO_TEST_FOR(vendor/github.com/jackc/pgx/v5/internal/pgmock)
 
 LICENSE(MIT)
 
-VERSION(v5.7.2)
+VERSION(v5.7.4)
 
 END()
