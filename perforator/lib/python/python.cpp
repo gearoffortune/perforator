@@ -20,7 +20,7 @@ namespace NPerforator::NLinguist::NPython {
 TPythonAnalyzer::TPythonAnalyzer(const llvm::object::ObjectFile& file) : File_(file) {}
 
 void TPythonAnalyzer::ParseSymbolLocations() {
-    if (Symbols_ != nullptr) {
+    if (Symbols_) {
         return;
     }
 
@@ -63,7 +63,6 @@ TMaybe<TPythonVersion> TryParseVersionFromPyVersionSymbol(
     const llvm::object::ObjectFile& file,
     const NPerforator::NELF::TLocation& pyVersion
 ) {
-
     if (pyVersion.Address == 0) {
         return Nothing();
     }
@@ -196,6 +195,10 @@ TMaybe<TParsedPythonVersion> ParseVersion(
 TMaybe<TParsedPythonVersion> TPythonAnalyzer::ParseVersion() {
     ParseSymbolLocations();
 
+    if (!Symbols_) {
+        return Nothing();
+    }
+
     #define TRY_ELF_TYPE(ELFT) \
     if (auto res = NPerforator::NLinguist::NPython::ParseVersion<ELFT>(File_, *Symbols_.Get())) { \
         return res; \
@@ -208,11 +211,13 @@ TMaybe<TParsedPythonVersion> TPythonAnalyzer::ParseVersion() {
 }
 
 TMaybe<NAsm::ThreadImageOffsetType> TPythonAnalyzer::ParseTLSPyThreadState() {
-    if (!Symbols_) {
-        ParseSymbolLocations();
+    if (File_.getArch() != llvm::Triple::x86 && File_.getArch() != llvm::Triple::x86_64) {
+        return Nothing();
     }
 
-    if (File_.getArch() != llvm::Triple::x86 && File_.getArch() != llvm::Triple::x86_64) {
+    ParseSymbolLocations();
+
+    if (!Symbols_) {
         return Nothing();
     }
 
@@ -265,7 +270,13 @@ TMaybe<ui64> TPythonAnalyzer::ParseAutoTSSKeyAddress() {
         return Nothing();
     }
 
-    if (!Symbols_ || Symbols_->PyRuntime->Address == 0) {
+    ParseSymbolLocations();
+
+    if (!Symbols_) {
+        return Nothing();
+    }
+
+    if (!Symbols_->PyRuntime || Symbols_->PyRuntime->Address == 0) {
         return Nothing();
     }
 
