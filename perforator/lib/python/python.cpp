@@ -31,7 +31,8 @@ void TPythonAnalyzer::ParseSymbolLocations() {
         kPyThreadStateGetCurrentSymbol,
         kPyGetVersionSymbol,
         kPyRuntimeSymbol,
-        kPyGILStateCheckSymbol
+        kPyGILStateCheckSymbol,
+        kPyInterpreterStateHeadSymbol
     );
 
     auto setSymbolIfFound = [&](const THashMap<TStringBuf, NPerforator::NELF::TLocation>& symbols, TStringBuf symbolName, TMaybe<NELF::TLocation>& target) {
@@ -46,6 +47,7 @@ void TPythonAnalyzer::ParseSymbolLocations() {
         setSymbolIfFound(*dynamicSymbols, kPyGetVersionSymbol, Symbols_->PyGetVersion);
         setSymbolIfFound(*dynamicSymbols, kPyRuntimeSymbol, Symbols_->PyRuntime);
         setSymbolIfFound(*dynamicSymbols, kPyGILStateCheckSymbol, Symbols_->PyGILStateCheck);
+        setSymbolIfFound(*dynamicSymbols, kPyInterpreterStateHeadSymbol, Symbols_->PyInterpreterStateHead);
     }
 
     auto symbols = NELF::RetrieveSymbols(File_, kCurrentFastGetSymbol);
@@ -287,6 +289,34 @@ TMaybe<ui64> TPythonAnalyzer::ParseAutoTSSKeyAddress() {
         pyGILStateCheckSymbol.Address,
         *bytecode
     );
+}
+
+TMaybe<ui64> TPythonAnalyzer::ParseInterpHeadAddress() {
+    if (File_.getArch() != llvm::Triple::x86 && File_.getArch() != llvm::Triple::x86_64) {
+        return Nothing();
+    }
+
+    ParseSymbolLocations();
+
+    if (!Symbols_) {
+        return Nothing();
+    }
+
+    if (!Symbols_->PyInterpreterStateHead || Symbols_->PyInterpreterStateHead->Address == 0) {
+        return Nothing();
+    }
+
+    NPerforator::NELF::TLocation& pyInterpreterStateHeadSymbol = *Symbols_->PyInterpreterStateHead;
+    if (pyInterpreterStateHeadSymbol.Size == 0) {
+        pyInterpreterStateHeadSymbol.Size = 30;
+    }
+
+    auto bytecode = NPerforator::NELF::RetrieveContentFromTextSection(File_, pyInterpreterStateHeadSymbol);
+    if (!bytecode) {
+        return Nothing();
+    }
+
+    return NAsm::NX86::DecodeInterpHeadAddress(File_.makeTriple(), pyInterpreterStateHeadSymbol.Address, *bytecode);
 }
 
 } // namespace NPerforator::NLinguist::NPython
