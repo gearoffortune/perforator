@@ -289,13 +289,13 @@ Example 2:
  */
 TMaybe<ui64> DecodeAutoTSSKeyAddress(
     const llvm::Triple& triple,
-    ui64 pyGILStateCheckAddress,
+    ui64 pyGILStateEnsureAddress,
     TConstArrayRef<ui8> bytecode
 ) {
     auto instructionEvaluator = NPerforator::NAsm::NX86::MakeDefaultInstructionEvaluator();
     NPerforator::NAsm::NX86::TBytecodeEvaluator evaluator(
         triple,
-        NPerforator::NAsm::NX86::MakeInitialState(pyGILStateCheckAddress),
+        NPerforator::NAsm::NX86::MakeInitialState(pyGILStateEnsureAddress),
         bytecode,
         *instructionEvaluator,
         NPerforator::NAsm::NX86::MakeStopOnCallCondition()

@@ -31,7 +31,7 @@ void TPythonAnalyzer::ParseSymbolLocations() {
         kPyThreadStateGetCurrentSymbol,
         kPyGetVersionSymbol,
         kPyRuntimeSymbol,
-        kPyGILStateCheckSymbol,
+        kPyGILStateEnsureSymbol,
         kPyInterpreterStateHeadSymbol
     );
 
@@ -46,7 +46,7 @@ void TPythonAnalyzer::ParseSymbolLocations() {
         setSymbolIfFound(*dynamicSymbols, kPyThreadStateGetCurrentSymbol, Symbols_->GetCurrentThreadState);
         setSymbolIfFound(*dynamicSymbols, kPyGetVersionSymbol, Symbols_->PyGetVersion);
         setSymbolIfFound(*dynamicSymbols, kPyRuntimeSymbol, Symbols_->PyRuntime);
-        setSymbolIfFound(*dynamicSymbols, kPyGILStateCheckSymbol, Symbols_->PyGILStateCheck);
+        setSymbolIfFound(*dynamicSymbols, kPyGILStateEnsureSymbol, Symbols_->PyGILStateEnsure);
         setSymbolIfFound(*dynamicSymbols, kPyInterpreterStateHeadSymbol, Symbols_->PyInterpreterStateHead);
     }
 
@@ -276,28 +276,24 @@ TMaybe<ui64> TPythonAnalyzer::ParseAutoTSSKeyAddress() {
         return Nothing();
     }
 
-    if (!Symbols_->PyRuntime || Symbols_->PyRuntime->Address == 0) {
+    if (!Symbols_->PyGILStateEnsure || Symbols_->PyGILStateEnsure->Address == 0) {
         return Nothing();
     }
 
-    if (!Symbols_->PyGILStateCheck || Symbols_->PyGILStateCheck->Address == 0) {
-        return Nothing();
-    }
-
-    NPerforator::NELF::TLocation& pyGILStateCheckSymbol = *Symbols_->PyGILStateCheck;
-    if (pyGILStateCheckSymbol.Size == 0) {
+    NPerforator::NELF::TLocation& pyGILStateEnsureSymbol = *Symbols_->PyGILStateEnsure;
+    if (pyGILStateEnsureSymbol.Size == 0) {
         // fallback in case symbol size is not specified in symbol table of ELF
-        pyGILStateCheckSymbol.Size = 100;
+        pyGILStateEnsureSymbol.Size = 100;
     }
 
-    auto bytecode = NPerforator::NELF::RetrieveContentFromTextSection(File_, pyGILStateCheckSymbol);
+    auto bytecode = NPerforator::NELF::RetrieveContentFromTextSection(File_, pyGILStateEnsureSymbol);
     if (!bytecode) {
         return Nothing();
     }
 
     return NAsm::NX86::DecodeAutoTSSKeyAddress(
         File_.makeTriple(),
-        pyGILStateCheckSymbol.Address,
+        pyGILStateEnsureSymbol.Address,
         *bytecode
     );
 }

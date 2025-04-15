@@ -18,7 +18,7 @@ constexpr TStringBuf kPyThreadStateGetCurrentSymbol = "_PyThreadState_GetCurrent
 constexpr TStringBuf kPyVersionSymbol = "Py_Version";
 constexpr TStringBuf kPyGetVersionSymbol = "Py_GetVersion";
 constexpr TStringBuf kPyRuntimeSymbol = "_PyRuntime";
-constexpr TStringBuf kPyGILStateCheckSymbol = "PyGILState_Check";
+constexpr TStringBuf kPyGILStateEnsureSymbol = "PyGILState_Ensure";
 constexpr TStringBuf kPyInterpreterStateHeadSymbol = "PyInterpreterState_Head";
 
 const re2::RE2 kPythonVersionRegex(R"(([23])\.(\d+)(?:\.(\d{1,2}))?([^\.]|$))");
@@ -54,7 +54,7 @@ public:
         TMaybe<NPerforator::NELF::TLocation> PyVersion;
         TMaybe<NPerforator::NELF::TLocation> PyGetVersion;
         TMaybe<NPerforator::NELF::TLocation> PyRuntime;
-        TMaybe<NPerforator::NELF::TLocation> PyGILStateCheck;
+        TMaybe<NPerforator::NELF::TLocation> PyGILStateEnsure;
         TMaybe<NPerforator::NELF::TLocation> PyInterpreterStateHead;
     };
 
