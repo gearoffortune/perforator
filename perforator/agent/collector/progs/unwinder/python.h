@@ -3,6 +3,7 @@
 #include "binary.h"
 #include "metrics.h"
 #include "process.h"
+#include "pthread.h"
 #include "py_types.h"
 #include "py_threads.h"
 
@@ -311,6 +312,42 @@ move_to_next_frame:
     BPF_TRACE("python: Collected %d frames", state->frame_count);
 }
 
+// Returns true if we should proceed with stack collection
+static ALWAYS_INLINE bool python_retrieve_configs(
+    struct process_info* proc_info,
+    struct python_state* state
+) {
+    if (proc_info == NULL || state == NULL) {
+        return false;
+    }
+
+    binary_id id = proc_info->interpreter_binary.id;
+    struct python_config* config = bpf_map_lookup_elem(&python_storage, &id);
+    if (config == NULL) {
+        return false;
+    }
+    state->config = *config;
+    if (config->py_runtime_relative_address != 0) {
+        state->py_runtime_address = proc_info->interpreter_binary.start_address + config->py_runtime_relative_address;
+    }
+    if (config->auto_tss_key_relative_address != 0) {
+        state->auto_tss_key_address = proc_info->interpreter_binary.start_address + config->auto_tss_key_relative_address;
+    }
+
+    if (proc_info->pthread_binary.type != SPECIAL_BINARY_TYPE_PTHREAD_GLIBC) {
+        return true;
+    }
+
+    id = proc_info->pthread_binary.id;
+    struct pthread_config* pthread_config = bpf_map_lookup_elem(&pthread_storage, &id);
+    if (pthread_config != NULL) {
+        state->pthread_config = *pthread_config;
+    }
+    state->found_pthread_config = (pthread_config != NULL);
+
+    return (config != NULL);
+}
+
 static ALWAYS_INLINE void python_collect_stack(
     struct process_info* proc_info,
     struct python_state* state
@@ -319,19 +356,14 @@ static ALWAYS_INLINE void python_collect_stack(
         return;
     }
 
-    if (proc_info->interpreter_binary.type != INTERPRETER_TYPE_PYTHON) {
+    if (proc_info->interpreter_binary.type != SPECIAL_BINARY_TYPE_PYTHON_INTERPRETER) {
         return;
     }
 
-    binary_id id = proc_info->interpreter_binary.id;
-    struct python_config* config = bpf_map_lookup_elem(&python_storage, &id);
-    if (config == NULL) {
-        // sanity check, should be not NULL because of previous check for python interpreter type
+    bool found_config = python_retrieve_configs(proc_info, state);
+    if (!found_config) {
         return;
     }
-
-    state->config = *config;
-    state->py_runtime_address = proc_info->interpreter_binary_start_address + config->py_runtime_relative_address;
 
     metric_increment(METRIC_PYTHON_PROCESSED_STACKS_COUNT);
 
@@ -344,7 +376,7 @@ static ALWAYS_INLINE void python_collect_stack(
 
     BPF_TRACE("python: Successfully extracted PyThreadState addr %p", py_thread_state_addr);
 
-    void* py_interpreter_frame = python_read_current_frame_from_thread_state(config, py_thread_state_addr);
+    void* py_interpreter_frame = python_read_current_frame_from_thread_state(&state->config, py_thread_state_addr);
     if (py_interpreter_frame == NULL) {
         return;
     }
@@ -352,5 +384,5 @@ static ALWAYS_INLINE void python_collect_stack(
     BPF_TRACE("python: Successfully read PyInterpreterFrame addr %p", py_interpreter_frame);
 
     python_reset_state(state);
-    python_walk_stack(py_interpreter_frame, config, state);
+    python_walk_stack(py_interpreter_frame, &state->config, state);
 }
