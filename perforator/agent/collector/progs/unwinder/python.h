@@ -63,13 +63,13 @@ static ALWAYS_INLINE void* python_read_previous_frame(void* frame, struct python
     long err = bpf_probe_read_user(
         &frame,
         sizeof(void*),
-        (void*) frame + config->offsets.py_interpreter_frame_offsets.previous
+        (void*) frame + config->offsets.py_frame_offsets.previous
     );
     if (err != 0) {
         metric_increment(METRIC_PYTHON_READ_PREVIOUS_FRAME_ERROR);
         BPF_TRACE(
             "python: failed to read previous frame by offset %d: %d",
-            config->offsets.py_interpreter_frame_offsets.previous,
+            config->offsets.py_frame_offsets.previous,
             err
         );
         return NULL;
@@ -79,19 +79,19 @@ static ALWAYS_INLINE void* python_read_previous_frame(void* frame, struct python
 }
 
 static ALWAYS_INLINE bool python_read_frame_owner(enum python_frame_owner* owner, void* frame, struct python_config* config) {
-    if (config->offsets.py_interpreter_frame_offsets.owner == PYTHON_UNSPECIFIED_OFFSET) {
+    if (config->offsets.py_frame_offsets.owner == PYTHON_UNSPECIFIED_OFFSET) {
         // Before Python 3.11.4
         *owner = FRAME_OWNED_BY_THREAD;
         return true;
     }
 
     // For Python versions (3.11.4+) with owner field, read it
-    long err = bpf_probe_read_user(owner, sizeof(u8), (void*) frame + config->offsets.py_interpreter_frame_offsets.owner);
+    long err = bpf_probe_read_user(owner, sizeof(u8), (void*) frame + config->offsets.py_frame_offsets.owner);
     if (err != 0) {
         metric_increment(METRIC_PYTHON_READ_FRAME_OWNER_ERROR_COUNT);
         BPF_TRACE(
             "python: failed to read frame owner at offset %d: %d",
-            config->offsets.py_interpreter_frame_offsets.owner,
+            config->offsets.py_frame_offsets.owner,
             err
         );
         return false;
@@ -107,7 +107,7 @@ static ALWAYS_INLINE void python_reset_state(struct python_state* state) {
 
     state->frame_count = 0;
     state->code_object.filename = 0;
-    state->code_object.qualname = 0;
+    state->code_object.name = 0;
 }
 
 static ALWAYS_INLINE bool python_read_code_object(struct python_code_object* result_object, struct python_config* config, void* code) {
@@ -115,13 +115,13 @@ static ALWAYS_INLINE bool python_read_code_object(struct python_code_object* res
         return false;
     }
     result_object->filename = 0;
-    result_object->qualname = 0;
+    result_object->name = 0;
 
-    long err = bpf_probe_read_user(&result_object->qualname, sizeof(void*), code + config->offsets.py_code_object_offsets.qualname);
+    long err = bpf_probe_read_user(&result_object->name, sizeof(void*), code + config->offsets.py_code_object_offsets.name);
     if (err != 0) {
         BPF_TRACE(
-            "python: failed to read qualname at offset %d: %d",
-            config->offsets.py_code_object_offsets.qualname,
+            "python: failed to read name at offset %d: %d",
+            config->offsets.py_code_object_offsets.name,
             err
         );
         return false;
@@ -137,7 +137,7 @@ static ALWAYS_INLINE bool python_read_code_object(struct python_code_object* res
         return false;
     }
 
-    BPF_TRACE("python: read filename and qualname pointers: %p, %p", result_object->filename, result_object->qualname);
+    BPF_TRACE("python: read filename and name pointers: %p, %p", result_object->filename, result_object->name);
 
     return true;
 }
@@ -200,9 +200,9 @@ static ALWAYS_INLINE bool python_read_symbol(struct python_symbol* result_symbol
         }
     }
 
-    if (code_object->qualname != 0) {
-        if (!python_read_python_ascii_string(result_symbol->qual_name, sizeof(result_symbol->qual_name), config, (void*) code_object->qualname)) {
-            BPF_TRACE("python: failed to read code object qualname");
+    if (code_object->name != 0) {
+        if (!python_read_python_ascii_string(result_symbol->name, sizeof(result_symbol->name), config, (void*) code_object->name)) {
+            BPF_TRACE("python: failed to read code object name");
             return false;
         }
     }
@@ -216,11 +216,11 @@ static ALWAYS_INLINE bool python_process_frame(struct python_frame* res_frame, v
     }
 
     void* code = NULL;
-    long err = bpf_probe_read_user(&code, sizeof(void*), (void*) frame + config->offsets.py_interpreter_frame_offsets.f_code);
+    long err = bpf_probe_read_user(&code, sizeof(void*), (void*) frame + config->offsets.py_frame_offsets.f_code);
     if (err != 0) {
         BPF_TRACE(
             "python: failed to read PyCodeObject* at offset %d: %d",
-            config->offsets.py_interpreter_frame_offsets.f_code,
+            config->offsets.py_frame_offsets.f_code,
             err
         );
         return false;
@@ -269,7 +269,7 @@ static ALWAYS_INLINE bool python_process_frame(struct python_frame* res_frame, v
 }
 
 static ALWAYS_INLINE void python_walk_stack(
-    void* py_interpreter_frame,
+    void* py_frame,
     struct python_config* config,
     struct python_state* state
 ) {
@@ -278,12 +278,12 @@ static ALWAYS_INLINE void python_walk_stack(
     }
 
     for (int i = 0; i < PYTHON_MAX_STACK_DEPTH; i++) {
-        if (py_interpreter_frame == NULL) {
+        if (py_frame == NULL) {
             break;
         }
 
         enum python_frame_owner owner = FRAME_OWNED_BY_THREAD;
-        if (!python_read_frame_owner(&owner, py_interpreter_frame, config)) {
+        if (!python_read_frame_owner(&owner, py_frame, config)) {
             break;
         }
 
@@ -298,7 +298,7 @@ static ALWAYS_INLINE void python_walk_stack(
             goto move_to_next_frame;
         }
 
-        if (!python_process_frame(&state->frames[i], py_interpreter_frame, config, state)) {
+        if (!python_process_frame(&state->frames[i], py_frame, config, state)) {
             break;
         }
         state->frame_count = i + 1;
@@ -306,7 +306,7 @@ static ALWAYS_INLINE void python_walk_stack(
         BPF_TRACE("python: Successfully processed frame %d", i);
 
 move_to_next_frame:
-        py_interpreter_frame = python_read_previous_frame(py_interpreter_frame, config);
+        py_frame = python_read_previous_frame(py_frame, config);
     }
 
     BPF_TRACE("python: Collected %d frames", state->frame_count);
@@ -376,13 +376,13 @@ static ALWAYS_INLINE void python_collect_stack(
 
     BPF_TRACE("python: Successfully extracted PyThreadState addr %p", py_thread_state_addr);
 
-    void* py_interpreter_frame = python_read_current_frame_from_thread_state(&state->config, py_thread_state_addr);
-    if (py_interpreter_frame == NULL) {
+    void* py_frame = python_read_current_frame_from_thread_state(&state->config, py_thread_state_addr);
+    if (py_frame == NULL) {
         return;
     }
 
-    BPF_TRACE("python: Successfully read PyInterpreterFrame addr %p", py_interpreter_frame);
+    BPF_TRACE("python: Successfully read python frame addr %p", py_frame);
 
     python_reset_state(state);
-    python_walk_stack(py_interpreter_frame, &state->config, state);
+    python_walk_stack(py_frame, &state->config, state);
 }

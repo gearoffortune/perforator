@@ -60,10 +60,15 @@ struct python_ascii_object_offsets {
 struct python_code_object_offsets {
     u32 co_firstlineno;
     u32 filename;
-    u32 qualname;
+    u32 name;
 };
 
-struct python_interpreter_frame_offsets {
+struct python_frame_object_offsets {
+    u32 f_code;
+    u32 f_back;
+};
+
+struct py_frame_offsets {
     u32 f_code;
     u32 previous;
     u32 owner;
@@ -82,7 +87,7 @@ struct python_internals_offsets {
     struct python_runtime_state_offsets py_runtime_state_offsets;
     struct python_thread_state_offsets py_thread_state_offsets;
     struct python_cframe_offsets py_cframe_offsets;
-    struct python_interpreter_frame_offsets py_interpreter_frame_offsets;
+    struct py_frame_offsets py_frame_offsets;
     struct python_interpreter_state_offsets py_interpreter_state_offsets;
     struct python_code_object_offsets py_code_object_offsets;
     struct python_ascii_object_offsets py_ascii_object_offsets;
@@ -110,12 +115,12 @@ struct python_symbol_key {
 
 struct python_symbol {
     char file_name[PYTHON_MAX_FILENAME_LENGTH];
-    char qual_name[PYTHON_MAX_FUNCNAME_LENGTH];
+    char name[PYTHON_MAX_FUNCNAME_LENGTH];
 };
 
 struct python_code_object {
     u64 filename;
-    u64 qualname;
+    u64 name;
 };
 
 struct python_frame {
