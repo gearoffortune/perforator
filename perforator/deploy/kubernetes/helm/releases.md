@@ -21,6 +21,10 @@ Internal changes:
 
 1: If you are sending patch to GitHub, specify PR. Otherwise (if you are sending patch to internal monorepo), leave unset and then specify Git commit.
 -->
+# Unreleased
+Breaking changes:
++ The proxy.url_prefix value is now required. Chart will fail if this value is not specified
+
 # 0.2.8
 
 Enhancements:

@@ -47,7 +47,7 @@ binary_provider:
     root_path: "/cache/binaries"
   max_simultaneous_downloads: 30
 rendered_profiles:
-  url_prefix: {{ .Values.proxy.url_prefix | quote }}
+  url_prefix: {{ include "perforator.proxy.url_prefix" . | quote }}
   bucket: {{ .Values.databases.s3.buckets.taskResults }}
 profile_blacklist:
   profiler_version:
