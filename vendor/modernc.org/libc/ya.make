@@ -2,7 +2,7 @@ GO_LIBRARY()
 
 LICENSE(BSD-3-Clause)
 
-VERSION(v1.50.3)
+VERSION(v1.50.9)
 
 SRCS(
     fsync.go
@@ -68,6 +68,31 @@ IF (OS_LINUX AND ARCH_ARM64)
         libc_unix1.go
         musl_linux_arm64.go
     )
+ENDIF()
+
+IF (OS_LINUX AND ARCH_ARM7)
+    SRCS(
+        capi_linux_arm.go
+        ccgo.go
+        etc.go
+        ioutil_linux.go
+        libc.go
+        libc32.go
+        libc_arm.go
+        libc_linux.go
+        libc_linux_arm.go
+        libc_unix.go
+        libc_unix1.go
+        mem.go
+        musl_linux_arm.go
+        printf.go
+        pthread.go
+        pthread_all.go
+        scanf.go
+        sync.go
+    )
+
+    GO_TEST_SRCS(all_test.go)
 ENDIF()
 
 IF (OS_DARWIN)
@@ -150,6 +175,7 @@ END()
 RECURSE(
     gotest
     honnef.co
+    internal
     netinet
     sys
     uuid

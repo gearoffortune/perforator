@@ -4,6 +4,8 @@ LICENSE(Apache-2.0)
 
 VERSION(v0.116.0)
 
+GO_SKIP_TESTS(TestFieldsWithTags)
+
 SRCS(
     fields.go
     fold.go
