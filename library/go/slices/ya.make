@@ -10,6 +10,7 @@ SRCS(
     intersects.go
     join.go
     map.go
+    merge_sorted.go
     reverse.go
     shuffle.go
     sort.go
@@ -25,6 +26,7 @@ GO_XTEST_SRCS(
     intersects_test.go
     join_test.go
     map_test.go
+    merge_sorted_test.go
     reverse_test.go
     shuffle_test.go
     subtract_test.go
