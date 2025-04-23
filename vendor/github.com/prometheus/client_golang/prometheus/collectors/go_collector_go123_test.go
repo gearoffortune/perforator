@@ -11,12 +11,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build go1.22 && !go1.23
-// +build go1.22,!go1.23
+//go:build go1.23 && !go1.24
+// +build go1.23,!go1.24
 
 package collectors
-
-import "sort"
 
 func withAllMetrics() []string {
 	return withBaseMetrics([]string{
@@ -54,6 +52,7 @@ func withAllMetrics() []string {
 		"go_gc_scan_stack_bytes",
 		"go_gc_scan_total_bytes",
 		"go_gc_stack_starting_size_bytes",
+		"go_godebug_non_default_behavior_asynctimerchan_events_total",
 		"go_godebug_non_default_behavior_execerrdot_events_total",
 		"go_godebug_non_default_behavior_gocachehash_events_total",
 		"go_godebug_non_default_behavior_gocachetest_events_total",
@@ -63,8 +62,8 @@ func withAllMetrics() []string {
 		"go_godebug_non_default_behavior_http2server_events_total",
 		"go_godebug_non_default_behavior_httplaxcontentlength_events_total",
 		"go_godebug_non_default_behavior_httpmuxgo121_events_total",
+		"go_godebug_non_default_behavior_httpservecontentkeepheaders_events_total",
 		"go_godebug_non_default_behavior_installgoroot_events_total",
-		"go_godebug_non_default_behavior_jstmpllitinterp_events_total",
 		"go_godebug_non_default_behavior_multipartmaxheaders_events_total",
 		"go_godebug_non_default_behavior_multipartmaxparts_events_total",
 		"go_godebug_non_default_behavior_multipathtcp_events_total",
@@ -73,9 +72,14 @@ func withAllMetrics() []string {
 		"go_godebug_non_default_behavior_randautoseed_events_total",
 		"go_godebug_non_default_behavior_tarinsecurepath_events_total",
 		"go_godebug_non_default_behavior_tls10server_events_total",
+		"go_godebug_non_default_behavior_tls3des_events_total",
 		"go_godebug_non_default_behavior_tlsmaxrsasize_events_total",
 		"go_godebug_non_default_behavior_tlsrsakex_events_total",
 		"go_godebug_non_default_behavior_tlsunsafeekm_events_total",
+		"go_godebug_non_default_behavior_winreadlinkvolume_events_total",
+		"go_godebug_non_default_behavior_winsymlink_events_total",
+		"go_godebug_non_default_behavior_x509keypairleaf_events_total",
+		"go_godebug_non_default_behavior_x509negativeserial_events_total",
 		"go_godebug_non_default_behavior_x509sha1_events_total",
 		"go_godebug_non_default_behavior_x509usefallbackroots_events_total",
 		"go_godebug_non_default_behavior_x509usepolicies_events_total",
@@ -165,6 +169,7 @@ func withSchedulerMetrics() []string {
 
 func withDebugMetrics() []string {
 	return withBaseMetrics([]string{
+		"go_godebug_non_default_behavior_asynctimerchan_events_total",
 		"go_godebug_non_default_behavior_execerrdot_events_total",
 		"go_godebug_non_default_behavior_gocachehash_events_total",
 		"go_godebug_non_default_behavior_gocachetest_events_total",
@@ -174,8 +179,8 @@ func withDebugMetrics() []string {
 		"go_godebug_non_default_behavior_http2server_events_total",
 		"go_godebug_non_default_behavior_httplaxcontentlength_events_total",
 		"go_godebug_non_default_behavior_httpmuxgo121_events_total",
+		"go_godebug_non_default_behavior_httpservecontentkeepheaders_events_total",
 		"go_godebug_non_default_behavior_installgoroot_events_total",
-		"go_godebug_non_default_behavior_jstmpllitinterp_events_total",
 		"go_godebug_non_default_behavior_multipartmaxheaders_events_total",
 		"go_godebug_non_default_behavior_multipartmaxparts_events_total",
 		"go_godebug_non_default_behavior_multipathtcp_events_total",
@@ -184,9 +189,14 @@ func withDebugMetrics() []string {
 		"go_godebug_non_default_behavior_randautoseed_events_total",
 		"go_godebug_non_default_behavior_tarinsecurepath_events_total",
 		"go_godebug_non_default_behavior_tls10server_events_total",
+		"go_godebug_non_default_behavior_tls3des_events_total",
 		"go_godebug_non_default_behavior_tlsmaxrsasize_events_total",
 		"go_godebug_non_default_behavior_tlsrsakex_events_total",
 		"go_godebug_non_default_behavior_tlsunsafeekm_events_total",
+		"go_godebug_non_default_behavior_winreadlinkvolume_events_total",
+		"go_godebug_non_default_behavior_winsymlink_events_total",
+		"go_godebug_non_default_behavior_x509keypairleaf_events_total",
+		"go_godebug_non_default_behavior_x509negativeserial_events_total",
 		"go_godebug_non_default_behavior_x509sha1_events_total",
 		"go_godebug_non_default_behavior_x509usefallbackroots_events_total",
 		"go_godebug_non_default_behavior_x509usepolicies_events_total",
@@ -194,27 +204,17 @@ func withDebugMetrics() []string {
 	})
 }
 
-var defaultRuntimeMetrics = []string{
-	"go_gc_gogc_percent",
-	"go_gc_gomemlimit_bytes",
-	"go_sched_gomaxprocs_threads",
-}
-
-func withDefaultRuntimeMetrics(metricNames []string, withoutGC, withoutSched bool) []string {
-	if withoutGC && withoutSched {
-		// If both flags are true, return the metricNames as is.
-		return metricNames
-	} else if withoutGC && !withoutSched {
-		// If only withoutGC is true, include "go_sched_gomaxprocs_threads" only.
-		metricNames = append(metricNames, []string{"go_sched_gomaxprocs_threads"}...)
-	} else if withoutSched && !withoutGC {
-		// If only withoutSched is true, exclude "go_sched_gomaxprocs_threads".
-		metricNames = append(metricNames, []string{"go_gc_gogc_percent", "go_gc_gomemlimit_bytes"}...)
-	} else {
-		// If neither flag is true, use the default metrics.
-		metricNames = append(metricNames, defaultRuntimeMetrics...)
+var (
+	defaultRuntimeMetrics = []string{
+		"go_gc_gogc_percent",
+		"go_gc_gomemlimit_bytes",
+		"go_sched_gomaxprocs_threads",
 	}
-	// sorting is required
-	sort.Strings(metricNames)
-	return metricNames
-}
+	onlyGCDefRuntimeMetrics = []string{
+		"go_gc_gogc_percent",
+		"go_gc_gomemlimit_bytes",
+	}
+	onlySchedDefRuntimeMetrics = []string{
+		"go_sched_gomaxprocs_threads",
+	}
+)
