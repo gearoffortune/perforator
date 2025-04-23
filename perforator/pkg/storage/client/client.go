@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -12,8 +11,6 @@ import (
 
 	"github.com/klauspost/compress/zstd"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/yandex/perforator/library/go/core/log"
 	"github.com/yandex/perforator/perforator/pkg/certifi"
@@ -111,14 +108,6 @@ type TvmConfig struct {
 	CacheDir         string `yaml:"cache_dir"`
 }
 
-type TLSConfig struct {
-	Enabled               bool   `yaml:"enabled"`
-	CAFile                string `yaml:"ca_file_path"`
-	ClientCertificateFile string `yaml:"certificate_file_path"`
-	ClientKeyFile         string `yaml:"key_file_path"`
-	ServerNameOverride    string `yaml:"server_name_override,omitempty"`
-}
-
 type GRPCConfig struct {
 	MaxSendMessageSize uint32 `yaml:"max_send_message_size"`
 }
@@ -143,7 +132,7 @@ func (t *Timeouts) fillDefault() {
 
 type Config struct {
 	TvmConfig          *TvmConfig                            `yaml:"tvm"`
-	TLS                TLSConfig                             `yaml:"tls"`
+	TLS                certifi.ClientTLSConfig               `yaml:"tls"`
 	GRPCConfig         GRPCConfig                            `yaml:"grpc,omitempty"`
 	EndpointSet        endpointsetresolver.EndpointSetConfig `yaml:"endpoint_set,omitempty"`
 	Host               string                                `yaml:"host,omitempty"`
@@ -189,33 +178,11 @@ func NewStorageClient(conf *Config, l xlog.Logger) (*Client, error) {
 
 	var opts []grpc.DialOption
 
-	if conf.TLS.Enabled {
-		caCertPool, err := certifi.CertPoolFromFile(conf.TLS.CAFile)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create CA certificate pool: %w", err)
-		}
-
-		tlsConf := &tls.Config{
-			RootCAs: caCertPool,
-		}
-
-		if conf.TLS.ClientCertificateFile != "" && conf.TLS.ClientKeyFile != "" {
-			cert, err := tls.LoadX509KeyPair(conf.TLS.ClientCertificateFile, conf.TLS.ClientKeyFile)
-			if err != nil {
-				return nil, fmt.Errorf("failed to load server key pair: %w", err)
-			}
-			tlsConf.Certificates = []tls.Certificate{cert}
-		}
-
-		if conf.TLS.ServerNameOverride != "" {
-			tlsConf.ServerName = conf.TLS.ServerNameOverride
-		}
-
-		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(tlsConf)))
-
-	} else {
-		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	tlsOpts, err := conf.TLS.GRPCDialOptions()
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure TLS: %w", err)
 	}
+	opts = append(opts, tlsOpts...)
 
 	opts = append(opts,
 		grpc.WithDefaultCallOptions(

@@ -3,7 +3,6 @@ package server
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -17,14 +16,12 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/yandex/perforator/library/go/core/log"
 	"github.com/yandex/perforator/library/go/core/metrics"
 	"github.com/yandex/perforator/perforator/internal/xmetrics"
-	"github.com/yandex/perforator/perforator/pkg/certifi"
 	"github.com/yandex/perforator/perforator/pkg/grpcutil/grpcmetrics"
 	"github.com/yandex/perforator/perforator/pkg/profilequerylang"
 	"github.com/yandex/perforator/perforator/pkg/sampletype"
@@ -736,29 +733,11 @@ func NewStorageServer(
 
 	var grpcOpts []grpc.ServerOption
 
-	if conf.TLS.Enabled {
-		cert, err := tls.LoadX509KeyPair(conf.TLS.CertificateFile, conf.TLS.KeyFile)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load server key pair: %w", err)
-		}
-		caCertPool, err := certifi.CertPoolFromFile(conf.TLS.ClientCAFile)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create CA certificate pool: %w", err)
-		}
-
-		tlsConf := &tls.Config{
-			Certificates: []tls.Certificate{cert},
-			ClientCAs:    caCertPool,
-		}
-
-		if conf.TLS.VerifyClient {
-			tlsConf.ClientAuth = tls.RequireAndVerifyClientCert
-		}
-
-		creds := credentials.NewTLS(tlsConf)
-		grpcOpts = append(grpcOpts, grpc.Creds(creds))
-
+	tlsOpts, err := conf.TLS.GRPCServerOptions()
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure TLS: %w", err)
 	}
+	grpcOpts = append(grpcOpts, tlsOpts...)
 
 	var unaryServerInterceptors []grpc.UnaryServerInterceptor
 	var streamServerInterceptors []grpc.StreamServerInterceptor

@@ -25,6 +25,9 @@ Internal changes:
 Breaking changes:
 + The proxy.url_prefix value is now required. Chart will fail if this value is not specified
 
+Enhancements:
++ The Agent now supports the insecureSkipVerify option for TLS when establishing connections with storage
+
 # 0.2.8
 
 Enhancements:
