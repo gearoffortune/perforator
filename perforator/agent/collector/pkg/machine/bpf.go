@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/containerd/containerd/pkg/cap"
@@ -23,10 +22,10 @@ import (
 	"github.com/yandex/perforator/library/go/core/log"
 	"github.com/yandex/perforator/library/go/core/metrics"
 	"github.com/yandex/perforator/library/go/ptr"
+	"github.com/yandex/perforator/perforator/agent/collector/pkg/machine/links"
 	"github.com/yandex/perforator/perforator/internal/unwinder"
 	"github.com/yandex/perforator/perforator/pkg/graceful"
 	"github.com/yandex/perforator/perforator/pkg/linux"
-	"github.com/yandex/perforator/perforator/pkg/linux/kallsyms"
 	"github.com/yandex/perforator/perforator/pkg/linux/procfs"
 )
 
@@ -80,31 +79,12 @@ type BPF struct {
 	partsmu              sync.RWMutex
 	unwindTableParts     map[uint32]*ebpf.Map
 
-	links programLinks
-}
-
-type programLinks struct {
-	KprobeFinishTaskSwitch  link.Link
-	TracepointSignalDeliver link.Link
-}
-
-func (p *programLinks) Close() error {
-	errs := make([]error, 0)
-
-	if p.KprobeFinishTaskSwitch != nil {
-		errs = append(errs, p.KprobeFinishTaskSwitch.Close())
-		p.KprobeFinishTaskSwitch = nil
-	}
-	if p.TracepointSignalDeliver != nil {
-		errs = append(errs, p.TracepointSignalDeliver.Close())
-		p.TracepointSignalDeliver = nil
-	}
-
-	return errors.Join(errs...)
+	links *links.Links
 }
 
 func NewBPF(conf *Config, log log.Logger, metrics metrics.Registry) (*BPF, error) {
 	metrics = metrics.WithPrefix("bpf")
+
 	b := &BPF{
 		conf: conf,
 		log:  log.WithName("BPF"),
@@ -118,6 +98,8 @@ func NewBPF(conf *Config, log log.Logger, metrics metrics.Registry) (*BPF, error
 		metrics: metrics,
 
 		unwindTableParts: make(map[uint32]*ebpf.Map),
+
+		links: links.NewLinks(log),
 	}
 
 	err := b.initialize()
@@ -156,7 +138,12 @@ func (b *BPF) initialize() (err error) {
 
 	err = b.setupProgramsUnsafe(b.conf.Debug)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to setup programs: %w", err)
+	}
+
+	err = b.setupProgramLinks()
+	if err != nil {
+		return fmt.Errorf("failed to setup links: %w", err)
 	}
 
 	b.log.Info("Successfully initialized eBPF program")
@@ -288,6 +275,7 @@ func (b *BPF) setupMaps(debug bool) (err error) {
 // setupProgramsUnsafe requires b.progsmu to be locked.
 // Close any existing programs and load the new programs, probably in the debug mode.
 // This routine can be used for online program debugging without restarts.
+// Note: this does not reload links, user should do it separately (via setupProgramLinks or b.links.Reload)
 func (b *BPF) setupProgramsUnsafe(debug bool) (err error) {
 	if b.progs != nil {
 		err = b.progs.Close()
@@ -330,61 +318,33 @@ func (b *BPF) setupProgramsUnsafe(debug bool) (err error) {
 		return err
 	}
 
-	err = b.setupProgramLinks()
-	if err != nil {
-		return fmt.Errorf("failed to setup links: %w", err)
-	}
-
 	return nil
 }
 
-func (b *BPF) attachDynamicKprobe(name string, prog *ebpf.Program, opts *link.KprobeOptions) (link.Link, error) {
-	resolver, err := kallsyms.DefaultKallsymsResolver()
-	if err != nil {
-		return nil, err
-	}
-	symbols, err := resolver.LookupSymbolRegex(name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to lookup kprobe %s: %w", name, err)
-	}
-
-	errs := make([]error, 0)
-	for _, symbol := range symbols {
-		link, err := link.Kprobe(symbol, prog, opts)
-		if err == nil {
-			b.log.Debug("Found dynamic kprobe target", log.String("regex", name), log.String("symbol", symbol))
-			return link, nil
-		}
-		errs = append(errs, err)
-	}
-
-	return nil, fmt.Errorf("failed to attach kprobe %s: %w", name, errors.Join(errs...))
-}
-
 func (b *BPF) setupProgramLinks() (err error) {
+	if err := b.links.Close(); err != nil {
+		b.log.Warn("Failed to close previous links", log.Error(err))
+	}
+
+	defer func() {
+		if err != nil {
+			err = b.links.Close()
+			b.log.Warn("Failed to close links on error", log.Error(err))
+		}
+	}()
+
 	if enabled := b.conf.TraceWallTime; enabled != nil && *enabled {
-		// See https://github.com/iovisor/bcc/pull/3315
-		b.links.KprobeFinishTaskSwitch, err = b.attachDynamicKprobe(`^finish_task_switch(\.isra\.\d+)?$`, b.progs.PerforatorFinishTaskSwitch, nil)
+		err = b.links.Kprobe(`^finish_task_switch(\.isra\.\d+)?$`, b.progs.PerforatorFinishTaskSwitch)
 		if err != nil {
 			return fmt.Errorf("failed to setup kprobe finish_task_switch link: %w", err)
 		}
-		defer func() {
-			if err != nil {
-				_ = b.links.KprobeFinishTaskSwitch.Close()
-			}
-		}()
 	}
 
 	if enabled := b.conf.TraceSignals; enabled != nil && *enabled {
-		b.links.TracepointSignalDeliver, err = link.Tracepoint("signal", "signal_deliver", b.progs.PerforatorSignalDeliver, nil)
+		err = b.links.Tracepoint("signal", "signal_deliver", b.progs.PerforatorSignalDeliver)
 		if err != nil {
 			return fmt.Errorf("failed to setup tracepoint signal_deliver link: %w", err)
 		}
-		defer func() {
-			if err != nil {
-				_ = b.links.TracepointSignalDeliver.Close()
-			}
-		}()
 	}
 
 	return nil
@@ -457,7 +417,12 @@ func (b *BPF) ReloadProgram(debug bool) error {
 	}
 	b.progdebug = debug
 
-	return b.setupProgramsUnsafe(debug)
+	err := b.setupProgramsUnsafe(debug)
+	if err != nil {
+		return fmt.Errorf("failed to reload program: %w", err)
+	}
+
+	return b.links.Reload(b.progs.PerforatorSignalDeliver, b.progs.PerforatorFinishTaskSwitch)
 }
 
 func (b *BPF) UpdateConfig(conf *unwinder.ProfilerConfig) error {
