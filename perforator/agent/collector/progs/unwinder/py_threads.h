@@ -28,26 +28,34 @@ static ALWAYS_INLINE void* python_read_py_thread_state_ptr_static_tls(u64 offset
     return py_thread_state_addr;
 }
 
-static ALWAYS_INLINE bool read_tss_key(u32* key_dst, struct python_state* state) {
+static ALWAYS_INLINE bool read_tss_key(i32* key_dst, struct python_state* state) {
     if (state == NULL || key_dst == NULL || state->auto_tss_key_address == 0) {
         return false;
     }
 
-    u32 is_initialized = 0;
-    long err = bpf_probe_read_user(&is_initialized, sizeof(u32), (void*) (state->auto_tss_key_address + state->config.offsets.py_tss_t_offsets.is_initialized));
+    long err;
+    if (state->config.offsets.py_tss_t_offsets.is_initialized != PYTHON_UNSPECIFIED_OFFSET) {
+        u32 is_initialized = 0;
+        err = bpf_probe_read_user(&is_initialized, sizeof(u32), (void*) (state->auto_tss_key_address + state->config.offsets.py_tss_t_offsets.is_initialized));
+        if (err != 0) {
+            BPF_TRACE("python: failed to read is_initialized at address %p: %d", state->auto_tss_key_address + state->config.offsets.py_tss_t_offsets.is_initialized, err);
+            return false;
+        }
+
+        if (is_initialized == 0) {
+            BPF_TRACE("python: tss is not initialized, auto tss key address %p, offset %d", state->auto_tss_key_address, state->config.offsets.py_tss_t_offsets.is_initialized);
+            return false;
+        }
+    }
+
+    u32 extra_offset =  (state->config.offsets.py_tss_t_offsets.key != PYTHON_UNSPECIFIED_OFFSET) ? state->config.offsets.py_tss_t_offsets.key : 0;
+    err = bpf_probe_read_user(key_dst, sizeof(i32), (void*) (state->auto_tss_key_address + extra_offset));
     if (err != 0) {
-        BPF_TRACE("python: failed to read is_initialized at address %p: %d", state->auto_tss_key_address + state->config.offsets.py_tss_t_offsets.is_initialized, err);
+        BPF_TRACE("python: failed to read tss key at address %p: %d", state->auto_tss_key_address + extra_offset, err);
         return false;
     }
 
-    if (is_initialized == 0) {
-        BPF_TRACE("python: tss is not initialized, auto tss key address %p, offset %d", state->auto_tss_key_address, state->config.offsets.py_tss_t_offsets.is_initialized);
-        return false;
-    }
-
-    err = bpf_probe_read_user(key_dst, sizeof(u32), (void*) (state->auto_tss_key_address + state->config.offsets.py_tss_t_offsets.key));
-    if (err != 0) {
-        BPF_TRACE("python: failed to read tss key at address %p: %d", state->auto_tss_key_address + state->config.offsets.py_tss_t_offsets.key, err);
+    if (*key_dst < 0) {
         return false;
     }
 
@@ -64,7 +72,7 @@ static ALWAYS_INLINE void* python_read_py_thread_state_ptr_pthread_tss(struct py
         return NULL;
     }
 
-    u32 tss_key = 0;
+    i32 tss_key = 0;
     if (!read_tss_key(&tss_key, state)) {
         BPF_TRACE("python: failed to read tss key");
         return NULL;
@@ -72,7 +80,7 @@ static ALWAYS_INLINE void* python_read_py_thread_state_ptr_pthread_tss(struct py
 
     BPF_TRACE("python: read tss key %u", tss_key);
 
-    return pthread_read_tss(&state->pthread_config, tss_key);
+    return pthread_read_tss(&state->pthread_config, (u32) tss_key);
 }
 
 static ALWAYS_INLINE void* python_read_py_thread_state_ptr_from_tls(struct python_state* state) {
