@@ -1,3 +1,7 @@
 TS_TSC()
 NO_LINT()
 END()
+
+RECURSE_FOR_TESTS(
+tests
+)
