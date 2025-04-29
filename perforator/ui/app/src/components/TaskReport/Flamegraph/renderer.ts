@@ -459,7 +459,7 @@ export const renderFlamegraph: RenderFlamegraphType = (
 
     const hl = findElement('highlight');
     const labels = findElement('labels-container');
-    const labelTemplate = findElement('label-template');
+    const labelTemplate = findElement('label-template') as HTMLTemplateElement;
     const status = findElement('status');
     const annotations = findElement('annotations');
     const content = findElement('content');
@@ -503,8 +503,9 @@ export const renderFlamegraph: RenderFlamegraphType = (
     const getNodeTitle = getNodeTitleFull.bind(null, readString, maybeShorten);
 
     function drawLabel(text: string, x: number, y: number, w: number, opacity: string, color: string) {
-        const node = labelTemplate.firstChild!.cloneNode(true) as HTMLDivElement;
-        node.firstChild!.textContent = text;
+        const dFragment = labelTemplate.content.cloneNode(true) as DocumentFragment;
+        const node = dFragment.firstElementChild as HTMLDivElement;
+        node.firstElementChild!.textContent = text;
         node.style.top = y + canvas.offsetTop + 'px';
         node.style.left = x + canvas.offsetLeft + 'px';
         node.style.width = w + 'px';

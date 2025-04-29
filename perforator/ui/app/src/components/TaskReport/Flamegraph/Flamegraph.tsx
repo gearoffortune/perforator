@@ -205,11 +205,10 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
                     <div ref={canvasRef} onClickCapture={handleOutsideContextMenu} onContextMenu={handleContextMenu}>
                         <canvas className="flamegraph__canvas" />
                     </div>
-                    <template className="flamegraph__label-template">
-                        <div className="flamegraph__label">
-                            <span />
-                        </div>
-                    </template>
+                    <template className="flamegraph__label-template" dangerouslySetInnerHTML={{ __html: `
+                    <div class="flamegraph__label">
+                        <span></span>
+                    </div>` }}/>
                     <div className="flamegraph__labels-container" />
                     <div className='flamegraph__highlight'>
                         <span />
