@@ -4,7 +4,10 @@
   "description": "Yandex perforator flamegraph UI rendering library",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "type": "module",
   "devDependencies": {
+    "@types/react": "19.1.2",
+    "@types/react-dom": "19.1.2",
     "typescript": "5.3.3"
   },
   "scripts": {
@@ -22,5 +25,12 @@
   "bugs": {
     "url": "https://github.com/yandex/perforator/issues"
   },
-  "homepage": "https://github.com/yandex/perforator#readme"
+  "homepage": "https://github.com/yandex/perforator#readme",
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "dependencies": {
+    "culori": "4.0.1"
+  }
 }

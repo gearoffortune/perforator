@@ -2,13 +2,17 @@
     "include": [
         "lib/**/*"
     ],
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "rootDir": "./lib",
     "compilerOptions": {
-        "module": "ES2020",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
         "rootDir": "./lib",
         "allowJs": true,
         "outDir": "dist",
         "declaration": true,
-        "declarationDir": "dist"
+        "declarationDir": "dist",
+        "jsx": "react",
+        "target": "es2020"
     }
 }
