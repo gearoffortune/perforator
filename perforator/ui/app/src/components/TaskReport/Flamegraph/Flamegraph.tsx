@@ -1,11 +1,6 @@
 import React, { useState } from 'react';
 
-import { Xmark } from '@gravity-ui/icons';
-import BarsAscendingAlignLeftArrowUpIcon from '@gravity-ui/icons/svgs/bars-ascending-align-left-arrow-up.svg?raw';
-import BarsDescendingAlignLeftArrowDownIcon from '@gravity-ui/icons/svgs/bars-descending-align-left-arrow-down.svg?raw';
-import FunnelIcon from '@gravity-ui/icons/svgs/funnel.svg?raw';
-import FunnelXmarkIcon from '@gravity-ui/icons/svgs/funnel-xmark.svg?raw';
-import MagnifierIcon from '@gravity-ui/icons/svgs/magnifier.svg?raw';
+import { BarsAscendingAlignLeftArrowUp, BarsDescendingAlignLeftArrowDown, Funnel, FunnelXmark, Magnifier, Xmark } from '@gravity-ui/icons';
 import { Button, Icon } from '@gravity-ui/uikit';
 
 import { Hotkey } from 'src/components/Hotkey/Hotkey';
@@ -158,16 +153,16 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
                     <h3 className="flamegraph__title">Flame Graph</h3>
                     <div className="flamegraph__buttons">
                         <Button className="flamegraph__button flamegraph__button_reverse" onClick={handleReverse}>
-                            <Icon data={reverse ? BarsDescendingAlignLeftArrowDownIcon : BarsAscendingAlignLeftArrowUpIcon}/> Reverse
+                            <Icon data={reverse ? BarsDescendingAlignLeftArrowDown : BarsAscendingAlignLeftArrowUp}/> Reverse
                         </Button>
                         <Button className="flamegraph__button flamegraph__button_search" onClick={handleSearch}>
-                            <Icon className="regexp-dialog__header-icon" data={MagnifierIcon}/>
+                            <Icon className="regexp-dialog__header-icon" data={Magnifier}/>
                         Search
                             <Hotkey value="cmd+F" />
                         </Button>
                         {search ?
                             <Button onClick={switchKeepOnlyFound}>
-                                <Icon data={keepOnlyFound ? FunnelXmarkIcon : FunnelIcon}/>
+                                <Icon data={keepOnlyFound ? FunnelXmark : Funnel}/>
                                 {keepOnlyFound ? 'Show all stacks' : 'Show matched stacks'}
                                 <Hotkey value="alt+F"/>
                             </Button>

@@ -1,6 +1,6 @@
 import React from 'react';
 
-import CopyCheckIcon from '@gravity-ui/icons/svgs/copy-check.svg?raw';
+import { CopyCheck } from '@gravity-ui/icons';
 import type { MenuItemProps, PopupProps } from '@gravity-ui/uikit';
 import { CopyToClipboard, Icon, Menu, Popup } from '@gravity-ui/uikit';
 
@@ -54,7 +54,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ popupData, anchorRef, 
                 {() => <Menu.Item
                     {...commonButtonProps}
                     onClick={() => {
-                        createSuccessToast({ renderIcon: () => <Icon data={CopyCheckIcon}/>, name: 'copy', content: 'Name copied to clipboard' });
+                        createSuccessToast({ renderIcon: () => <Icon data={CopyCheck}/>, name: 'copy', content: 'Name copied to clipboard' });
                         onClosePopup();
                     }}
                 >
@@ -77,7 +77,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ popupData, anchorRef, 
                     {() => <Menu.Item
                         {...commonButtonProps}
                         onClick={() => {
-                            createSuccessToast({ renderIcon: () => <Icon data={CopyCheckIcon}/>, name: 'copy', content: 'File path copied to clipboard' });
+                            createSuccessToast({ renderIcon: () => <Icon data={CopyCheck}/>, name: 'copy', content: 'File path copied to clipboard' });
                             onClosePopup();
                         }}
                     >

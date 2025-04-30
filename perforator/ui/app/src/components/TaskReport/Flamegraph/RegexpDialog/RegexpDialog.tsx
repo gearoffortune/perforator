@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import MagnifierIcon from '@gravity-ui/icons/svgs/magnifier.svg?raw';
+import { Magnifier } from '@gravity-ui/icons';
 import { Checkbox, Dialog, Icon, TextInput } from '@gravity-ui/uikit';
 
 import { useRegexError } from './useRegexError';
@@ -47,7 +47,7 @@ export function RegexpDialog({ showDialog, onCloseDialog, onSearchUpdate, initia
     };
     return (
         <Dialog className="regexp-dialog__dialog" size="l" open={showDialog} onClose={onCloseDialog}>
-            <Dialog.Header insertBefore={<Icon className="regexp-dialog__header-icon" data={MagnifierIcon}/>} caption="Search"/>
+            <Dialog.Header insertBefore={<Icon className="regexp-dialog__header-icon" data={Magnifier}/>} caption="Search"/>
             <Dialog.Body>
                 <TextInput
                     note={'Regular expressions are supported'}

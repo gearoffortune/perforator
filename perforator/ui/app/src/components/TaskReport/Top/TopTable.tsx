@@ -1,8 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 
 import { HelpPopover } from '@gravity-ui/components';
-import ArrowUpRightFromSquareIcon from '@gravity-ui/icons/svgs/arrow-up-right-from-square.svg?raw';
-import MagnifierIcon from '@gravity-ui/icons/svgs/magnifier.svg?raw';
+import { ArrowUpRightFromSquare, Magnifier } from '@gravity-ui/icons';
 import type { ProgressColorStops, TableColumnConfig, TableSettingsData, TableSortState } from '@gravity-ui/uikit';
 import { Icon, Link as UIKitLink, Progress, Table, TextInput, withTableSettings, withTableSorting } from '@gravity-ui/uikit';
 
@@ -193,11 +192,11 @@ function topColumns (
                 </span>
                 {name.slice(end)}
                 <Link className={'top-table__column-icon-link'} href={createNewQueryForSwitch(name)}>
-                    <Icon className={'top-table__column-icon'} data={MagnifierIcon}/>
+                    <Icon className={'top-table__column-icon'} data={Magnifier}/>
                 </Link>
 
                 {goToLink && <UIKitLink className={'top-table__column-icon-link'} target="_blank" href={goToLink}>
-                    <Icon className={'top-table__column-icon'} data={ArrowUpRightFromSquareIcon} />
+                    <Icon className={'top-table__column-icon'} data={ArrowUpRightFromSquare} />
                 </UIKitLink>}
             </span>
         );
