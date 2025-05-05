@@ -201,10 +201,12 @@ func (s *StorageServer) fixupMissingMetadataFields(meta *profilemeta.ProfileMeta
 		meta.System = "perforator"
 	}
 	if meta.Cluster == "" {
-		if s.opts.ClusterName != "" {
+		// We want to prioritize cluster label received from agent
+		// If it is empty, we fall back to user-provided cluster name on storage side
+		if val := meta.Attributes["cluster"]; val != "" {
+			meta.Cluster = val
+		} else if s.opts.ClusterName != "" {
 			meta.Cluster = s.opts.ClusterName
-		} else {
-			meta.Cluster = meta.Attributes["cluster"]
 		}
 	}
 	if meta.NodeID == "" {
