@@ -1187,7 +1187,7 @@
     "title": "ESLint",
     "description": "Статический анализатор кода (линтер).\n\nОсуществляет поиск, а иногда и исправление частых ошибок.\nМожет следить за стилем кода, форматированием.\n\nРасширяем плагинами (Typescript, Prettier, Stylelint).\n\n[Подробнее про линтинг в tier-0](https://docs.yandex-team.ru/frontend-in-arcadia/index/quick-start#lint)",
     "type": "NPM_PACKAGE",
-    "default": "9.24.0",
+    "default": "9.25.1",
     "links": {
       "Home": "https://eslint.org",
       "Sources": "https://github.com/eslint/eslint",
@@ -1196,6 +1196,10 @@
     },
     "useDirectly": true,
     "versions": {
+      "9.25.1": {
+        "add_date": "2025-05-06T05:32:53",
+        "resources": []
+      },
       "9.24.0": {
         "add_date": "2025-04-22T05:30:34",
         "resources": []
@@ -1549,7 +1553,7 @@
     "title": "Next.js",
     "description": "Сборщик-бандлер от проекта Next.js\n\nОчень opinionated, но кому-то подходит.\n\nВ tier-0 используется в модуле/макросе [`TS_NEXT()`](https://docs.yandex-team.ru/frontend-in-arcadia/references/TS_NEXT).",
     "type": "NPM_PACKAGE",
-    "default": "15.3.0",
+    "default": "15.3.1",
     "links": {
       "Home": "https://nextjs.org",
       "Sources": "https://github.com/vercel/next.js",
@@ -1558,6 +1562,10 @@
     },
     "useDirectly": true,
     "versions": {
+      "15.3.1": {
+        "add_date": "2025-05-06T05:33:21",
+        "resources": []
+      },
       "15.3.0": {
         "add_date": "2025-04-29T05:30:52",
         "resources": []
@@ -4199,7 +4207,7 @@
   "playwright": {
     "description": "Раннер для тестов Playwright, позволяет выполнять end-to-end тесты с учётом специфики различных браузеров и устройств",
     "type": "NPM_PACKAGE",
-    "default": "1.51.1",
+    "default": "1.52.0",
     "links": {
       "Home": "https://playwright.dev/",
       "Sources": "https://github.com/microsoft/playwright",
@@ -4209,6 +4217,10 @@
     "specifier": ">=1.41.2",
     "useDirectly": true,
     "versions": {
+      "1.52.0": {
+        "add_date": "2025-05-06T05:41:00",
+        "resources": []
+      },
       "1.51.1": {
         "add_date": "2025-04-01T05:38:53",
         "resources": []
@@ -4812,7 +4824,7 @@
     "title": "Vite",
     "description": "Современный сборщик frontend проектов\n\nПод капотом используется более низкоуровневый сборщик [rollup](https://rollupjs.org/).\n\nДля транспиляции TypeScript может использовать нативные способы: [esbuild](https://esbuild.github.io/), [SWC](https://swc.rs/)\n\nПоэтому, если требуется использовать `rollup` или `esbuild`/`SWC` на проекте - то `vite` - ваш выбор.\n\nВ tier-0 используется в модуле/макросе [`TS_VITE()`](https://docs.yandex-team.ru/frontend-in-arcadia/references/TS_VITE).",
     "type": "NPM_PACKAGE",
-    "default": "6.2.6",
+    "default": "6.3.2",
     "links": {
       "Home": "https://vitejs.dev/",
       "Sources": "https://github.com/vitejs/vite/tree/main",
@@ -4822,6 +4834,10 @@
     },
     "useDirectly": true,
     "versions": {
+      "6.3.2": {
+        "add_date": "2025-05-06T05:41:28",
+        "resources": []
+      },
       "6.2.6": {
         "add_date": "2025-04-29T05:31:49",
         "resources": []
