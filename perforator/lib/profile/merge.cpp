@@ -349,7 +349,7 @@ public:
     {}
 
     void Finish() {
-        Builder_.Finish();
+        std::move(Builder_).Finish();
     }
 
     void Add(const NProto::NProfile::Profile& proto) {
@@ -375,7 +375,7 @@ void TProfileMerger::Add(const NProto::NProfile::Profile& proto) {
     return Impl_->Add(proto);
 }
 
-void TProfileMerger::Finish() {
+void TProfileMerger::Finish() && {
     return Impl_->Finish();
 }
 
@@ -390,7 +390,7 @@ void MergeProfiles(
     for (auto& profile : profiles) {
         merger.Add(profile);
     }
-    merger.Finish();
+    std::move(merger).Finish();
 }
 
 ////////////////////////////////////////////////////////////////////////////////

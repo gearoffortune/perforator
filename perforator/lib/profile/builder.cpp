@@ -638,7 +638,7 @@ TSampleId TProfileBuilder::AddSample(const TSampleInfo& info) {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void TProfileBuilder::Finish() {
+void TProfileBuilder::Finish() && {
     return Impl_->Finish();
 }
 

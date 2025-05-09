@@ -260,6 +260,7 @@ public:
         ConvertLocations();
         ConvertComments();
         ConvertSamples();
+        std::move(Builder_).Finish();
     }
 
 private:

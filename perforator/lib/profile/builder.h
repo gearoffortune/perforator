@@ -216,7 +216,7 @@ public:
     TSampleBuilder AddSample();
     TSampleId AddSample(const TSampleInfo& info);
 
-    void Finish();
+    void Finish() &&;
 
 public:
     class TMetadataBuilder {

@@ -249,7 +249,7 @@ int main(int argc, const char* argv[]) {
                     merger.Add(profile);
                 }
 
-                merger.Finish();
+                std::move(merger).Finish();
             });
         }
 
@@ -268,7 +268,7 @@ int main(int argc, const char* argv[]) {
         for (auto& profile : profiles) {
             merger.Add(profile);
         }
-        merger.Finish();
+        std::move(merger).Finish();
 
         TFileOutput out{argv[2]};
         merged.SerializeToArcadiaStream(&out);
@@ -299,7 +299,7 @@ int main(int argc, const char* argv[]) {
             Cerr << "Merged profile #" << cnt++ << Endl;
         }
 
-        merger.Finish();
+        std::move(merger).Finish();
 
         TFileOutput out{argv[2]};
         merged.SerializeToArcadiaStream(&out);
