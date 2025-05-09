@@ -4594,7 +4594,7 @@
     "title": "Stylelint",
     "description": "Инструмент для линтинга файлов стилей.\n\nИспользуется в макросе [TS_STYLELINT()](https://docs.yandex-team.ru/frontend-in-arcadia/references/macros#ts-stylelint).",
     "type": "NPM_PACKAGE",
-    "default": "16.18.0",
+    "default": "16.19.0",
     "links": {
       "Home": "https://stylelint.io/",
       "Sources": "https://github.com/stylelint/stylelint",
@@ -4604,6 +4604,10 @@
     },
     "useDirectly": true,
     "versions": {
+      "16.19.0": {
+        "add_date": "2025-05-09T12:59:51",
+        "resources": []
+      },
       "16.18.0": {
         "add_date": "2025-04-22T05:31:02",
         "resources": []
@@ -4824,7 +4828,7 @@
     "title": "Vite",
     "description": "Современный сборщик frontend проектов\n\nПод капотом используется более низкоуровневый сборщик [rollup](https://rollupjs.org/).\n\nДля транспиляции TypeScript может использовать нативные способы: [esbuild](https://esbuild.github.io/), [SWC](https://swc.rs/)\n\nПоэтому, если требуется использовать `rollup` или `esbuild`/`SWC` на проекте - то `vite` - ваш выбор.\n\nВ tier-0 используется в модуле/макросе [`TS_VITE()`](https://docs.yandex-team.ru/frontend-in-arcadia/references/TS_VITE).",
     "type": "NPM_PACKAGE",
-    "default": "6.3.2",
+    "default": "6.3.3",
     "links": {
       "Home": "https://vitejs.dev/",
       "Sources": "https://github.com/vitejs/vite/tree/main",
@@ -4834,6 +4838,10 @@
     },
     "useDirectly": true,
     "versions": {
+      "6.3.3": {
+        "add_date": "2025-05-09T13:00:08",
+        "resources": []
+      },
       "6.3.2": {
         "add_date": "2025-05-06T05:41:28",
         "resources": []
