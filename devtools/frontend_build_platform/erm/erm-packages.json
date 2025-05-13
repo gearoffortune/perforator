@@ -4644,7 +4644,7 @@
     "title": "Stylelint",
     "description": "Инструмент для линтинга файлов стилей.\n\nИспользуется в макросе [TS_STYLELINT()](https://docs.yandex-team.ru/frontend-in-arcadia/references/macros#ts-stylelint).",
     "type": "NPM_PACKAGE",
-    "default": "16.19.0",
+    "default": "16.19.1",
     "links": {
       "Home": "https://stylelint.io/",
       "Sources": "https://github.com/stylelint/stylelint",
@@ -4654,6 +4654,10 @@
     },
     "useDirectly": true,
     "versions": {
+      "16.19.1": {
+        "add_date": "2025-05-13T05:32:08",
+        "resources": []
+      },
       "16.19.0": {
         "add_date": "2025-05-09T12:59:51",
         "resources": []
@@ -5186,7 +5190,7 @@
     "title": "webpack",
     "description": "Классический сборщик frontend проектов\n\nВ tier-0 используется в модуле/макросе [`TS_WEBPACK()`](https://docs.yandex-team.ru/frontend-in-arcadia/references/TS_WEBPACK).",
     "type": "NPM_PACKAGE",
-    "default": "5.99.6",
+    "default": "5.99.7",
     "links": {
       "Home": "https://webpack.js.org",
       "Sources": "https://github.com/webpack/webpack",
@@ -5196,6 +5200,10 @@
     },
     "useDirectly": true,
     "versions": {
+      "5.99.7": {
+        "add_date": "2025-05-13T05:32:48",
+        "resources": []
+      },
       "5.99.6": {
         "add_date": "2025-05-06T05:41:41",
         "resources": []
