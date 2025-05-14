@@ -221,7 +221,15 @@ export class FlamegraphOffseter {
                 node.omittedSampleCount = node.sampleCount;
             }
         }
-        const maxH = Math.max.apply(null, keepCoordinates.map(([h, _i]) => h));
+
+        let maxH = 0;
+        for(let i = 0; i < keepCoordinates.length; i++){
+            const h = keepCoordinates[i][0];
+            if(h > maxH){
+                maxH = h;
+            }
+        }
+
         const keptCoordinatesByHs = makeByH(keepCoordinates);
 
         for (let h = maxH; h >= 0; h--) {
