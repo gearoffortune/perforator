@@ -1,4 +1,4 @@
-import type { StringifiedNode } from 'src/models/Profile';
+import type { StringifiedNode } from './models/Profile';
 
 
 export const getAtLessPath = (node: StringifiedNode) => {

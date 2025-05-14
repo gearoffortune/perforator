@@ -1,3 +1,4 @@
+import * as React from 'react'
 import { useCallback, useEffect, useState } from 'react';
 
 import { Magnifier } from '@gravity-ui/icons';
@@ -5,7 +6,7 @@ import { Checkbox, Dialog, Icon, TextInput } from '@gravity-ui/uikit';
 
 import { useRegexError } from './useRegexError';
 
-import './RegexpDialog.scss';
+import './RegexpDialog.css';
 
 
 interface RegexpDialogProps {

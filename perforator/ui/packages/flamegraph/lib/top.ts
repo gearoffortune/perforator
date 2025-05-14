@@ -1,6 +1,6 @@
-import type { FormatNode, ProfileData, StringifiableFields } from 'src/models/Profile';
+import type { FormatNode, ProfileData, StringifiableFields } from './models/Profile';
 
-import type { H, I } from '../renderer';
+import type { H, I } from './renderer';
 
 import type { TopKeys } from './top-types';
 

@@ -13,7 +13,6 @@
 // * rewritten the render logic with higher order functions
 // * added different titles for hover and status
 
-// import { uiFactory } from 'src/factory/index';
 import type { FormatNode, ProfileData } from './models/Profile';
 
 import { hugenum } from './flame-utils';

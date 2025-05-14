@@ -1,4 +1,4 @@
-import type { ProfileData, StringifiedNode } from 'src/models/Profile';
+import type { ProfileData, StringifiedNode } from './models/Profile';
 
 
 export function readNodeStrings(data: ProfileData, coords: { h: number; i: number}): StringifiedNode {

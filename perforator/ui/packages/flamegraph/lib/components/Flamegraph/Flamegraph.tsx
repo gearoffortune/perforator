@@ -1,21 +1,23 @@
-import React, { useState } from 'react';
+import * as React from 'react'
+import {useState} from 'react'
 
 import { BarsAscendingAlignLeftArrowUp, BarsDescendingAlignLeftArrowDown, Funnel, FunnelXmark, Magnifier, Xmark } from '@gravity-ui/icons';
 import { Button, Icon } from '@gravity-ui/uikit';
 
-import { Hotkey } from 'src/components/Hotkey/Hotkey';
-import type { ProfileData } from 'src/models/Profile';
-import type { UserSettings } from 'src/providers/UserSettingsProvider/UserSettings.ts';
+import { Hotkey } from '../Hotkey/Hotkey';
+import type { ProfileData } from '../../models/Profile';
+import type { UserSettings } from '../../models/UserSettings';
 
-import type { PopupData } from './ContextMenu.tsx';
-import { ContextMenu } from './ContextMenu.tsx';
-import { useTypedQuery } from './query-utils.ts';
-import { RegexpDialog } from './RegexpDialog/RegexpDialog.tsx';
-import type { QueryKeys } from './renderer.ts';
-import { FlamegraphOffseter, renderFlamegraph as newFlame } from './renderer.ts';
-import { readNodeStrings } from './utils/read-string.ts';
+import type { ContextMenuProps, PopupData } from './ContextMenu';
+import { ContextMenu } from './ContextMenu';
+import { RegexpDialog } from '../RegexpDialog/RegexpDialog';
+import type { QueryKeys } from '../../renderer';
+import { FlamegraphOffseter, renderFlamegraph as newFlame } from '../../renderer';
+import { readNodeStrings } from '../../read-string';
 
-import './Flamegraph.scss';
+import './Flamegraph.css';
+import { GoToDefinitionHref } from '../../models/goto';
+import { GetStateFromQuery, SetStateFromQuery } from '../../query-utils';
 
 
 export interface FlamegraphProps {
@@ -23,12 +25,16 @@ export interface FlamegraphProps {
     theme: 'light' | 'dark';
     userSettings: UserSettings;
     profileData: ProfileData | null;
+    goToDefinitionHref: GoToDefinitionHref;
+    onFinishRendering?: () => void;
+    onSuccess: ContextMenuProps['onSuccess']   
+    getState: GetStateFromQuery<QueryKeys>;
+    setState: SetStateFromQuery<QueryKeys>;
 }
 
-export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSettings, profileData }) => {
+export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSettings, profileData, goToDefinitionHref, onFinishRendering, onSuccess, getState: getQuery, setState: setQuery }) => {
     const flamegraphContainer = React.useRef<HTMLDivElement | null>(null);
     const canvasRef = React.useRef<HTMLDivElement | null>(null);
-    const [getQuery, setQuery] = useTypedQuery<QueryKeys>();
     const [popupData, setPopupData] = useState<null | PopupData>(null);
     const [showDialog, setShowDialog] = useState(false);
     const flamegraphOffsets = React.useRef<FlamegraphOffseter | null>(null);
@@ -80,11 +86,12 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
                 setState: setQuery,
                 getState: getQuery,
                 theme,
-                userSettings,
+                shortenFrameTexts: userSettings.shortenFrameTexts,
                 isDiff,
                 searchPattern: search ? exactMatch === 'true' ? decodeURIComponent(search) : RegExp(decodeURIComponent(search)) : null,
                 reverse,
                 keepOnlyFound,
+                onFinishRendering
             };
 
             return newFlame(flamegraphContainer.current, profileData, flamegraphOffsets.current, renderOptions);
@@ -211,7 +218,15 @@ export const Flamegraph: React.FC<FlamegraphProps> = ({ isDiff, theme, userSetti
                 </div>
             </div>
             {popupData && (
-                <ContextMenu onClosePopup={() => {setPopupData(null);}} popupData={popupData} anchorRef={canvasRef} getQuery={getQuery} setQuery={setQuery} />
+                <ContextMenu 
+                onSuccess={onSuccess} 
+                onClosePopup={() => {setPopupData(null);}} 
+                popupData={popupData} 
+                anchorRef={canvasRef} 
+                getQuery={getQuery} 
+                setQuery={setQuery} 
+                goToDefinitionHref={goToDefinitionHref} 
+                />
             )}
         </>
     );

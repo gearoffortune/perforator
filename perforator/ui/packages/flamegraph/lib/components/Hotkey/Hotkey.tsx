@@ -2,7 +2,7 @@ import React from 'react';
 
 import { Hotkey as GravityHotkey } from '@gravity-ui/uikit';
 
-import './Hotkey.scss';
+import './Hotkey.css';
 
 
 export interface HotkeyProps {

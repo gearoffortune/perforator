@@ -2,7 +2,7 @@ import React from 'react';
 
 import { Progress, type Stack as ProgressStack } from '@gravity-ui/uikit';
 
-import './NegativePositiveProgress.scss';
+import './NegativePositiveProgress.css';
 
 
 export type NegativePositiveProgressProps = {

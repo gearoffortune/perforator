@@ -1,35 +1,34 @@
-import React from 'react';
+import * as React from 'react'
 
 import { CopyCheck } from '@gravity-ui/icons';
-import type { MenuItemProps, PopupProps } from '@gravity-ui/uikit';
+import type { MenuItemProps, PopupProps, ToastProps } from '@gravity-ui/uikit';
 import { CopyToClipboard, Icon, Menu, Popup } from '@gravity-ui/uikit';
 
-import { Hotkey } from 'src/components/Hotkey/Hotkey';
-import { uiFactory } from 'src/factory';
-import type { StringifiedNode } from 'src/models/Profile';
-import { createSuccessToast } from 'src/utils/toaster';
+import { Hotkey } from '../Hotkey/Hotkey';
+import type { StringifiedNode } from '../../models/Profile';
 
-import { getAtLessPath } from './file-path';
-import type { GetStateFromQuery, SetStateFromQuery } from './query-utils';
-import { parseStacks, stringifyStacks } from './query-utils';
-import type { QueryKeys } from './renderer';
+import { getAtLessPath } from '../../file-path';
+import type { GetStateFromQuery, SetStateFromQuery } from '../../query-utils';
+import { parseStacks, stringifyStacks } from '../../query-utils';
+import type { QueryKeys } from '../../renderer';
+import { GoToDefinitionHref } from '../../models/goto';
 
 
 export type PopupData = { offset: [number, number]; node: StringifiedNode; coords: [number, number] };
 
-function getHref(node: StringifiedNode) {
-    return uiFactory().goToDefinitionHref(node);
-}
 
-type ContextMenuProps = {
+
+export type ContextMenuProps = {
     popupData: PopupData;
     anchorRef: PopupProps['anchorRef'];
     onClosePopup: () => void;
     setQuery: SetStateFromQuery<QueryKeys>;
     getQuery: GetStateFromQuery<QueryKeys>;
+    goToDefinitionHref: GoToDefinitionHref;
+    onSuccess: (options: Pick<ToastProps, 'renderIcon' | 'name' | 'content'>) => void
 };
-export const ContextMenu: React.FC<ContextMenuProps> = ({ popupData, anchorRef, onClosePopup, setQuery, getQuery }) => {
-    const href = getHref(popupData.node);
+export const ContextMenu: React.FC<ContextMenuProps> = ({ popupData, anchorRef, onClosePopup, setQuery, getQuery, goToDefinitionHref, onSuccess }) => {
+    const href = goToDefinitionHref(popupData.node);
     const hasFile = Boolean(popupData.node.file);
     const shouldShowGoTo = (
         hasFile &&
@@ -54,7 +53,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ popupData, anchorRef, 
                 {() => <Menu.Item
                     {...commonButtonProps}
                     onClick={() => {
-                        createSuccessToast({ renderIcon: () => <Icon data={CopyCheck}/>, name: 'copy', content: 'Name copied to clipboard' });
+                        onSuccess({ renderIcon: () => <Icon data={CopyCheck}/>, name: 'copy', content: 'Name copied to clipboard' });
                         onClosePopup();
                     }}
                 >
@@ -77,7 +76,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ popupData, anchorRef, 
                     {() => <Menu.Item
                         {...commonButtonProps}
                         onClick={() => {
-                            createSuccessToast({ renderIcon: () => <Icon data={CopyCheck}/>, name: 'copy', content: 'File path copied to clipboard' });
+                            onSuccess({ renderIcon: () => <Icon data={CopyCheck}/>, name: 'copy', content: 'File path copied to clipboard' });
                             onClosePopup();
                         }}
                     >

@@ -1,30 +1,32 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import * as React from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { type NavigateFunction } from 'react-router-dom';
 
 import { HelpPopover } from '@gravity-ui/components';
 import { ArrowUpRightFromSquare, Magnifier } from '@gravity-ui/icons';
 import type { ProgressColorStops, TableColumnConfig, TableSettingsData, TableSortState } from '@gravity-ui/uikit';
 import { Icon, Link as UIKitLink, Progress, Table, TextInput, withTableSettings, withTableSorting } from '@gravity-ui/uikit';
 
-import { Link } from 'src/components/Link/Link';
-import { NegativePositiveProgress } from 'src/components/NegativePositiveProgress/NegativePositiveProgress';
-import { uiFactory } from 'src/factory';
-import type { ProfileData, StringifiedNode } from 'src/models/Profile';
-import { useUserSettings } from 'src/providers/UserSettingsProvider';
-import type { NumTemplatingFormat } from 'src/providers/UserSettingsProvider/UserSettings';
-import { cn } from 'src/utils/cn';
+import { NegativePositiveProgress } from '../NegativePositiveProgress/NegativePositiveProgress';
+import type { ProfileData, StringifiedNode } from '../../models/Profile';
 
-import { hugenum } from '../Flamegraph/flame-utils';
-import { pct } from '../Flamegraph/pct';
-import { modifyQuery, useTypedQuery } from '../Flamegraph/query-utils';
-import { useRegexError } from '../Flamegraph/RegexpDialog/useRegexError';
-import type { QueryKeys } from '../Flamegraph/renderer';
-import { shorten } from '../Flamegraph/shorten';
-import type { ReadString } from '../Flamegraph/utils/node-title';
-import { getNodeTitleFull } from '../Flamegraph/utils/node-title';
-import type { TableFunctionTop } from '../Flamegraph/utils/top';
-import { isNonDiffKey, isSelfKey, type NonDiffTopKeys, type TopKeys } from '../Flamegraph/utils/top-types';
 
-import './TopTable.scss';
+import { cn } from '../../utils/cn';
+import type { UserSettings, NumTemplatingFormat } from '../../models/UserSettings';
+
+import { GetStateFromQuery, modifyQuery, SetStateFromQuery } from '../../query-utils';
+import { useRegexError } from '../../components/RegexpDialog/useRegexError';
+import type { QueryKeys } from '../../renderer';
+import { shorten } from '../../shorten';
+import type { ReadString } from '../../node-title';
+import { getNodeTitleFull } from '../../node-title';
+import type { TableFunctionTop } from '../../top';
+import { isNonDiffKey, isSelfKey, type NonDiffTopKeys, type TopKeys } from '../../top-types';
+
+import { hugenum } from '../../flame-utils';
+import { pct } from '../../pct';
+import './TopTable.css';
+import { GoToDefinitionHref } from '../../models/goto';
 
 
 const b = cn('top-table');
@@ -68,6 +70,8 @@ interface TopColumnsOpts {
     totalBaseEventCount?: number;
     numTemplating?: NumTemplatingFormat;
     isDiff?: boolean;
+    goToDefinitionHref: GoToDefinitionHref;
+    navigate: NavigateFunction;
 }
 
 function getNameType(key: TopKeys) {
@@ -98,7 +102,7 @@ function getProgressSteps(key: TopKeys) {
 function topColumns (
     readString: ReadString,
     search: string,
-    { getNodeTitle, eventType, totalEventCount, totalBaseEventCount, numTemplating, isDiff }: TopColumnsOpts,
+    { getNodeTitle, eventType, totalEventCount, totalBaseEventCount, numTemplating, isDiff, goToDefinitionHref, navigate }: TopColumnsOpts,
 ): TableColumnConfig<TableFunctionTop>[] {
     const regex = new RegExp(search);
 
@@ -183,7 +187,7 @@ function topColumns (
         const start = match?.index ?? -1;
         if (start === -1) {return name;}
         const end = start + (match?.[0].length ?? 0);
-        const goToLink = uiFactory().goToDefinitionHref({ file: readString(item.file), frameOrigin: readString(item.frameOrigin) } as StringifiedNode);
+        const goToLink = goToDefinitionHref({ file: readString(item.file), frameOrigin: readString(item.frameOrigin) } as StringifiedNode);
         return (
             <span className="top-table__name-column">
                 {name.slice(0, start)}
@@ -191,9 +195,9 @@ function topColumns (
                     {name.slice(start, end)}
                 </span>
                 {name.slice(end)}
-                <Link className={'top-table__column-icon-link'} href={createNewQueryForSwitch(name)}>
+                <span className={'top-table__column-icon-link'} onClick={() => navigate(createNewQueryForSwitch(name))}>
                     <Icon className={'top-table__column-icon'} data={Magnifier}/>
-                </Link>
+                </span>
 
                 {goToLink && <UIKitLink className={'top-table__column-icon-link'} target="_blank" href={goToLink}>
                     <Icon className={'top-table__column-icon'} data={ArrowUpRightFromSquare} />
@@ -259,11 +263,23 @@ function topColumns (
 interface TopTableProps {
     topData: TableFunctionTop[];
     profileData: ProfileData;
+    userSettings: UserSettings;
+    goToDefinitionHref: GoToDefinitionHref;
+    onFinishRendering?: () => void;
+    navigate: NavigateFunction;
+    getState: GetStateFromQuery<QueryKeys>;
+    setState: SetStateFromQuery<QueryKeys>;
 }
 
 export const TopTable: React.FC<TopTableProps> = ({
     topData,
     profileData,
+    userSettings,
+    goToDefinitionHref,
+    onFinishRendering,
+    navigate,
+    getState: getQuery,
+    setState: setQuery,
 }) => {
     const totalBaseEventCount = useMemo(() => profileData.rows[0][0].baseEventCount, [profileData.rows]);
     const isDiff = Boolean(totalBaseEventCount);
@@ -279,14 +295,12 @@ export const TopTable: React.FC<TopTableProps> = ({
     }, [readString, profileData?.meta.eventType]);
     const totalEventCount = React.useMemo(() => profileData.rows[0][0].eventCount, [profileData.rows]);
 
-    const { userSettings } = useUserSettings();
     const maybeShorten = useCallback((str: string) => {
         return userSettings.shortenFrameTexts === 'true' ? shorten(str) : str;
     }, [userSettings.shortenFrameTexts]);
     const getNodeTitle = useCallback((node: TableFunctionTop) => getNodeTitleFull(readString, maybeShorten, node), [maybeShorten, readString]);
     const numTemplating = useMemo(() => userSettings.numTemplating, [userSettings.numTemplating]);
     const [sortState, setSortState] = useState<TableSortState[number]>({ column: (isDiff ? 'diffcalc.self.eventCount' : 'self.eventCount'), order: 'desc' });
-    const [getQuery, setQuery] = useTypedQuery<QueryKeys>();
     const searchQuery = getQuery('topQuery');
     const setSearchQuery = useCallback((query: string) => {
         setQuery({ topQuery: query });
@@ -295,7 +309,7 @@ export const TopTable: React.FC<TopTableProps> = ({
     const [isSeaching, startTransition] = useTransition();
     const [settings, setSettings] = useState<TableSettingsData>([]);
     const regexError = useRegexError(searchValue);
-    const boundTopColumns = useCallback(() => topColumns(readString, regexError ? '' : searchValue, { getNodeTitle, eventType, totalEventCount, numTemplating, isDiff, totalBaseEventCount }),
+    const boundTopColumns = useCallback(() => topColumns(readString, regexError ? '' : searchValue, { getNodeTitle, eventType, totalEventCount, numTemplating, isDiff, totalBaseEventCount, goToDefinitionHref, navigate }),
         [readString, regexError, searchValue, getNodeTitle, eventType, totalEventCount, numTemplating, isDiff, totalBaseEventCount],
     );
 
@@ -344,7 +358,7 @@ export const TopTable: React.FC<TopTableProps> = ({
 
     useEffect(() => {
         if (topSlice.length > 0 && !hasSentDataRef.current) {
-            uiFactory().rum()?.finishDataRendering?.('top-table');
+            onFinishRendering?.();
             hasSentDataRef.current = true;
         }
     }, [topSlice.length]);

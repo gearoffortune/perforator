@@ -3,15 +3,16 @@
     --flamegraph-block-spacing: 1px;
 
     font: 16px var(--flamegraph-font);
-
-    #profile {
-        // stylelint-disable-next-line color-named
-        color: black;
-        font-size: 16px;
-    }
 }
 
-.flamegraph__header, .flamegraph__annotations {
+.flamegraph #profile {
+    /* stylelint-disable-next-line color-named */
+    color: black;
+    font-size: 16px;
+}
+
+.flamegraph__header,
+.flamegraph__annotations {
     --flamegraph-button-height: 30px;
 
     height: var(--flamegraph-button-height);
@@ -21,7 +22,7 @@
     left: 0;
     background: var(--g-color-base-background);
     z-index: 1;
-    display: flex
+    display: flex;
 }
 
 .flamegraph__deletion {
@@ -42,7 +43,8 @@
     text-align: center;
 }
 
-.flamegraph__buttons, .flamegraph__frames-count {
+.flamegraph__buttons,
+.flamegraph__frames-count {
     position: absolute;
     top: 0;
 }
@@ -63,8 +65,11 @@
     width: 100%;
 }
 
-.flamegraph__label, .flamegraph__highlight {
-    line-height: calc(var(--flamegraph-level-height) - var(--flamegraph-block-spacing));
+.flamegraph__label,
+.flamegraph__highlight {
+    line-height: calc(
+        var(--flamegraph-level-height) - var(--flamegraph-block-spacing)
+    );
 }
 
 .flamegraph__label {
@@ -91,7 +96,6 @@
 .g-root_theme_dark .flamegraph__highlight {
     color: #ccc;
     outline: 1px solid #222c;
-
 }
 
 .flamegraph__highlight span {
