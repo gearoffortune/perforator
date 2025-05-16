@@ -600,6 +600,9 @@ export const renderFlamegraph: RenderFlamegraphType = (
         }
 
 
+        const currentNodeCoords = fg.currentNodeCoords;
+        const currentNode = rows[currentNodeCoords[0]][currentNodeCoords[1]];
+
         for (let h = 0; h < rows.length; h++) {
             const y = fg.calcTopOffset(h);
             const row = rows[h];
@@ -619,7 +622,7 @@ export const renderFlamegraph: RenderFlamegraphType = (
 
                 const color = isMarked ?
                     SEARCH_COLOR :
-                    isDiff ? calculateDiffColor(node, root) : node.color!;
+                    isDiff ? calculateDiffColor(node, currentNode) : node.color!;
 
                 c.fillStyle = color as string;
                 c.fillRect(node.x!, y, width, BLOCK_HEIGHT);
