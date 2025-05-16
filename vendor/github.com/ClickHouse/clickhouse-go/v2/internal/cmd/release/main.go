@@ -96,12 +96,13 @@ func gitHubOutputReleaseURLIfAvailable(url string) {
 		return
 	}
 
-	if _, err := f.WriteString(fmt.Sprintf("RELEASE_URL=%s\n", url)); err != nil {
-		log.Fatalln(err)
-		return
-	}
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Fatalln(err)
+		}
+	}()
 
-	if err := f.Close(); err != nil {
+	if _, err := f.WriteString(fmt.Sprintf("RELEASE_URL=%s\n", url)); err != nil {
 		log.Fatalln(err)
 		return
 	}
@@ -199,7 +200,7 @@ func changelogFilePath() string {
 
 func getRootPath() string {
 	wd, _ := os.Getwd()
-	rootPath := strings.Replace(wd, "internal/cmd/release_prep", "", 1)
+	rootPath := strings.Replace(wd, "internal/cmd/release", "", 1)
 	return rootPath
 }
 
