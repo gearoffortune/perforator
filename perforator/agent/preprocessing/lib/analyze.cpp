@@ -60,6 +60,13 @@ NPerforator::NBinaryProcessing::NPython::PythonConfig BuildPythonConfig(llvm::ob
         conf.SetRelativeAutoTSSkeyAddress(*autoTSSkeyAddress);
     }
 
+    auto unicodeType = analyzer.ParseUnicodeType();
+    if (unicodeType == NPerforator::NLinguist::NPython::EUnicodeType::UCS2) {
+        conf.SetUnicodeTypeSizeLog2(1);
+    } else if (unicodeType == NPerforator::NLinguist::NPython::EUnicodeType::UCS4) {
+        conf.SetUnicodeTypeSizeLog2(2);
+    }
+
     return conf;
 }
 

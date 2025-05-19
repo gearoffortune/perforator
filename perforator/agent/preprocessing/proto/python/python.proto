@@ -15,4 +15,5 @@ message PythonConfig {
     int64 PyThreadStateTLSOffset = 2;
     uint64 RelativePyRuntimeAddress = 3;
     uint64 RelativeAutoTSSkeyAddress = 4;
+    uint32 UnicodeTypeSizeLog2 = 5;
 }

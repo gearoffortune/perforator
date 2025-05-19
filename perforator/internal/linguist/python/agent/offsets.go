@@ -36,7 +36,8 @@ type jsonOffsets struct {
 	PyRuntimeState     map[string]int `json:"_PyRuntimeState"`
 	PyCFrame           map[string]int `json:"_PyCFrame,omitempty"`
 	PyInterpreterFrame map[string]int `json:"_PyInterpreterFrame,omitempty"`
-	PyASCIIObject      map[string]int `json:"PyASCIIObject"`
+	PyASCIIObject      map[string]int `json:"PyASCIIObject,omitempty"`
+	PyUnicodeObject    map[string]int `json:"PyUnicodeObject,omitempty"`
 	PyTssT             map[string]int `json:"Py_tss_t,omitempty"`
 }
 
@@ -237,8 +238,8 @@ func extractPyCodeObjectOffsets(data map[string]int) unwinder.PythonCodeObjectOf
 }
 
 // Extract frame offsets from JSON data
-func extractPyFrameOffsets(data map[string]int) unwinder.PyFrameOffsets {
-	var offsets unwinder.PyFrameOffsets
+func extractPyFrameOffsets(data map[string]int) unwinder.PythonFrameOffsets {
+	var offsets unwinder.PythonFrameOffsets
 
 	if val, ok := data["f_code"]; ok {
 		offsets.FCode = uint32(val)
@@ -292,9 +293,28 @@ func extractPyRuntimeStateOffsets(data map[string]int) unwinder.PythonRuntimeSta
 	return offsets
 }
 
+// Extract PyUnicodeObject offsets from JSON data
+func extractPyUnicodeObjectOffsets(data map[string]int) unwinder.PythonStringObjectOffsets {
+	var offsets unwinder.PythonStringObjectOffsets
+
+	if val, ok := data["length"]; ok {
+		offsets.Length = uint32(val)
+	} else {
+		offsets.Length = UnspecifiedOffset
+	}
+
+	if val, ok := data["str"]; ok {
+		offsets.Data = uint32(val)
+	} else {
+		offsets.Data = UnspecifiedOffset
+	}
+
+	return offsets
+}
+
 // Extract PyASCIIObject offsets from JSON data
-func extractPyASCIIObjectOffsets(data map[string]int) unwinder.PythonAsciiObjectOffsets {
-	var offsets unwinder.PythonAsciiObjectOffsets
+func extractPyASCIIObjectOffsets(data map[string]int) unwinder.PythonStringObjectOffsets {
+	var offsets unwinder.PythonStringObjectOffsets
 
 	if val, ok := data["length"]; ok {
 		offsets.Length = uint32(val)
@@ -388,7 +408,9 @@ func convertToPythonInternalsOffsets(data jsonOffsets) *unwinder.PythonInternals
 	}
 
 	if data.PyASCIIObject != nil {
-		offsets.PyAsciiObjectOffsets = extractPyASCIIObjectOffsets(data.PyASCIIObject)
+		offsets.PyStringObjectOffsets = extractPyASCIIObjectOffsets(data.PyASCIIObject)
+	} else if data.PyUnicodeObject != nil {
+		offsets.PyStringObjectOffsets = extractPyUnicodeObjectOffsets(data.PyUnicodeObject)
 	}
 
 	if data.PyTssT != nil {
