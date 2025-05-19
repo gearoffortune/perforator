@@ -295,10 +295,10 @@ export const TopTable: React.FC<TopTableProps> = ({
     }, [readString, profileData?.meta.eventType]);
     const totalEventCount = React.useMemo(() => profileData.rows[0][0].eventCount, [profileData.rows]);
 
-    const maybeShorten = useCallback((str: string) => {
-        return userSettings.shortenFrameTexts === 'true' ? shorten(str) : str;
-    }, [userSettings.shortenFrameTexts]);
-    const getNodeTitle = useCallback((node: TableFunctionTop) => getNodeTitleFull(readString, maybeShorten, node), [maybeShorten, readString]);
+    const getNodeTitle = useCallback(
+        (node: TableFunctionTop) => getNodeTitleFull(readString, shorten, userSettings.shortenFrameTexts === 'true', node),
+        [readString, userSettings.shortenFrameTexts],
+    );
     const numTemplating = useMemo(() => userSettings.numTemplating, [userSettings.numTemplating]);
     const [sortState, setSortState] = useState<TableSortState[number]>({ column: (isDiff ? 'diffcalc.self.eventCount' : 'self.eventCount'), order: 'desc' });
     const searchQuery = getQuery('topQuery');

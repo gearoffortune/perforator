@@ -435,15 +435,6 @@ export const renderFlamegraph: RenderFlamegraphType = (
         return getComputedStyle(flamegraphContainer).getPropertyValue(variable);
     }
 
-
-    function maybeShorten(str: string) {
-        return shortenFrameTexts === 'true' || shortenFrameTexts === 'hover' ? shorten(str) : str;
-    }
-    function shortenTitle(title: string) {
-        return shortenFrameTexts === 'true' ? shorten(title) : title;
-    }
-
-
     const BACKGROUND = getCssVariable('--g-color-base-background');
     const SEARCH_COLOR = theme === 'dark' ? darken('#ee00ee') : '#ee00ee';
 
@@ -494,7 +485,9 @@ export const renderFlamegraph: RenderFlamegraphType = (
         return profileData.stringTable[id];
     }
 
-    const search = outerSearch.bind(null, readString, maybeShorten, profileData.rows);
+    const shouldShortenTextForOverview = shortenFrameTexts === 'true' || shortenFrameTexts === 'hover';
+    const shouldShortenTextForHover = shortenFrameTexts === 'true';
+    const search = outerSearch.bind(null, readString, shorten, shouldShortenTextForOverview, profileData.rows);
 
     const maybeSearch = (query: RegExp | string | null): Coordinate[] | null => {
         let foundCoords: Coordinate[] | null;
@@ -506,7 +499,8 @@ export const renderFlamegraph: RenderFlamegraphType = (
         return foundCoords;
     };
 
-    const getNodeTitle = getNodeTitleFull.bind(null, readString, maybeShorten);
+    const getNodeTitle = getNodeTitleFull.bind(null, readString, shorten, shouldShortenTextForOverview);
+    const getNodeTitleHl = getNodeTitleFull.bind(null, readString, shorten, shouldShortenTextForHover);
 
     function drawLabel(text: string, x: number, y: number, w: number, opacity: string, color: string) {
         const dFragment = labelTemplate.content.cloneNode(true) as DocumentFragment;
@@ -539,7 +533,7 @@ export const renderFlamegraph: RenderFlamegraphType = (
 
     // need to calculate cleared percentage
 
-    const renderTitle = renderTitleFull.bind(null, fg.countEventCountWidth, fg.countSampleCountWidth, getNodeTitle, isDiff);
+    const renderTitle = renderTitleFull.bind(null, fg.countEventCountWidth, fg.countSampleCountWidth, getNodeTitleHl, isDiff);
 
     const eventType = readString(profileData.meta.eventType);
 
@@ -787,7 +781,7 @@ export const renderFlamegraph: RenderFlamegraphType = (
 
         const left = node.x! + canvas.offsetLeft;
         const top = (fg.calcTopOffset(h) + canvas.offsetTop);
-        const title = getNodeTitle(node);
+        const title = getNodeTitleHl(node);
         const isMainRoot = currentNode && currentNode.textId === root.textId && currentNode.eventCount === root.eventCount;
         const highlightTitle = isMainRoot ? getCanvasTitle(node, null, root) : getCanvasTitle(node, currentNode!, root);
         const color = calcHighlightColor(node);
@@ -838,7 +832,7 @@ export const renderFlamegraph: RenderFlamegraphType = (
     };
 
     function renderHighlight(title: string, newColor: string | null, left: number, top: number, width: number, highlightTitle: string) {
-        hl.firstChild!.textContent = shortenTitle(title);
+        hl.firstChild!.textContent = title;
         //@ts-ignore allowing to use null for reset
         hl.style.backgroundColor = newColor;
         hl.style.left = left + 'px';

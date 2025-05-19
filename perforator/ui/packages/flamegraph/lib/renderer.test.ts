@@ -61,7 +61,7 @@ function readString(id?: number) {
 }
 
 describe('flamegraph titles', () => {
-    const getNodeTitle = getNodeTitleFull.bind(null, readString, (s) => s);
+    const getNodeTitle = getNodeTitleFull.bind(null, readString, (s) => s, false);
 
     const renderTitle = renderTitleFull.bind(null, n => n.eventCount, n => n.sampleCount, getNodeTitle, false);
 
@@ -85,7 +85,7 @@ describe('flamegraph titles', () => {
 });
 
 describe('flamegraph titles for diffs', () => {
-    const getNodeTitle = getNodeTitleFull.bind(null, readString, (s) => s);
+    const getNodeTitle = getNodeTitleFull.bind(null, readString, (s) => s, false);
 
     const renderTitle = renderTitleFull.bind(null, n => n.eventCount, n => n.sampleCount, getNodeTitle, true);
 

@@ -12,7 +12,7 @@ export function escapeRegex(str: string) {
 }
 
 
-export function search(readString: ReadString, maybeShorten: StringModifier, rows: ProfileData['rows'], query: RegExp | string): Coordinate[] {
+export function search(readString: ReadString, shorten: StringModifier, shouldShorten: boolean, rows: ProfileData['rows'], query: RegExp | string): Coordinate[] {
     const res: Coordinate[] = [];
     const test = (() => {
         if (typeof query === 'string') {
@@ -22,7 +22,7 @@ export function search(readString: ReadString, maybeShorten: StringModifier, row
         return (str: string)=> query.test(str);
     })();
 
-    const getNodeTitle = getNodeTitleFull.bind(null, readString, maybeShorten);
+    const getNodeTitle = getNodeTitleFull.bind(null, readString, shorten, shouldShorten);
 
     for (let h = 0; h < rows.length; h++) {
         for (let i = 0; i < rows[h].length; i++) {

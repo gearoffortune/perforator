@@ -5,9 +5,15 @@ export type ReadString = (id?: number) => string;
 
 export type StringModifier = (s: string) => string;
 
-export function getNodeTitleFull(readString: ReadString, maybeShorten: StringModifier, node: Pick<FormatNode, 'kind' | 'textId' | 'file' | 'inlined'>): string {
+export function getNodeTitleFull(readString: ReadString, shorten: StringModifier, shouldShorten: boolean, node: Pick<FormatNode, 'kind' | 'textId' | 'file' | 'inlined'>): string {
     const kind = readString(node.kind);
-    let nodeTitle = maybeShorten(readString(node.textId)) + ' ' + readString(node.file);
+    let nodeTitle: string | undefined;
+    const nodeText = readString(node.textId);
+    if (shouldShorten) {
+        nodeTitle = shorten(nodeText);
+    } else {
+        nodeTitle = nodeText + ' ' + readString(node.file);
+    }
     if (kind !== '') {
         nodeTitle += ` (${kind})`;
     }
