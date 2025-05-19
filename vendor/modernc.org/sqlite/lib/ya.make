@@ -2,7 +2,7 @@ GO_LIBRARY()
 
 LICENSE(BSD-3-Clause)
 
-VERSION(v1.30.0)
+VERSION(v1.34.1)
 
 SRCS(
     defs.go
@@ -22,7 +22,7 @@ IF (OS_LINUX AND ARCH_ARM64)
     )
 ENDIF()
 
-IF (OS_LINUX AND ARCH_ARM7)
+IF (OS_LINUX AND ARCH_ARM6 OR OS_LINUX AND ARCH_ARM7)
     SRCS(
         sqlite_linux_arm.go
     )

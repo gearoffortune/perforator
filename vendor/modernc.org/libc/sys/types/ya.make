@@ -2,7 +2,7 @@ GO_LIBRARY()
 
 LICENSE(BSD-3-Clause)
 
-VERSION(v1.50.9)
+VERSION(v1.55.3)
 
 IF (OS_LINUX AND ARCH_X86_64)
     SRCS(
@@ -18,7 +18,7 @@ IF (OS_LINUX AND ARCH_ARM64)
     )
 ENDIF()
 
-IF (OS_LINUX AND ARCH_ARM7)
+IF (OS_LINUX AND ARCH_ARM6 OR OS_LINUX AND ARCH_ARM7)
     SRCS(
         capi_linux_arm.go
         types_linux_arm.go
