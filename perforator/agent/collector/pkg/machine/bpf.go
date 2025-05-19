@@ -22,7 +22,6 @@ import (
 	"github.com/yandex/perforator/library/go/core/log"
 	"github.com/yandex/perforator/library/go/core/metrics"
 	"github.com/yandex/perforator/library/go/ptr"
-	"github.com/yandex/perforator/perforator/agent/collector/pkg/machine/links"
 	"github.com/yandex/perforator/perforator/internal/unwinder"
 	"github.com/yandex/perforator/perforator/pkg/graceful"
 	"github.com/yandex/perforator/perforator/pkg/linux"
@@ -79,7 +78,7 @@ type BPF struct {
 	partsmu              sync.RWMutex
 	unwindTableParts     map[uint32]*ebpf.Map
 
-	links *links.Links
+	links *bpfLinks
 }
 
 func NewBPF(conf *Config, log log.Logger, metrics metrics.Registry) (*BPF, error) {
@@ -98,8 +97,6 @@ func NewBPF(conf *Config, log log.Logger, metrics metrics.Registry) (*BPF, error
 		metrics: metrics,
 
 		unwindTableParts: make(map[uint32]*ebpf.Map),
-
-		links: links.NewLinks(log),
 	}
 
 	err := b.initialize()
@@ -141,7 +138,8 @@ func (b *BPF) initialize() (err error) {
 		return fmt.Errorf("failed to setup programs: %w", err)
 	}
 
-	err = b.setupProgramLinks()
+	b.links = newBPFLinks(b.log)
+	err = b.links.setup(b.conf, b.progs)
 	if err != nil {
 		return fmt.Errorf("failed to setup links: %w", err)
 	}
@@ -275,7 +273,6 @@ func (b *BPF) setupMaps(debug bool) (err error) {
 // setupProgramsUnsafe requires b.progsmu to be locked.
 // Close any existing programs and load the new programs, probably in the debug mode.
 // This routine can be used for online program debugging without restarts.
-// Note: this does not reload links, user should do it separately (via setupProgramLinks or b.links.Reload)
 func (b *BPF) setupProgramsUnsafe(debug bool) (err error) {
 	if b.progs != nil {
 		err = b.progs.Close()
@@ -285,7 +282,7 @@ func (b *BPF) setupProgramsUnsafe(debug bool) (err error) {
 		b.progs = nil
 	}
 
-	err = b.links.Close()
+	err = b.links.close()
 	if err != nil {
 		return fmt.Errorf("failed to close links: %w", err)
 	}
@@ -321,43 +318,14 @@ func (b *BPF) setupProgramsUnsafe(debug bool) (err error) {
 	return nil
 }
 
-func (b *BPF) setupProgramLinks() (err error) {
-	if err := b.links.Close(); err != nil {
-		b.log.Warn("Failed to close previous links", log.Error(err))
-	}
-
-	defer func() {
-		if err != nil {
-			err = b.links.Close()
-			b.log.Warn("Failed to close links on error", log.Error(err))
-		}
-	}()
-
-	if enabled := b.conf.TraceWallTime; enabled != nil && *enabled {
-		err = b.links.Kprobe(`^finish_task_switch(\.isra\.\d+)?$`, b.progs.PerforatorFinishTaskSwitch)
-		if err != nil {
-			return fmt.Errorf("failed to setup kprobe finish_task_switch link: %w", err)
-		}
-	}
-
-	if enabled := b.conf.TraceSignals; enabled != nil && *enabled {
-		err = b.links.Tracepoint("signal", "signal_deliver", b.progs.PerforatorSignalDeliver)
-		if err != nil {
-			return fmt.Errorf("failed to setup tracepoint signal_deliver link: %w", err)
-		}
-	}
-
-	return nil
-}
-
 func (b *BPF) UnlinkPrograms() error {
-	return b.links.Close()
+	return b.links.close()
 }
 
 func (b *BPF) Close() error {
 	b.progsmu.Lock()
 	defer b.progsmu.Unlock()
-	return errors.Join(b.maps.Close(), b.progs.Close(), b.links.Close())
+	return errors.Join(b.maps.Close(), b.progs.Close(), b.links.close())
 }
 
 func memLockedSize(fd int) (uint64, error) {
@@ -422,7 +390,13 @@ func (b *BPF) ReloadProgram(debug bool) error {
 		return fmt.Errorf("failed to reload program: %w", err)
 	}
 
-	return b.links.Reload(b.progs.PerforatorSignalDeliver, b.progs.PerforatorFinishTaskSwitch)
+	err = b.links.close()
+	if err != nil {
+		return fmt.Errorf("failed to close links: %w", err)
+	}
+
+	b.links = newBPFLinks(b.log)
+	return b.links.setup(b.conf, b.progs)
 }
 
 func (b *BPF) UpdateConfig(conf *unwinder.ProfilerConfig) error {
