@@ -7,6 +7,7 @@ import { ArrowUpRightFromSquare } from '@gravity-ui/icons';
 import { Button, Card, ClipboardButton, Icon, Link } from '@gravity-ui/uikit';
 
 import { uiFactory } from 'src/factory';
+import type { MergeProfilesRequest, ProfileQuery } from 'src/generated/perforator/proto/perforator/perforator';
 import type { TaskStatus } from 'src/generated/perforator/proto/perforator/task_service';
 import type { ProfileTaskQuery, TaskResult } from 'src/models/Task';
 import { TaskState } from 'src/models/Task';
@@ -31,7 +32,6 @@ export interface TaskCardProps {
 
 export const TaskCard: React.FC<TaskCardProps> = props => {
     const { task } = props;
-    const navigate = useNavigate();
 
     const status = task?.Status;
     const state = status?.State || TaskState.Unknown;
@@ -107,34 +107,7 @@ export const TaskCard: React.FC<TaskCardProps> = props => {
 
     return (
         <Card className="task-card">
-            <div className="task-card__buttons">
-                <ShareButton getUrl={() => window.location.href} />
-                {query?.Selector ? (
-                    <Button
-                        className="task-card__button-compare"
-                        href={`/diff?selector=${query.Selector}&maxProfiles=${spec?.MaxSamples}`}
-                        onClick={(e) => {
-                            if (!e.metaKey && !e.altKey && e.button === 0) {
-                                e.preventDefault();
-                                navigate(`/diff?selector=${query.Selector}&maxProfiles=${spec?.MaxSamples}`);
-                            }
-                        }}
-                    >
-                        {'Compare with\u2026'}
-                    </Button>
-                ) : null}
-                {format !== 'RawProfile' && !isDiff ? (
-                    <Button
-                        onClick={() =>
-                            redirectToTaskPage(navigate, {
-                                selector: query?.Selector,
-                                maxProfiles: spec?.MaxSamples,
-                                rawProfile: 'true',
-                            } as ProfileTaskQuery)
-                        }
-                    >Get pprof...</Button>
-                ) : null}
-            </div>
+            <TaskButtons query={query} spec={spec} format={format} isDiff={isDiff}/>
             <h2 className="task-card__title">Task {props.taskId}</h2>
             <DefinitionList items={properties} />
             <TaskProgress
@@ -185,3 +158,35 @@ const Executor: React.FC<{executor: string}> = ({ executor }) => {
         </Button> : null}
     </>;
 };
+
+type TaskButtonsProps = {query: ProfileQuery | undefined; spec: MergeProfilesRequest | undefined; format: string | undefined; isDiff: boolean}
+function TaskButtons({ format, isDiff, query, spec }: TaskButtonsProps) {
+    const navigate = useNavigate();
+    return <div className="task-card__buttons">
+        <ShareButton getUrl={() => window.location.href} />
+        {query?.Selector ? (
+            <Button
+                className="task-card__button-compare"
+                href={`/diff?selector=${query.Selector}&maxProfiles=${spec?.MaxSamples}`}
+                onClick={(e) => {
+                    if (!e.metaKey && !e.altKey && e.button === 0) {
+                        e.preventDefault();
+                        navigate(`/diff?selector=${query.Selector}&maxProfiles=${spec?.MaxSamples}`);
+                    }
+                }}
+            >
+                {'Compare with\u2026'}
+            </Button>
+        ) : null}
+        {format !== 'RawProfile' && !isDiff ? (
+            <Button
+                onClick={() => redirectToTaskPage(navigate, {
+                    selector: query?.Selector,
+                    maxProfiles: spec?.MaxSamples,
+                    rawProfile: 'true',
+                } as ProfileTaskQuery)}
+            >Get pprof...</Button>
+        ) : null}
+    </div>;
+}
+
