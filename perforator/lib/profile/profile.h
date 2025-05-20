@@ -594,7 +594,7 @@ public:
         return GetStringUnsafe();
     }
 
-    ui64 GetNumber() const {
+    i64 GetNumber() const {
         Y_ENSURE(IsNumber());
         return GetNumberUnsafe();
     }
