@@ -225,6 +225,82 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////
 
+// I'm sorry.
+template <typename Parent, i32 (Parent::*GetSize)() const, auto (Parent::*GetItem)(i32) const>
+class TArrayField {
+public:
+    TArrayField(const Parent* parent)
+        : Parent_{parent}
+    {}
+
+    i32 Size() const {
+        return std::invoke(GetSize, Parent_);
+    }
+
+    decltype(auto) Get(i32 index) const {
+        return std::invoke(GetItem, Parent_, index);
+    }
+
+public:
+    class TIterator {
+    public:
+        TIterator(const Parent* parent, i32 i)
+            : Parent_{parent}
+            , Index_{i}
+        {}
+
+        TIterator& operator++() {
+            ++Index_;
+            return *this;
+        }
+
+        TIterator operator++(int) {
+            TIterator copy = *this;
+            ++*this;
+            return copy;
+        }
+
+        bool operator==(const TIterator& other) const {
+            return Index_ == other.Index_;
+        }
+
+        bool operator!=(const TIterator& other) const {
+            return !operator==(other);
+        }
+
+        decltype(auto) operator*() const {
+            return Deref();
+        }
+
+        decltype(auto) operator->() const {
+            return Deref();
+        }
+
+        decltype(auto) Deref() const {
+            return std::invoke(GetItem, Parent_, Index_);
+        }
+
+    private:
+        const Parent* Parent_;
+        i32 Index_ = 0;
+    };
+
+    // NOLINTNEXTLINE
+    TIterator begin() const {
+        return TIterator{Parent_, 0};
+    }
+
+    // NOLINTNEXTLINE
+    TIterator end() const {
+        return TIterator{Parent_, Size()};
+    }
+
+private:
+    const Parent* Parent_;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+
 template <CStrongIndex Index>
 class TIndexedEntityReader {
 public:
@@ -359,6 +435,14 @@ public:
     explicit operator bool() const {
         return 0 != *Index_;
     }
+
+    bool operator==(TStringBuf rhs) const {
+        return View() == rhs;
+    }
+
+    bool operator!=(TStringBuf rhs) const {
+        return !operator==(rhs);
+    }
 };
 
 class TFunction : public TIndexedEntityReader<TFunctionId> {
@@ -446,6 +530,10 @@ public:
         return TSourceLine{Profile_, TSourceLineId::FromInternalIndex(offset + id)};
     }
 
+    auto GetLines() const {
+        return TArrayField<TInlineChain, &TInlineChain::GetLineCount, &TInlineChain::GetLine>(this);
+    }
+
     void DumpJson(NJson::TJsonWriter& writer) const {
         writer.OpenMap();
         writer.Write("type", "inline_chain");
@@ -453,8 +541,8 @@ public:
 
         writer.WriteKey("lines");
         writer.OpenArray();
-        for (i32 i = 0; i < GetLineCount(); ++i) {
-            GetLine(i).DumpJson(writer);
+        for (TSourceLine line : GetLines()) {
+            line.DumpJson(writer);
         }
         writer.CloseArray();
 
@@ -549,6 +637,10 @@ public:
         i32 position = id + Profile_->stacks().offset(*Index_);
         i32 index = Profile_->stacks().frame_id(position);
         return TStackFrame{Profile_, TStackFrameId::FromInternalIndex(index)};
+    }
+
+    auto GetStackFrames() const {
+        return TArrayField<TStack, &TStack::GetStackFrameCount, &TStack::GetStackFrame>(this);
     }
 
     void DumpJson(NJson::TJsonWriter& writer) const {
@@ -677,6 +769,10 @@ public:
         return {Profile_, index};
     }
 
+    auto GetContainers() const {
+        return TArrayField<TThread, &TThread::GetContainerCount, &TThread::GetContainer>(this);
+    }
+
     void DumpJson(NJson::TJsonWriter& writer) const {
         writer.OpenMap();
         writer.Write("type", "thread");
@@ -687,8 +783,8 @@ public:
         writer.Write("process_name", GetProcessName().View());
         writer.WriteKey("containers");
         writer.OpenArray();
-        for (i32 i = 0; i < GetContainerCount(); ++i) {
-            writer.Write(GetContainer(i).View());
+        for (TStringRef container : GetContainers()) {
+            writer.Write(container.View());
         }
         writer.CloseArray();
         writer.CloseMap();
@@ -715,6 +811,10 @@ public:
         return TStack{Profile_, stackIndex};
     }
 
+    auto GetStacks() const {
+        return TArrayField<TSampleKey, &TSampleKey::GetStackCount, &TSampleKey::GetStack>(this);
+    }
+
     TThread GetThread() const {
         ui32 tid = Profile_->sample_keys().threads().thread_id(*Index_);
         return TThread{Profile_, TThreadId::FromInternalIndex(tid)};
@@ -736,6 +836,10 @@ public:
         return TLabel{Profile_, labelIndex};
     }
 
+    auto GetLabels() const {
+        return TArrayField<TSampleKey, &TSampleKey::GetLabelCount, &TSampleKey::GetLabel>(this);
+    }
+
     void DumpJson(NJson::TJsonWriter& writer) const {
         writer.OpenMap();
         writer.Write("type", "sample_key");
@@ -746,15 +850,15 @@ public:
 
         writer.WriteKey("stacks");
         writer.OpenArray();
-        for (i32 i = 0; i < GetStackCount(); ++i) {
-            GetStack(i).DumpJson(writer);
+        for (TStack stack : GetStacks()) {
+            stack.DumpJson(writer);
         }
         writer.CloseArray();
 
         writer.WriteKey("labels");
         writer.OpenArray();
-        for (i32 i = 0; i < GetLabelCount(); ++i) {
-            GetLabel(i).DumpJson(writer);
+        for (TLabel label : GetLabels()) {
+            label.DumpJson(writer);
         }
         writer.CloseArray();
 
@@ -838,6 +942,14 @@ public:
     ui64 GetValue(i32 index) const {
         Y_ASSERT(index < GetValueCount());
         return Profile_->samples().values(index).value(*Index_);
+    }
+
+    auto GetValues() const {
+        return TArrayField<TSample, &TSample::GetValueCount, &TSample::GetValue>(this);
+    }
+
+    auto GetValueTypes() const {
+        return TArrayField<TSample, &TSample::GetValueCount, &TSample::GetValueType>(this);
     }
 
     TValueType GetValueType(i32 index) const {
