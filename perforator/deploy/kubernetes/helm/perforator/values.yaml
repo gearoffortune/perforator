@@ -186,6 +186,14 @@ agent:
     storageHostnameOverride: ""
     # Label used to describe nodes topology.
     topologyLableKey: "topology.kubernetes.io/zone"
+    # user defined labels
+    labels:
+      # Labels that are added to all profiles, gathered by agent. 
+      # It has higher priority and can override existing labels, added by agent.
+      profiles:
+    #   app: myapp
+    #   environment: production
+
 
   tls:
     # Enable agent TLS for agent-storage communication.

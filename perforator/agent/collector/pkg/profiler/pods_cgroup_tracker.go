@@ -55,6 +55,11 @@ func (t *PodsCgroupTracker) buildCgroupConfig(
 	labels["service"] = pod.ServiceName()
 	labels["cgroup"] = pod.CgroupName()
 
+	// User can explicitly override any gathered label
+	for key, val := range t.conf.Labels {
+		labels[key] = val
+	}
+
 	cgroupConfig := &CgroupConfig{
 		Name:   pod.CgroupName(),
 		Labels: labels,
@@ -69,10 +74,6 @@ func (t *PodsCgroupTracker) makeCommonProfileLabels() (labels map[string]string)
 		"host":             t.hostname,
 		"cpu":              t.cpuModelName,
 		"profiler_version": buildinfo.Info.SVNRevision,
-	}
-
-	for key, val := range t.conf.Labels {
-		labels[key] = val
 	}
 
 	return

@@ -24,5 +24,6 @@ pods_deploy_system:
   deploy_system: "kubernetes"
   kubernetes:
     topology_lable_key: {{ .Values.agent.config.topologyLableKey | quote }}
+  labels: {{ toYaml .Values.agent.config.labels.profiles | nindent 6 }}
   pod_options:
     default: true
