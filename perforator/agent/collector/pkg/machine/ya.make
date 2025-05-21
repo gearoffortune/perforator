@@ -6,3 +6,7 @@ SRCS(
 )
 
 END()
+
+RECURSE(
+    uprobe
+)

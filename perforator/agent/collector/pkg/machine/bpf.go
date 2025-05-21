@@ -22,6 +22,7 @@ import (
 	"github.com/yandex/perforator/library/go/core/log"
 	"github.com/yandex/perforator/library/go/core/metrics"
 	"github.com/yandex/perforator/library/go/ptr"
+	"github.com/yandex/perforator/perforator/agent/collector/pkg/machine/uprobe"
 	"github.com/yandex/perforator/perforator/internal/unwinder"
 	"github.com/yandex/perforator/perforator/pkg/graceful"
 	"github.com/yandex/perforator/perforator/pkg/linux"
@@ -34,6 +35,11 @@ const (
 	perfReaderTimeout     = 2 * time.Second
 	ebpfMapSizeLimitBytes = 1<<32 - 1<<20
 )
+
+type UprobeConfig struct {
+	uprobe.Config `yaml:",inline"`
+	Pid           int `yaml:"pid,omitempty"`
+}
 
 type Config struct {
 	Debug bool `yaml:"debug"`
@@ -53,6 +59,8 @@ type Config struct {
 	TraceWallTime *bool `yaml:"trace_walltime"`
 	// Collect python stacks
 	TracePython *bool `yaml:"trace_python"`
+	// Configuration for uprobes tracing
+	Uprobes []UprobeConfig `yaml:"uprobes,omitempty"`
 }
 
 type BPF struct {
@@ -395,7 +403,6 @@ func (b *BPF) ReloadProgram(debug bool) error {
 		return fmt.Errorf("failed to close links: %w", err)
 	}
 
-	b.links = newBPFLinks(b.log)
 	return b.links.setup(b.conf, b.progs)
 }
 
@@ -438,6 +445,12 @@ func (b *BPF) AddTracedProcess(pid linux.ProcessID) error {
 
 func (b *BPF) RemoveTracedProcess(pid linux.ProcessID) error {
 	return b.maps.TracedProcesses.Delete(pid)
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+func (b *BPF) UprobeRegistry() *uprobe.Registry {
+	return b.links.uprobeRegistry
 }
 
 ////////////////////////////////////////////////////////////////////////////////
