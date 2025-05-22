@@ -50,6 +50,11 @@ func (t *PodsCgroupTracker) buildCgroupConfig(
 	pod deploysystemmodel.Pod,
 ) *CgroupConfig {
 	labels := t.makeCommonProfileLabels()
+
+	for k, v := range pod.Labels() {
+		labels[k] = v
+	}
+
 	labels["pod"] = pod.ID()
 	labels["cluster"] = pod.Topology()
 	labels["service"] = pod.ServiceName()
