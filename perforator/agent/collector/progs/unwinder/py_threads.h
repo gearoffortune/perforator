@@ -169,29 +169,16 @@ static NOINLINE void python_upsert_thread_state(struct python_state* state, void
              (void*) py_thread_state, state->thread_key.inner_ns_tid);
 }
 
-static ALWAYS_INLINE void* python_retrieve_main_interpreterstate(void* py_runtime_ptr, struct python_runtime_state_offsets* runtime_state_offsets) {
-    if (py_runtime_ptr == NULL || runtime_state_offsets == NULL) {
+static ALWAYS_INLINE void* python_calculate_main_interpreter_state_address(struct python_state* state) {
+    if (state == NULL) {
         return NULL;
     }
 
-    void* main_interpreter_state = NULL;
-    long err = bpf_probe_read_user(
-        &main_interpreter_state,
-        sizeof(void*),
-        py_runtime_ptr + runtime_state_offsets->py_interpreters_main
-    );
-    if (err != 0) {
-        BPF_TRACE("python: failed to read main PyInterpreterState: %d", err);
-        return NULL;
-    }
-    if (main_interpreter_state == NULL) {
-        BPF_TRACE("python: main *PyInterpreterState is NULL");
-        return NULL;
+    if (state->py_runtime_address != 0) {
+        return (void*) (state->py_runtime_address + state->config.offsets.py_runtime_state_offsets.py_interpreters_main);
     }
 
-    BPF_TRACE("python: successfully retrieved main PyInterpreterState %p", main_interpreter_state);
-
-    return main_interpreter_state;
+    return (void*) state->py_interp_head_address;
 }
 
 static ALWAYS_INLINE void* python_retrieve_thread_state_from_interpreterstate(void* py_interpreter_state, struct python_interpreter_state_offsets* interpreter_state_offsets) {
@@ -214,21 +201,26 @@ static ALWAYS_INLINE void* python_retrieve_thread_state_from_interpreterstate(vo
 }
 
 static ALWAYS_INLINE void* python_get_head_thread_state(
-    void* py_runtime_ptr,
-    struct python_internals_offsets* offsets
+    struct python_state* state
 ) {
-    if (py_runtime_ptr == NULL || offsets == NULL) {
+    if (state == NULL) {
         return NULL;
     }
 
-    void* main_interpreter_state = python_retrieve_main_interpreterstate(py_runtime_ptr, &offsets->py_runtime_state_offsets);
-    void* head_thread_state = python_retrieve_thread_state_from_interpreterstate(main_interpreter_state, &offsets->py_interpreter_state_offsets);
-
-    if (head_thread_state == NULL) {
-        BPF_TRACE("python: head *PyThreadState from *PyInterpreterState is NULL");
+    void* main_interpreter_state_address = python_calculate_main_interpreter_state_address(state);
+    if (main_interpreter_state_address == NULL) {
+        return NULL;
+    }
+    void* main_interpreter_state = NULL;
+    long err = bpf_probe_read_user(&main_interpreter_state, sizeof(void*), main_interpreter_state_address);
+    if (err != 0) {
+        BPF_TRACE("python: failed to read main *PyInterpreterState: %d", err);
+        return NULL;
     }
 
-    BPF_TRACE("python: successfully retrieved head *PyThreadState from *PyInterpreterState");
+    void* head_thread_state = python_retrieve_thread_state_from_interpreterstate(main_interpreter_state, &state->config.offsets.py_interpreter_state_offsets);
+
+    BPF_TRACE("python: retrieved head *PyThreadState from *PyInterpreterState %p", head_thread_state);
 
     return head_thread_state;
 }
@@ -292,7 +284,7 @@ static ALWAYS_INLINE void* python_get_thread_state_and_update_cache(
     void* current_thread_state = python_read_py_thread_state_ptr_from_tls(state);
     void* fill_cache_thread_state = current_thread_state;
     if (fill_cache_thread_state == NULL) {
-        fill_cache_thread_state = python_get_head_thread_state((void*) state->py_runtime_address, &state->config.offsets);
+        fill_cache_thread_state = python_get_head_thread_state(state);
     } else {
         BPF_TRACE("python: successfully retrieved PyThreadState from TLS: %p", fill_cache_thread_state);
     }

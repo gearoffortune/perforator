@@ -105,6 +105,7 @@ struct python_internals_offsets {
 struct python_config {
     u64 py_thread_state_tls_offset;
     u64 py_runtime_relative_address;
+    u64 py_interp_head_relative_address;
     u64 auto_tss_key_relative_address;
     u32 version;
     u32 unicode_type_size_log2;
@@ -147,6 +148,7 @@ struct python_state {
     struct pthread_config pthread_config;
     bool found_pthread_config;
     u64 py_runtime_address;
+    u64 py_interp_head_address;
     u64 auto_tss_key_address;
     struct python_frame frames[PYTHON_MAX_STACK_DEPTH];
     u32 frame_count;

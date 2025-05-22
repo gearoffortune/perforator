@@ -55,6 +55,11 @@ NPerforator::NBinaryProcessing::NPython::PythonConfig BuildPythonConfig(llvm::ob
         conf.SetRelativePyRuntimeAddress(*pyRuntimeAddress);
     }
 
+    auto interpHeadAddress = analyzer.ParseInterpHeadAddress();
+    if (interpHeadAddress) {
+        conf.SetRelativePyInterpHeadAddress(*interpHeadAddress);
+    }
+
     auto autoTSSkeyAddress = analyzer.ParseAutoTSSKeyAddress();
     if (autoTSSkeyAddress) {
         conf.SetRelativeAutoTSSkeyAddress(*autoTSSkeyAddress);

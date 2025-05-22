@@ -407,6 +407,9 @@ static ALWAYS_INLINE bool python_retrieve_configs(
     if (config->py_runtime_relative_address != 0) {
         state->py_runtime_address = proc_info->interpreter_binary.start_address + config->py_runtime_relative_address;
     }
+    if (config->py_interp_head_relative_address != 0) {
+        state->py_interp_head_address = proc_info->interpreter_binary.start_address + config->py_interp_head_relative_address;
+    }
     if (config->auto_tss_key_relative_address != 0) {
         state->auto_tss_key_address = proc_info->interpreter_binary.start_address + config->auto_tss_key_relative_address;
     }
