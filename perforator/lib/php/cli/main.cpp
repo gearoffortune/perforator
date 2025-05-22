@@ -21,4 +21,11 @@ int main(int argc, const char* argv[]) {
     } else {
         Cout << "Could not parse php version" << Endl;
     }
+    TMaybe<NPerforator::NLinguist::NPhp::EZendVmKind> vmKind = analyzer.ParseZendVmKind();
+    if (vmKind) {
+        Cout << "Parsed zend vm kind: "
+             << NPerforator::NLinguist::NPhp::ToString(*vmKind) << Endl;
+    } else {
+        Cout << "Could not parse zend vm kind" << Endl;
+    }
 }

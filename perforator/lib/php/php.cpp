@@ -31,6 +31,21 @@ TString TParsedPhpVersion::ToString() const {
     return builder;
 }
 
+TString ToString(const EZendVmKind vmKind) {
+    switch (vmKind) {
+        case EZendVmKind::Call:
+            return "Call";
+        case EZendVmKind::Switch:
+            return "Switch";
+        case EZendVmKind::Goto:
+            return "Goto";
+        case EZendVmKind::Hybrid:
+            return "Hybrid";
+        default:
+            return "Unknown vm kind";
+    }
+}
+
 TZendPhpAnalyzer::TZendPhpAnalyzer(const llvm::object::ObjectFile& file)
     : File_(file)
 {
@@ -42,7 +57,9 @@ void TZendPhpAnalyzer::ParseSymbolLocations() {
     }
 
     Symbols_ = MakeHolder<TSymbols>();
-    auto dynamicSymbols = NELF::RetrieveDynamicSymbols(File_, kPhpVersionSymbol);
+    auto dynamicSymbols = NELF::RetrieveDynamicSymbols(File_,
+                                                       kPhpVersionSymbol,
+                                                       KZendVmKindSymbol);
 
     auto setSymbolIfFound =
         [&](const THashMap<TStringBuf, NPerforator::NELF::TLocation>& symbols,
@@ -54,6 +71,7 @@ void TZendPhpAnalyzer::ParseSymbolLocations() {
 
     if (dynamicSymbols) {
         setSymbolIfFound(*dynamicSymbols, kPhpVersionSymbol, Symbols_->PhpVersion);
+        setSymbolIfFound(*dynamicSymbols, KZendVmKindSymbol, Symbols_->ZendVmKind);
     }
 
     auto symbols = NELF::RetrieveSymbols(File_, kZmInfoPhpCoreSymbol);
@@ -202,6 +220,52 @@ TMaybe<TParsedPhpVersion> TZendPhpAnalyzer::ParseVersion() {
         return res;
     }
     return Nothing();
+}
+
+TMaybe<EZendVmKind> TZendPhpAnalyzer::ParseZendVmKind() {
+    ParseSymbolLocations();
+
+    if (!Symbols_ || !Symbols_->ZendVmKind) {
+        return Nothing();
+    }
+
+    NPerforator::NELF::TLocation& zendVmKindSymbol = *Symbols_->ZendVmKind;
+    if (zendVmKindSymbol.Size == 0) {
+        zendVmKindSymbol.Size = 32;
+    }
+
+    auto bytecode = NPerforator::NELF::RetrieveContentFromTextSection(File_, zendVmKindSymbol);
+    if (!bytecode) {
+        return Nothing();
+    }
+
+    TMaybe<ui64> vmKindValue = NAsm::NX86::DecodeZendVmKind(
+        File_.makeTriple(),
+        zendVmKindSymbol.Address,
+        *bytecode);
+
+    if (!vmKindValue) {
+        return Nothing();
+    }
+    EZendVmKind vmKindEnum;
+    switch (*vmKindValue) {
+        case 1:
+            vmKindEnum = EZendVmKind::Call;
+            break;
+        case 2:
+            vmKindEnum = EZendVmKind::Switch;
+            break;
+        case 3:
+            vmKindEnum = EZendVmKind::Goto;
+            break;
+        case 4:
+            vmKindEnum = EZendVmKind::Hybrid;
+            break;
+        default:
+            return Nothing();
+    }
+
+    return MakeMaybe(vmKindEnum);
 }
 
 } // namespace NPerforator::NLinguist::NPhp

@@ -87,4 +87,39 @@ TMaybe<ui64> DecodeZmInfoPhpCore(const llvm::Triple& triple, ui64 functionAddres
     return Nothing();
 }
 
+/*
+
+0000000000524090 <zend_vm_kind>:
+  524090:   f3 0f 1e fa             endbr64
+  524094:   b8 04 00 00 00          mov    $0x4,%eax <-- we need to receive this
+  524099:   c3                      ret
+
+*/
+
+TMaybe<ui64> DecodeZendVmKind(const llvm::Triple& triple, ui64 functionAddress, TConstArrayRef<ui8> bytecode) {
+    auto instructionEvaluator = NPerforator::NAsm::NX86::MakeDefaultInstructionEvaluator();
+    NPerforator::NAsm::NX86::TBytecodeEvaluator evaluator(
+        triple,
+        NPerforator::NAsm::NX86::MakeInitialState(functionAddress),
+        bytecode,
+        *instructionEvaluator,
+        NPerforator::NAsm::NX86::MakeStopOnRetCondition());
+    auto result = evaluator.Evaluate();
+    if (!result.has_value()) {
+        return Nothing();
+    }
+
+    auto raxValue = GetRegisterValueOrAddress(result->State, llvm::X86::RAX);
+    if (raxValue) {
+        return raxValue;
+    }
+
+    auto eaxValue = GetRegisterValueOrAddress(result->State, llvm::X86::EAX);
+    if (eaxValue) {
+        return eaxValue;
+    }
+
+    return Nothing();
+}
+
 } // namespace NPerforator::NLinguist::NPhp::NAsm::NX86

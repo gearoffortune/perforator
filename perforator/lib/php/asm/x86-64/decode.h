@@ -44,4 +44,10 @@ TMaybe<ui64> DecodeZmInfoPhpCore(
     TConstArrayRef<ui8> bytecode
 );
 
+TMaybe<ui64> DecodeZendVmKind(
+    const llvm::Triple& triple,
+    ui64 functionAddress,
+    TConstArrayRef<ui8> bytecode
+);
+
 } // namespace NPerforator::NLinguist::NPhp::NAsm::NX86
