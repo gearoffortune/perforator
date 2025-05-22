@@ -389,8 +389,10 @@ struct TUnwinder {
 void Unwind(uintptr_t callerFrameStart, uintptr_t callerIp) {
     TJvmInfo jvmInfo = TJvmInfo::Resolve();
     TUnwinder unwinder{jvmInfo};
+    Cout << "\n\n\n>>>>>> Unwinding started" << Endl;
     Cout << "Interpreter: [" << SHex(jvmInfo.InterpreterBegin) << ", " << SHex(jvmInfo.InterpreterEnd) << ")" << Endl;
     unwinder.ProcessFrame(callerFrameStart, callerIp);
+    Cout << "<<<<<< Unwinding finished" << Endl;
 }
 }
 
