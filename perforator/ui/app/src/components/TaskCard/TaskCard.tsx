@@ -102,7 +102,7 @@ export const TaskCard: React.FC<TaskCardProps> = props => {
         ['Diff sample count', diffSpec?.DiffQuery?.MaxSamples],
         ['Trace', renderTraceLink()],
         ['Flamegraph format', format === 'Flamegraph' ? 'HTML' : undefined],
-        ['Executor', <Executors attempts={status?.Attempts}/>],
+        ['Executor', getExecutor({ attempts: status?.Attempts })],
     ];
 
     return (
@@ -125,16 +125,14 @@ const Selector: React.FC<{selector: string}> = ({ selector }) => (
     </>
 );
 
-const Executors: React.FC<{attempts?: TaskStatus['Attempts']}> = ({ attempts }) => {
-    if (!attempts) {
-        return null;
+const getExecutor = ({ attempts }: { attempts?: TaskStatus['Attempts'] }) => {
+    const executor = attempts?.[attempts?.length - 1]?.Executor;
+    if (!executor) {
+        return undefined;
     }
 
-
-    const executor = attempts?.[attempts?.length - 1]?.Executor;
     return <>
-
-        <Executor executor={executor}/>
+        <Executor executor={executor} />
         {attempts.length > 1 ?
             (
                 <HelpPopover tooltipClassName={'task-card__popover-content'} content={attempts.map(attempt => {
