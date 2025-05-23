@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"github.com/google/pprof/profile"
-
-	"github.com/yandex/perforator/perforator/internal/linguist/python/models"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -15,11 +13,12 @@ type SpecialMapping = string
 
 const (
 	KernelSpecialMapping SpecialMapping = "[kernel]"
+	PythonSpecialMapping SpecialMapping = "[python]"
 )
 
 var (
 	SpecialMappings = map[string]bool{
-		models.PythonSpecialMapping:  true,
+		string(PythonSpecialMapping): true,
 		string(KernelSpecialMapping): true,
 	}
 )

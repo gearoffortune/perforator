@@ -4,32 +4,43 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/google/pprof/profile"
+	pprof "github.com/google/pprof/profile"
 	"github.com/stretchr/testify/require"
 
-	"github.com/yandex/perforator/perforator/internal/linguist/python/models"
+	"github.com/yandex/perforator/perforator/agent/collector/pkg/profile"
 )
 
-func createSimpleLocationNative(funcName string) *profile.Location {
-	loc := &profile.Location{
-		Line: []profile.Line{
+func createSimpleLocationNative(funcName string, isKernel bool) *pprof.Location {
+	loc := &pprof.Location{
+		Line: []pprof.Line{
 			{
-				Function: &profile.Function{
+				Function: &pprof.Function{
 					Name: funcName,
 				},
 			},
 		},
 	}
+	if isKernel {
+		loc.Mapping = &pprof.Mapping{File: string(profile.KernelSpecialMapping)}
+	}
 
 	return loc
 }
 
-func createSimpleLocationPython(funcName string) *profile.Location {
-	loc := &profile.Location{
-		Mapping: &profile.Mapping{File: string(models.PythonSpecialMapping)},
-		Line: []profile.Line{
+func createSimpleLocationKernel(funcName string) *pprof.Location {
+	return createSimpleLocationNative(funcName, true)
+}
+
+func createSimpleLocationUserspace(funcName string) *pprof.Location {
+	return createSimpleLocationNative(funcName, false)
+}
+
+func createSimpleLocationPython(funcName string) *pprof.Location {
+	loc := &pprof.Location{
+		Mapping: &pprof.Mapping{File: string(profile.PythonSpecialMapping)},
+		Line: []pprof.Line{
 			{
-				Function: &profile.Function{
+				Function: &pprof.Function{
 					Name: funcName,
 				},
 			},
@@ -43,36 +54,37 @@ func TestMergeStacks_Simple(t *testing.T) {
 	merger := NewNativeAndPythonStackMerger()
 
 	for _, test := range []struct {
-		name           string
-		sample         *profile.Sample
-		resultSample   *profile.Sample
+		name   string
+		sample *pprof.Sample
+		// if resultSample is nil, then we expect that the sample is not changed
+		resultSample   *pprof.Sample
 		performedMerge bool
 		containsPython bool
 	}{
 		{
 			name: "busyloop_release",
-			sample: &profile.Sample{
-				Location: []*profile.Location{
-					createSimpleLocationNative("_start"),
-					createSimpleLocationNative("__libc_start_main"),
-					createSimpleLocationNative(invalid),
-					createSimpleLocationNative("PyObject_CallMethod"),
-					createSimpleLocationNative(invalid),
-					createSimpleLocationNative("_PyEval_EvalFrameDefault"),
-					createSimpleLocationNative(invalid),
+			sample: &pprof.Sample{
+				Location: []*pprof.Location{
+					createSimpleLocationUserspace("_start"),
+					createSimpleLocationUserspace("__libc_start_main"),
+					createSimpleLocationUserspace(invalid),
+					createSimpleLocationUserspace("PyObject_CallMethod"),
+					createSimpleLocationUserspace(invalid),
+					createSimpleLocationUserspace("_PyEval_EvalFrameDefault"),
+					createSimpleLocationUserspace(invalid),
 					createSimpleLocationPython("<trampoline python frame>"),
 					createSimpleLocationPython("main"),
 					createSimpleLocationPython("simple"),
 					createSimpleLocationPython("foo"),
 				},
 			},
-			resultSample: &profile.Sample{
-				Location: []*profile.Location{
-					createSimpleLocationNative("_start"),
-					createSimpleLocationNative("__libc_start_main"),
-					createSimpleLocationNative(invalid),
-					createSimpleLocationNative("PyObject_CallMethod"),
-					createSimpleLocationNative(invalid),
+			resultSample: &pprof.Sample{
+				Location: []*pprof.Location{
+					createSimpleLocationUserspace("_start"),
+					createSimpleLocationUserspace("__libc_start_main"),
+					createSimpleLocationUserspace(invalid),
+					createSimpleLocationUserspace("PyObject_CallMethod"),
+					createSimpleLocationUserspace(invalid),
 					createSimpleLocationPython("<trampoline python frame>"),
 					createSimpleLocationPython("main"),
 					createSimpleLocationPython("simple"),
@@ -84,27 +96,27 @@ func TestMergeStacks_Simple(t *testing.T) {
 		},
 		{
 			name: "busyloop2_release",
-			sample: &profile.Sample{
-				Location: []*profile.Location{
-					createSimpleLocationNative("_start"),
-					createSimpleLocationNative("__libc_start_main"),
-					createSimpleLocationNative(invalid),
-					createSimpleLocationNative("PyObject_CallMethod"),
-					createSimpleLocationNative(invalid),
-					createSimpleLocationNative("_PyEval_EvalFrameDefault"),
+			sample: &pprof.Sample{
+				Location: []*pprof.Location{
+					createSimpleLocationUserspace("_start"),
+					createSimpleLocationUserspace("__libc_start_main"),
+					createSimpleLocationUserspace(invalid),
+					createSimpleLocationUserspace("PyObject_CallMethod"),
+					createSimpleLocationUserspace(invalid),
+					createSimpleLocationUserspace("_PyEval_EvalFrameDefault"),
 					createSimpleLocationPython("<trampoline python frame>"),
 					createSimpleLocationPython("main"),
 					createSimpleLocationPython("simple"),
 					createSimpleLocationPython("foo"),
 				},
 			},
-			resultSample: &profile.Sample{
-				Location: []*profile.Location{
-					createSimpleLocationNative("_start"),
-					createSimpleLocationNative("__libc_start_main"),
-					createSimpleLocationNative(invalid),
-					createSimpleLocationNative("PyObject_CallMethod"),
-					createSimpleLocationNative(invalid),
+			resultSample: &pprof.Sample{
+				Location: []*pprof.Location{
+					createSimpleLocationUserspace("_start"),
+					createSimpleLocationUserspace("__libc_start_main"),
+					createSimpleLocationUserspace(invalid),
+					createSimpleLocationUserspace("PyObject_CallMethod"),
+					createSimpleLocationUserspace(invalid),
 					createSimpleLocationPython("<trampoline python frame>"),
 					createSimpleLocationPython("main"),
 					createSimpleLocationPython("simple"),
@@ -116,47 +128,47 @@ func TestMergeStacks_Simple(t *testing.T) {
 		},
 		{
 			name: "busyloop1_debug",
-			sample: &profile.Sample{
-				Location: []*profile.Location{
-					createSimpleLocationNative("_start"),
-					createSimpleLocationNative("__libc_start_main"),
-					createSimpleLocationNative("main"),
-					createSimpleLocationNative("pymain"),
-					createSimpleLocationNative("PyObject_CallMethod"),
-					createSimpleLocationNative("callmethod"),
-					createSimpleLocationNative("_PyObject_CallFunctionVa"),
-					createSimpleLocationNative("_PyObject_CallNoArgsTstate"),
-					createSimpleLocationNative("_PyObject_VectorcallTstate"),
-					createSimpleLocationNative("_PyFunction_Vectorcall"),
-					createSimpleLocationNative("_PyEval_Vector"),
-					createSimpleLocationNative("_PyEval_EvalFrame"),
-					createSimpleLocationNative("_PyEval_EvalFrameDefault"),
-					createSimpleLocationNative("Py_XDECREF"),
+			sample: &pprof.Sample{
+				Location: []*pprof.Location{
+					createSimpleLocationUserspace("_start"),
+					createSimpleLocationUserspace("__libc_start_main"),
+					createSimpleLocationUserspace("main"),
+					createSimpleLocationUserspace("pymain"),
+					createSimpleLocationUserspace("PyObject_CallMethod"),
+					createSimpleLocationUserspace("callmethod"),
+					createSimpleLocationUserspace("_PyObject_CallFunctionVa"),
+					createSimpleLocationUserspace("_PyObject_CallNoArgsTstate"),
+					createSimpleLocationUserspace("_PyObject_VectorcallTstate"),
+					createSimpleLocationUserspace("_PyFunction_Vectorcall"),
+					createSimpleLocationUserspace("_PyEval_Vector"),
+					createSimpleLocationUserspace("_PyEval_EvalFrame"),
+					createSimpleLocationUserspace("_PyEval_EvalFrameDefault"),
+					createSimpleLocationUserspace("Py_XDECREF"),
 					createSimpleLocationPython("<trampoline python frame>"),
 					createSimpleLocationPython("main"),
 					createSimpleLocationPython("simple"),
 					createSimpleLocationPython("foo"),
 				},
 			},
-			resultSample: &profile.Sample{
-				Location: []*profile.Location{
-					createSimpleLocationNative("_start"),
-					createSimpleLocationNative("__libc_start_main"),
-					createSimpleLocationNative("main"),
-					createSimpleLocationNative("pymain"),
-					createSimpleLocationNative("PyObject_CallMethod"),
-					createSimpleLocationNative("callmethod"),
-					createSimpleLocationNative("_PyObject_CallFunctionVa"),
-					createSimpleLocationNative("_PyObject_CallNoArgsTstate"),
-					createSimpleLocationNative("_PyObject_VectorcallTstate"),
-					createSimpleLocationNative("_PyFunction_Vectorcall"),
-					createSimpleLocationNative("_PyEval_Vector"),
-					createSimpleLocationNative("_PyEval_EvalFrame"),
+			resultSample: &pprof.Sample{
+				Location: []*pprof.Location{
+					createSimpleLocationUserspace("_start"),
+					createSimpleLocationUserspace("__libc_start_main"),
+					createSimpleLocationUserspace("main"),
+					createSimpleLocationUserspace("pymain"),
+					createSimpleLocationUserspace("PyObject_CallMethod"),
+					createSimpleLocationUserspace("callmethod"),
+					createSimpleLocationUserspace("_PyObject_CallFunctionVa"),
+					createSimpleLocationUserspace("_PyObject_CallNoArgsTstate"),
+					createSimpleLocationUserspace("_PyObject_VectorcallTstate"),
+					createSimpleLocationUserspace("_PyFunction_Vectorcall"),
+					createSimpleLocationUserspace("_PyEval_Vector"),
+					createSimpleLocationUserspace("_PyEval_EvalFrame"),
 					createSimpleLocationPython("<trampoline python frame>"),
 					createSimpleLocationPython("main"),
 					createSimpleLocationPython("simple"),
 					createSimpleLocationPython("foo"),
-					createSimpleLocationNative("Py_XDECREF"),
+					createSimpleLocationUserspace("Py_XDECREF"),
 				},
 			},
 			performedMerge: true,
@@ -164,51 +176,51 @@ func TestMergeStacks_Simple(t *testing.T) {
 		},
 		{
 			name: "busyloop2_debug",
-			sample: &profile.Sample{
-				Location: []*profile.Location{
-					createSimpleLocationNative("_start"),
-					createSimpleLocationNative("__libc_start_main"),
-					createSimpleLocationNative("main"),
-					createSimpleLocationNative("pymain"),
-					createSimpleLocationNative("PyObject_CallMethod"),
-					createSimpleLocationNative("callmethod"),
-					createSimpleLocationNative("_PyObject_CallFunctionVa"),
-					createSimpleLocationNative("_PyObject_CallNoArgsTstate"),
-					createSimpleLocationNative("_PyObject_VectorcallTstate"),
-					createSimpleLocationNative("_PyFunction_Vectorcall"),
-					createSimpleLocationNative("_PyEval_Vector"),
-					createSimpleLocationNative("_PyEval_EvalFrame"),
-					createSimpleLocationNative("_PyEval_EvalFrameDefault"),
-					createSimpleLocationNative("_Py_DECREF_SPECIALIZED"),
-					createSimpleLocationNative("_PyInterpreterState_GET"),
-					createSimpleLocationNative("_PyThreadState_GET"),
+			sample: &pprof.Sample{
+				Location: []*pprof.Location{
+					createSimpleLocationUserspace("_start"),
+					createSimpleLocationUserspace("__libc_start_main"),
+					createSimpleLocationUserspace("main"),
+					createSimpleLocationUserspace("pymain"),
+					createSimpleLocationUserspace("PyObject_CallMethod"),
+					createSimpleLocationUserspace("callmethod"),
+					createSimpleLocationUserspace("_PyObject_CallFunctionVa"),
+					createSimpleLocationUserspace("_PyObject_CallNoArgsTstate"),
+					createSimpleLocationUserspace("_PyObject_VectorcallTstate"),
+					createSimpleLocationUserspace("_PyFunction_Vectorcall"),
+					createSimpleLocationUserspace("_PyEval_Vector"),
+					createSimpleLocationUserspace("_PyEval_EvalFrame"),
+					createSimpleLocationUserspace("_PyEval_EvalFrameDefault"),
+					createSimpleLocationUserspace("_Py_DECREF_SPECIALIZED"),
+					createSimpleLocationUserspace("_PyInterpreterState_GET"),
+					createSimpleLocationUserspace("_PyThreadState_GET"),
 					createSimpleLocationPython("<trampoline python frame>"),
 					createSimpleLocationPython("main"),
 					createSimpleLocationPython("simple"),
 					createSimpleLocationPython("foo"),
 				},
 			},
-			resultSample: &profile.Sample{
-				Location: []*profile.Location{
-					createSimpleLocationNative("_start"),
-					createSimpleLocationNative("__libc_start_main"),
-					createSimpleLocationNative("main"),
-					createSimpleLocationNative("pymain"),
-					createSimpleLocationNative("PyObject_CallMethod"),
-					createSimpleLocationNative("callmethod"),
-					createSimpleLocationNative("_PyObject_CallFunctionVa"),
-					createSimpleLocationNative("_PyObject_CallNoArgsTstate"),
-					createSimpleLocationNative("_PyObject_VectorcallTstate"),
-					createSimpleLocationNative("_PyFunction_Vectorcall"),
-					createSimpleLocationNative("_PyEval_Vector"),
-					createSimpleLocationNative("_PyEval_EvalFrame"),
+			resultSample: &pprof.Sample{
+				Location: []*pprof.Location{
+					createSimpleLocationUserspace("_start"),
+					createSimpleLocationUserspace("__libc_start_main"),
+					createSimpleLocationUserspace("main"),
+					createSimpleLocationUserspace("pymain"),
+					createSimpleLocationUserspace("PyObject_CallMethod"),
+					createSimpleLocationUserspace("callmethod"),
+					createSimpleLocationUserspace("_PyObject_CallFunctionVa"),
+					createSimpleLocationUserspace("_PyObject_CallNoArgsTstate"),
+					createSimpleLocationUserspace("_PyObject_VectorcallTstate"),
+					createSimpleLocationUserspace("_PyFunction_Vectorcall"),
+					createSimpleLocationUserspace("_PyEval_Vector"),
+					createSimpleLocationUserspace("_PyEval_EvalFrame"),
 					createSimpleLocationPython("<trampoline python frame>"),
 					createSimpleLocationPython("main"),
 					createSimpleLocationPython("simple"),
 					createSimpleLocationPython("foo"),
-					createSimpleLocationNative("_Py_DECREF_SPECIALIZED"),
-					createSimpleLocationNative("_PyInterpreterState_GET"),
-					createSimpleLocationNative("_PyThreadState_GET"),
+					createSimpleLocationUserspace("_Py_DECREF_SPECIALIZED"),
+					createSimpleLocationUserspace("_PyInterpreterState_GET"),
+					createSimpleLocationUserspace("_PyThreadState_GET"),
 				},
 			},
 			performedMerge: true,
@@ -216,12 +228,12 @@ func TestMergeStacks_Simple(t *testing.T) {
 		},
 		{
 			name: "only_native",
-			sample: &profile.Sample{
-				Location: []*profile.Location{
-					createSimpleLocationNative("_start"),
-					createSimpleLocationNative("__libc_start_main"),
-					createSimpleLocationNative("main"),
-					createSimpleLocationNative("foo"),
+			sample: &pprof.Sample{
+				Location: []*pprof.Location{
+					createSimpleLocationUserspace("_start"),
+					createSimpleLocationUserspace("__libc_start_main"),
+					createSimpleLocationUserspace("main"),
+					createSimpleLocationUserspace("foo"),
 				},
 			},
 			performedMerge: false,
@@ -229,12 +241,12 @@ func TestMergeStacks_Simple(t *testing.T) {
 		},
 		{
 			name: "incorrect",
-			sample: &profile.Sample{
-				Location: []*profile.Location{
-					createSimpleLocationNative("_start"),
-					createSimpleLocationNative("__libc_start_main"),
-					createSimpleLocationNative("main"),
-					createSimpleLocationNative("foo"),
+			sample: &pprof.Sample{
+				Location: []*pprof.Location{
+					createSimpleLocationUserspace("_start"),
+					createSimpleLocationUserspace("__libc_start_main"),
+					createSimpleLocationUserspace("main"),
+					createSimpleLocationUserspace("foo"),
 					createSimpleLocationPython("<trampoline python frame>"),
 					createSimpleLocationPython("main"),
 					createSimpleLocationPython("simple"),
@@ -246,50 +258,89 @@ func TestMergeStacks_Simple(t *testing.T) {
 		},
 		{
 			name: "trim_last_cpython_substack",
-			sample: &profile.Sample{
-				Location: []*profile.Location{
-					createSimpleLocationNative("_start"),
-					createSimpleLocationNative("__libc_start_main"),
-					createSimpleLocationNative("main"),
-					createSimpleLocationNative(invalid),
-					createSimpleLocationNative("PyObject_CallMethod"),
-					createSimpleLocationNative(invalid),
-					createSimpleLocationNative("_PyEval_EvalFrameDefault"),
-					createSimpleLocationNative(invalid),
-					createSimpleLocationNative("PyObject_CallMethod"),
-					createSimpleLocationNative(invalid),
-					createSimpleLocationNative("_PyEval_EvalFrameDefault"),
-					createSimpleLocationNative(invalid),
+			sample: &pprof.Sample{
+				Location: []*pprof.Location{
+					createSimpleLocationUserspace("_start"),
+					createSimpleLocationUserspace("__libc_start_main"),
+					createSimpleLocationUserspace("main"),
+					createSimpleLocationUserspace(invalid),
+					createSimpleLocationUserspace("PyObject_CallMethod"),
+					createSimpleLocationUserspace(invalid),
+					createSimpleLocationUserspace("_PyEval_EvalFrameDefault"),
+					createSimpleLocationUserspace(invalid),
+					createSimpleLocationUserspace("PyObject_CallMethod"),
+					createSimpleLocationUserspace(invalid),
+					createSimpleLocationUserspace("_PyEval_EvalFrameDefault"),
+					createSimpleLocationUserspace(invalid),
 					createSimpleLocationPython("<trampoline python frame>"),
 					createSimpleLocationPython("main"),
 					createSimpleLocationPython("simple"),
 					createSimpleLocationPython("foo"),
 				},
 			},
-			resultSample: &profile.Sample{
-				Location: []*profile.Location{
-					createSimpleLocationNative("_start"),
-					createSimpleLocationNative("__libc_start_main"),
-					createSimpleLocationNative("main"),
-					createSimpleLocationNative(invalid),
-					createSimpleLocationNative("PyObject_CallMethod"),
-					createSimpleLocationNative(invalid),
+			resultSample: &pprof.Sample{
+				Location: []*pprof.Location{
+					createSimpleLocationUserspace("_start"),
+					createSimpleLocationUserspace("__libc_start_main"),
+					createSimpleLocationUserspace("main"),
+					createSimpleLocationUserspace(invalid),
+					createSimpleLocationUserspace("PyObject_CallMethod"),
+					createSimpleLocationUserspace(invalid),
 					createSimpleLocationPython("<trampoline python frame>"),
 					createSimpleLocationPython("main"),
 					createSimpleLocationPython("simple"),
 					createSimpleLocationPython("foo"),
-					createSimpleLocationNative("PyObject_CallMethod"),
-					createSimpleLocationNative(invalid),
-					createSimpleLocationNative("_PyEval_EvalFrameDefault"),
-					createSimpleLocationNative(invalid),
+					createSimpleLocationUserspace("PyObject_CallMethod"),
+					createSimpleLocationUserspace(invalid),
+					createSimpleLocationUserspace("_PyEval_EvalFrameDefault"),
+					createSimpleLocationUserspace(invalid),
 				},
 			},
 			performedMerge: true,
 			containsPython: true,
 		},
+		{
+			name: "python_stack_before_kernel_stack_on_failed_merge",
+			sample: &pprof.Sample{
+				Location: []*pprof.Location{
+					createSimpleLocationUserspace("_start"),
+					createSimpleLocationUserspace("__libc_start_main"),
+					createSimpleLocationUserspace("main"),
+					createSimpleLocationUserspace("foo"),
+					createSimpleLocationKernel("apic_timer_interrupt"),
+					createSimpleLocationKernel("smp_apic_timer_interrupt"),
+					createSimpleLocationPython("<trampoline python frame>"),
+					createSimpleLocationPython("main"),
+					createSimpleLocationPython("simple"),
+					createSimpleLocationPython("foo"),
+				},
+			},
+			resultSample: &pprof.Sample{
+				Location: []*pprof.Location{
+					createSimpleLocationUserspace("_start"),
+					createSimpleLocationUserspace("__libc_start_main"),
+					createSimpleLocationUserspace("main"),
+					createSimpleLocationUserspace("foo"),
+					createSimpleLocationPython("<trampoline python frame>"),
+					createSimpleLocationPython("main"),
+					createSimpleLocationPython("simple"),
+					createSimpleLocationPython("foo"),
+					createSimpleLocationKernel("apic_timer_interrupt"),
+					createSimpleLocationKernel("smp_apic_timer_interrupt"),
+				},
+			},
+			performedMerge: false,
+			containsPython: true,
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			slices.Reverse(test.sample.Location)
+
+			originalSample := &pprof.Sample{
+				Location: make([]*pprof.Location, len(test.sample.Location)),
+			}
+			copy(originalSample.Location, test.sample.Location)
+
 			if test.resultSample != nil {
 				slices.Reverse(test.resultSample.Location)
 			}
@@ -299,11 +350,14 @@ func TestMergeStacks_Simple(t *testing.T) {
 			require.Equal(t, test.performedMerge, stats.PerformedMerge, "Did not perform merge")
 			require.Equal(t, test.containsPython, stats.CollectedPython, "Did not collect python")
 
-			if test.performedMerge {
-				require.Equal(t, len(test.resultSample.Location), len(test.sample.Location))
-				for i := 0; i < len(test.resultSample.Location); i++ {
-					require.Equal(t, test.resultSample.Location[i], test.sample.Location[i])
-				}
+			diffSample := originalSample
+			if test.resultSample != nil {
+				diffSample = test.resultSample
+			}
+
+			require.Equal(t, len(diffSample.Location), len(test.sample.Location))
+			for i := 0; i < len(diffSample.Location); i++ {
+				require.Equal(t, diffSample.Location[i], test.sample.Location[i])
 			}
 		})
 	}

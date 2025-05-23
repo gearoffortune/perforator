@@ -13,9 +13,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/google/pprof/profile"
+	pprof "github.com/google/pprof/profile"
 
-	python_models "github.com/yandex/perforator/perforator/internal/linguist/python/models"
+	"github.com/yandex/perforator/perforator/agent/collector/pkg/profile"
 	"github.com/yandex/perforator/perforator/pkg/profile/flamegraph/collapsed"
 	"github.com/yandex/perforator/perforator/pkg/profile/flamegraph/render/format"
 	"github.com/yandex/perforator/perforator/pkg/profile/labels"
@@ -277,12 +277,12 @@ func (f *FlameGraph) color(block *block) color.RGBA {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-func (f *FlameGraph) AddProfile(profile *profile.Profile) error {
+func (f *FlameGraph) AddProfile(profile *pprof.Profile) error {
 	f.addProfile(profile, false)
 	return nil
 }
 
-func (f *FlameGraph) AddBaselineProfile(profile *profile.Profile) error {
+func (f *FlameGraph) AddBaselineProfile(profile *pprof.Profile) error {
 	f.diff = true
 	f.addProfile(profile, true)
 	return nil
@@ -319,7 +319,7 @@ func (f *FlameGraph) TotalEvents() float64 {
 	return f.bb.root.nextCount.events
 }
 
-func (f *FlameGraph) RenderPProf(profile *profile.Profile, w io.Writer) error {
+func (f *FlameGraph) RenderPProf(profile *pprof.Profile, w io.Writer) error {
 	if err := f.AddProfile(profile); err != nil {
 		return err
 	}
@@ -597,7 +597,7 @@ func (f *FlameGraph) addCollapsedProfile(profile *collapsed.Profile, baseline bo
 	}
 }
 
-func (f *FlameGraph) getLocationFrames(loc *profile.Location) []locationData {
+func (f *FlameGraph) getLocationFrames(loc *pprof.Location) []locationData {
 	frames := make([]locationData, 0, len(loc.Line))
 	for i, line := range loc.Line {
 		funcname := "??"
@@ -649,7 +649,7 @@ func (f *FlameGraph) getLocationFrames(loc *profile.Location) []locationData {
 	return frames
 }
 
-func (f *FlameGraph) getLocationFramesCached(loc *profile.Location) []locationData {
+func (f *FlameGraph) getLocationFramesCached(loc *pprof.Location) []locationData {
 	if loc.Mapping == nil {
 		return f.getLocationFrames(loc)
 	}
@@ -671,7 +671,7 @@ func (f *FlameGraph) clearLocationsCache() {
 	f.locationsCache = make(map[locationMeta][]locationData)
 }
 
-func (f *FlameGraph) addProfile(p *profile.Profile, baseline bool) {
+func (f *FlameGraph) addProfile(p *pprof.Profile, baseline bool) {
 	defer func() {
 		f.clearLocationsCache()
 	}()
@@ -712,7 +712,7 @@ func (f *FlameGraph) addProfile(p *profile.Profile, baseline bool) {
 			if loc.Mapping != nil && strings.Contains(loc.Mapping.File, "kernel") {
 				origin = FrameOriginKernel
 			}
-			if loc.Mapping != nil && loc.Mapping.File == python_models.PythonSpecialMapping {
+			if loc.Mapping != nil && loc.Mapping.File == profile.PythonSpecialMapping {
 				origin = FrameOriginPython
 			}
 

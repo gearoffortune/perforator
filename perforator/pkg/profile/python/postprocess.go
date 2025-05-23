@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/google/pprof/profile"
+	pprof "github.com/google/pprof/profile"
 
+	"github.com/yandex/perforator/perforator/agent/collector/pkg/profile"
 	"github.com/yandex/perforator/perforator/internal/linguist/python/hardcode"
 	"github.com/yandex/perforator/perforator/internal/linguist/python/models"
 )
@@ -26,12 +27,12 @@ func (s *StackSubsegment) Length() int {
 }
 
 type NativeAndPythonStackMerger struct {
-	sample                *profile.Sample
+	sample                *pprof.Sample
 	cStackIndex           int
 	pythonStartStackIndex int
 	pythonStackIndex      int
 
-	resultStack []*profile.Location
+	resultStack []*pprof.Location
 
 	pythonSegments             []StackSubsegment
 	cPythonInterpreterSegments []StackSubsegment
@@ -39,13 +40,13 @@ type NativeAndPythonStackMerger struct {
 
 func NewNativeAndPythonStackMerger() *NativeAndPythonStackMerger {
 	return &NativeAndPythonStackMerger{
-		resultStack:                make([]*profile.Location, 0, 512),
+		resultStack:                make([]*pprof.Location, 0, 512),
 		pythonSegments:             []StackSubsegment{},
 		cPythonInterpreterSegments: []StackSubsegment{},
 	}
 }
 
-func (m *NativeAndPythonStackMerger) reset(sample *profile.Sample) {
+func (m *NativeAndPythonStackMerger) reset(sample *pprof.Sample) {
 	m.sample = sample
 	m.pythonStackIndex = -1
 	m.pythonStartStackIndex = -1
@@ -59,7 +60,7 @@ func (m *NativeAndPythonStackMerger) cleanup() {
 	m.sample = nil
 }
 
-func isInternalCPythonEvaluationFunction(loc *profile.Location) bool {
+func isInternalCPythonEvaluationFunction(loc *pprof.Location) bool {
 	for _, line := range loc.Line {
 		if line.Function != nil &&
 			(line.Function.Name == invalid || line.Function.SystemName == invalid ||
@@ -71,7 +72,7 @@ func isInternalCPythonEvaluationFunction(loc *profile.Location) bool {
 	return false
 }
 
-func isCPythonEvaluationEntryPoint(loc *profile.Location) bool {
+func isCPythonEvaluationEntryPoint(loc *pprof.Location) bool {
 	for _, line := range loc.Line {
 		if line.Function != nil &&
 			(hardcode.CPythonAPIEvaluationFunctions[line.Function.Name] || hardcode.CPythonAPIEvaluationFunctions[line.Function.SystemName]) {
@@ -111,7 +112,7 @@ func (m *NativeAndPythonStackMerger) nextCStackPythonInterpreterSegment() (res *
 	return res
 }
 
-func isTrampolinePythonFrame(f *profile.Function) bool {
+func isTrampolinePythonFrame(f *pprof.Function) bool {
 	return f.Name == models.PythonTrampolineFrame
 }
 
@@ -131,8 +132,8 @@ func (m *NativeAndPythonStackMerger) nextPythonInterpreterSegment() (res *StackS
 		}
 
 		if loc.Line[0].Function == nil {
-			// *profile.Function is also set for *profile.Location on agent, so here we just sanity check this
-			return nil, errors.New("*profile.Function not set for python *profile.Location")
+			// *pprof.Function is also set for *pprof.Location on agent, so here we just sanity check this
+			return nil, errors.New("*pprof.Function not set for python *pprof.Location")
 		}
 
 		if isTrampolinePythonFrame(loc.Line[0].Function) {
@@ -144,8 +145,12 @@ func (m *NativeAndPythonStackMerger) nextPythonInterpreterSegment() (res *StackS
 	return res, nil
 }
 
-func isPythonLocation(loc *profile.Location) bool {
-	return loc.Mapping != nil && loc.Mapping.File == string(models.PythonSpecialMapping)
+func isPythonLocation(loc *pprof.Location) bool {
+	return loc.Mapping != nil && loc.Mapping.File == string(profile.PythonSpecialMapping)
+}
+
+func isKernelLocation(loc *pprof.Location) bool {
+	return loc.Mapping != nil && loc.Mapping.File == string(profile.KernelSpecialMapping)
 }
 
 func (m *NativeAndPythonStackMerger) setStartPythonStackIndex() (foundPythonStack bool) {
@@ -245,9 +250,36 @@ func (m *NativeAndPythonStackMerger) trimLastCPythonSubstackIfNeeded() {
 	}
 }
 
-// Merge stacks inplace for this sample
-// Stack is laid down top to bottom from left to right
-func (m *NativeAndPythonStackMerger) MergeStacks(s *profile.Sample) (MergeStackStats, error) {
+func (m *NativeAndPythonStackMerger) putPythonBeforeKernelStack() {
+	userspaceStackStartIndex := m.pythonStartStackIndex + 1
+	for i := m.pythonStartStackIndex + 1; i < len(m.sample.Location); i++ {
+		if !isKernelLocation(m.sample.Location[i]) {
+			userspaceStackStartIndex = i
+			break
+		}
+
+		m.resultStack = append(m.resultStack, m.sample.Location[i])
+	}
+
+	for i := 0; i <= m.pythonStartStackIndex; i++ {
+		m.resultStack = append(m.resultStack, m.sample.Location[i])
+	}
+
+	for i := userspaceStackStartIndex; i < len(m.sample.Location); i++ {
+		m.resultStack = append(m.resultStack, m.sample.Location[i])
+	}
+
+	m.sample.Location = m.sample.Location[:0]
+	m.sample.Location = append(m.sample.Location, m.resultStack...)
+}
+
+// Merge stacks inplace for this sample.
+// Stack is laid down top to bottom from left to right.
+// We expect that first frames are reverse python frames, then reverse kernel frames, then reversed userspace frames.
+// The resulting stack is return using the same layout.
+// Here is the code that originates this layout:
+// https://github.com/yandex/perforator/blob/f838dd038cc7437bb5674d8ccee2c6086f0bc46c/perforator/agent/collector/pkg/profiler/sample_consumer.go#L480
+func (m *NativeAndPythonStackMerger) MergeStacks(s *pprof.Sample) (MergeStackStats, error) {
 	m.reset(s)
 	if m.sample == nil {
 		return MergeStackStats{}, nil
@@ -268,6 +300,9 @@ func (m *NativeAndPythonStackMerger) MergeStacks(s *profile.Sample) (MergeStackS
 	stats.PythonSubStacks = append(stats.PythonSubStacks, m.pythonSegments...)
 
 	if len(stats.PythonSubStacks) != len(stats.CSubStacks) {
+		if stats.CollectedPython {
+			m.putPythonBeforeKernelStack()
+		}
 		// Most probably python interpreter C stacks are not extracted correctly
 		//   so do not continue with merge
 		return stats, nil
@@ -300,7 +335,7 @@ type PostProcessResults struct {
 	Errors []error
 }
 
-func PostprocessSymbolizedProfileWithPython(p *profile.Profile) (res PostProcessResults) {
+func PostprocessSymbolizedProfileWithPython(p *pprof.Profile) (res PostProcessResults) {
 	merger := NewNativeAndPythonStackMerger()
 	for _, sample := range p.Sample {
 		stats, err := merger.MergeStacks(sample)

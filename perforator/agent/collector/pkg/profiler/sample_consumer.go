@@ -395,7 +395,7 @@ func (c *SampleConsumer) collectPythonStackInto(builder *profile.SampleBuilder) 
 			CodeObjectFirstLineNo: frame.SymbolKey.CoFirstlineno,
 		})
 
-		loc.SetMapping().SetPath(python_models.PythonSpecialMapping).Finish()
+		loc.SetMapping().SetPath(profile.PythonSpecialMapping).Finish()
 		c.processPythonFrame(loc, frame)
 
 		loc.Finish()
