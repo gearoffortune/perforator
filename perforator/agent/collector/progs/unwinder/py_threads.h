@@ -13,8 +13,6 @@
 static ALWAYS_INLINE void* python_read_py_thread_state_ptr_static_tls(u64 offset) {
     unsigned long tcb = get_tcb_pointer();
 
-    BPF_TRACE("python: read tcb %p, offset %d", tcb, offset);
-
     void* uaddr = (void*) (tcb - offset);
 
     void* py_thread_state_addr = NULL;
@@ -78,8 +76,6 @@ static ALWAYS_INLINE void* python_read_py_thread_state_ptr_pthread_tss(struct py
         return NULL;
     }
 
-    BPF_TRACE("python: read tss key %u", tss_key);
-
     return pthread_read_tss(&state->pthread_config, (u32) tss_key);
 }
 
@@ -88,59 +84,83 @@ static ALWAYS_INLINE void* python_read_py_thread_state_ptr_from_tls(struct pytho
         return NULL;
     }
 
+    void* res = NULL;
     if (state->config.py_thread_state_tls_offset != 0) {
-        return python_read_py_thread_state_ptr_static_tls(state->config.py_thread_state_tls_offset);
+        res = python_read_py_thread_state_ptr_static_tls(state->config.py_thread_state_tls_offset);
     } else if (state->found_pthread_config) {
-        return python_read_py_thread_state_ptr_pthread_tss(state);
-    } else {
-        BPF_TRACE("python: no tls read tried");
+        res = python_read_py_thread_state_ptr_pthread_tss(state);
     }
 
-    return NULL;
+    BPF_TRACE("python: read PyThreadState from TLS: %p", res);
+
+    return res;
 }
 
-static ALWAYS_INLINE void* python_get_py_thread_state_from_cache(u32 current_ns_pid, u32 inner_ns_tid) {
-    struct python_thread_key key = {
-        .current_ns_pid = current_ns_pid,
-        .inner_ns_tid = inner_ns_tid
-    };
-
-    void** py_thread_state_ptr = bpf_map_lookup_elem(&python_thread_id_py_thread_state, &key);
-    if (py_thread_state_ptr == NULL) {
-        BPF_TRACE("python: failed to find PyThreadState for current_ns_pid=%u, inner_ns_tid=%u",
-                 current_ns_pid, inner_ns_tid);
+static ALWAYS_INLINE void* python_get_py_thread_state_from_cache(struct python_thread_key* key) {
+    if (key == NULL) {
         return NULL;
     }
 
-    BPF_TRACE("python: successfully retrieved PyThreadState for current_ns_pid=%u, inner_ns_tid=%u",
-             current_ns_pid, inner_ns_tid);
+    void** py_thread_state_ptr = bpf_map_lookup_elem(&python_thread_id_py_thread_state, key);
+    if (py_thread_state_ptr == NULL) {
+        BPF_TRACE("python: failed to find PyThreadState for pid=%u, thread_id=%u",
+                 key->pid, key->thread_id);
+        return NULL;
+    }
+
+    BPF_TRACE("python: successfully retrieved PyThreadState for pid=%u, thread_id=%u",
+             key->pid, key->thread_id);
 
     return *py_thread_state_ptr;
 }
 
-static ALWAYS_INLINE void* python_get_current_thread_state_from_cache(u32 current_ns_pid) {
-    u32 inner_ns_tid = get_current_task_innermost_pid();
-    return python_get_py_thread_state_from_cache(current_ns_pid, inner_ns_tid);
+static ALWAYS_INLINE void* python_get_current_thread_state_from_cache(struct python_state* state) {
+    if (state == NULL) {
+        return NULL;
+    }
+
+    state->thread_key.pid = state->pid;
+
+    if (state->config.offsets.py_thread_state_offsets.native_thread_id == PYTHON_UNSPECIFIED_OFFSET) {
+        // Note: For x86_64 and glibc 2.4+ (after 2006) pthread_t is actually struct pthread* pointer.
+        // Also tcb_head_t is a header of struct pthread.
+        state->thread_key.thread_id = get_tcb_pointer();
+    } else {
+        state->thread_key.thread_id = get_current_task_innermost_pid();
+    }
+
+    return python_get_py_thread_state_from_cache(&state->thread_key);
 }
 
-static ALWAYS_INLINE u32 python_read_native_thread_id(void* py_thread_state, struct python_thread_state_offsets* thread_state_offsets) {
-    if (py_thread_state == NULL || thread_state_offsets == NULL || thread_state_offsets->native_thread_id == PYTHON_UNSPECIFIED_OFFSET) {
+static ALWAYS_INLINE u64 python_read_thread_id(void* py_thread_state, struct python_thread_state_offsets* thread_state_offsets) {
+    if (py_thread_state == NULL || thread_state_offsets == NULL) {
         return 0;
     }
 
-    u32 native_thread_id = 0;
-    long err = bpf_probe_read_user(&native_thread_id, sizeof(u32), (void*)py_thread_state + thread_state_offsets->native_thread_id);
+    u32 offset = thread_state_offsets->native_thread_id;
+    if (offset == PYTHON_UNSPECIFIED_OFFSET) {
+        offset = thread_state_offsets->thread_id;
+    }
+
+    if (offset == PYTHON_UNSPECIFIED_OFFSET) {
+        return 0;
+    }
+
+    u64 thread_id = 0;
+    long err = bpf_probe_read_user(&thread_id, sizeof(u64), (void*)py_thread_state + offset);
     if (err != 0) {
-        metric_increment(METRIC_PYTHON_READ_NATIVE_THREAD_ID_ERROR_COUNT);
+        metric_increment(METRIC_PYTHON_READ_THREAD_ID_ERROR_COUNT);
         BPF_TRACE(
-            "python: failed to read native thread ID at offset %d: %d",
-            thread_state_offsets->native_thread_id,
+            "python: failed to read thread_id on *PyThreadState at offset %d: %d",
+            offset,
             err
         );
         return 0;
     }
 
-    return native_thread_id;
+    BPF_TRACE("python: read thread_id at offset %d: %u", offset, thread_id);
+
+    return thread_id;
 }
 
 static NOINLINE void python_upsert_thread_state(struct python_state* state, void* py_thread_state) {
@@ -148,25 +168,21 @@ static NOINLINE void python_upsert_thread_state(struct python_state* state, void
         return;
     }
 
-    BPF_TRACE("python: upsert PyThreadState");
-
-    state->thread_key.current_ns_pid = state->pid;
-
-    // Here we assume that native_thread_id is actually pid in bottom-level pid namespace.
-    state->thread_key.inner_ns_tid = python_read_native_thread_id(py_thread_state, &state->config.offsets.py_thread_state_offsets);
-    if (state->thread_key.inner_ns_tid == 0) {
-        BPF_TRACE("python: failed to retrieve native thread ID from thread_state %p", py_thread_state);
+    state->thread_key.pid = state->pid;
+    state->thread_key.thread_id = python_read_thread_id(py_thread_state, &state->config.offsets.py_thread_state_offsets);
+    if (state->thread_key.thread_id == 0) {
         return;
     }
 
     long err = bpf_map_update_elem(&python_thread_id_py_thread_state, &state->thread_key, &py_thread_state, BPF_ANY);
     if (err != 0) {
-        BPF_TRACE("python: failed to update BPF map with native_thread_id=%u: %d",
-                 state->thread_key.inner_ns_tid, err);
+        BPF_TRACE("python: failed to update BPF map with thread_id=%u: %d",
+                state->thread_key.thread_id, err);
+        return;
     }
 
-    BPF_TRACE("python: successfully upserted PyThreadState %p for native_thread_id=%u",
-             (void*) py_thread_state, state->thread_key.inner_ns_tid);
+    BPF_TRACE("python: successfully upserted PyThreadState %p for thread_id=%u",
+            (void*) py_thread_state, state->thread_key.thread_id);
 }
 
 static ALWAYS_INLINE void* python_calculate_main_interpreter_state_address(struct python_state* state) {
@@ -281,23 +297,19 @@ static ALWAYS_INLINE void* python_get_thread_state_and_update_cache(
     }
 
     // Attempt to read the PyThreadState pointer from TLS
-    void* current_thread_state = python_read_py_thread_state_ptr_from_tls(state);
-    void* fill_cache_thread_state = current_thread_state;
-    if (fill_cache_thread_state == NULL) {
-        fill_cache_thread_state = python_get_head_thread_state(state);
-    } else {
-        BPF_TRACE("python: successfully retrieved PyThreadState from TLS: %p", fill_cache_thread_state);
+    void* some_thread_state = python_read_py_thread_state_ptr_from_tls(state);
+    if (some_thread_state == NULL) {
+        some_thread_state = python_get_head_thread_state(state);
     }
 
-    python_fill_threads_cache(state, fill_cache_thread_state);
+    python_fill_threads_cache(state, some_thread_state);
 
-    if (current_thread_state == NULL) {
-        current_thread_state = python_get_current_thread_state_from_cache(state->pid);
-    }
-
+    void* current_thread_state = python_get_current_thread_state_from_cache(state);
     if (current_thread_state == NULL) {
         BPF_TRACE("python: failed to retrieve PyThreadState from both TLS and cache for thread");
     }
+
+    BPF_TRACE("python: successfully retrieved PyThreadState %p", current_thread_state);
 
     return current_thread_state;
 }

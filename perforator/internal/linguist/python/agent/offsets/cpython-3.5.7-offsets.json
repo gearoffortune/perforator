@@ -2,6 +2,7 @@
   "PyThreadState": {
     "prev": 0,
     "next": 8,
+    "thread_id": 152,
     "frame": 24
   },
   "PyFrameObject": {

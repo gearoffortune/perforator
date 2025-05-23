@@ -450,7 +450,6 @@ static ALWAYS_INLINE void python_collect_stack(
     void* py_thread_state_addr = python_get_thread_state_and_update_cache(state);
     if (py_thread_state_addr == NULL) {
         metric_increment(METRIC_PYTHON_TLS_THREAD_STATE_NULL);
-        BPF_TRACE("python: read NULL *PyThreadState");
         return;
     }
 

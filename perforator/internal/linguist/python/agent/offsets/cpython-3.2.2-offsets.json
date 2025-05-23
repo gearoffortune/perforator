@@ -1,6 +1,7 @@
 {
   "PyThreadState": {
     "next": 0,
+    "thread_id": 144,
     "frame": 16
   },
   "PyFrameObject": {

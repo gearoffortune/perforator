@@ -14,20 +14,21 @@ struct python_runtime_state_offsets {
 struct python_thread_state_offsets {
     u32 cframe;
     u32 current_frame;
-    u32 native_thread_id;
+    u32 thread_id; // pthread thread id
+    u32 native_thread_id; // OS thread id
     u32 prev_thread;
     u32 next_thread;
 };
 
-// Python threads share the same thread group in current pid namespace.
-// We also use innermost namespace pid because it is native_thread_id field on PyThreadState structure.
-// This allows caching *PyThreadState for docker processes which have host thread group id
-// as first part of a key and container pid as the second part of a key.
-// First part of a key is needed to avoid collisions with other processes.
-// For example collision can happen if we have 2 python containers where both python processes have pid 1.
 struct python_thread_key {
-    u32 current_ns_pid;
-    u32 inner_ns_tid;
+    // This field stores one of these options:
+    // - PyThreadState->native_thread_id which is innermost namespace native thread id (pid_t)
+    //   in case we are dealing with CPython 3.11+
+    // - PyThreadState->thread_id which is pthread thread id (pthread_t) for cpython before 3.11:
+    //   in case we are dealing with CPython 3.10-
+    // This field is only unique within a process.
+    u64 thread_id;
+    u32 pid;
 };
 
 enum {

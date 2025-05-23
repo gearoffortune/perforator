@@ -1,7 +1,8 @@
 {
   "PyThreadState": {
-    "next": 8,
     "prev": 0,
+    "next": 8,
+    "thread_id": 176,
     "frame": 24
   },
   "PyFrameObject": {

@@ -173,6 +173,12 @@ func extractPyThreadStateOffsets(data map[string]int) unwinder.PythonThreadState
 		offsets.NativeThreadId = UnspecifiedOffset
 	}
 
+	if val, ok := data["thread_id"]; ok {
+		offsets.ThreadId = uint32(val)
+	} else {
+		offsets.ThreadId = UnspecifiedOffset
+	}
+
 	if val, ok := data["cframe"]; ok {
 		offsets.Cframe = uint32(val)
 	} else {
