@@ -33,6 +33,7 @@ var (
 		// "PyEval_CallObjectWithKeywords": true,
 		// "PyEval_EvalCode":               true,
 		"_PyEval_EvalFrameDefault": true,
+		"PyEval_EvalFrameEx":       true,
 		// "PyObject_CallNoArgs":           true,
 		// "PyObject_VectorcallDict":       true,
 		// "PyObject_Vectorcall":           true,

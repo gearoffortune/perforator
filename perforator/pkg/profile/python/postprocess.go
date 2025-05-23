@@ -16,6 +16,15 @@ const (
 	invalid = "<invalid>"
 )
 
+type MergeAlgorithm int
+
+const (
+	// This merge algorithm is used for CPython before 3.11
+	OneToOnePythonFrameToPyEval MergeAlgorithm = iota
+	// This merge algorithm is used after (>=) CPython 3.11
+	SubstacksMapping
+)
+
 // both bounds are included
 type StackSubsegment struct {
 	Left  int
@@ -81,6 +90,31 @@ func isCPythonEvaluationEntryPoint(loc *pprof.Location) bool {
 	}
 
 	return false
+}
+
+// This function is called to calculate some data which will be used
+// to determine which merge algorithm we should use
+func (m *NativeAndPythonStackMerger) determineMergeAlgorithm() MergeAlgorithm {
+	pythonFramesCount := 0
+	pyEvalFrameDefaultCount := 0
+
+	for _, loc := range m.sample.Location {
+		switch {
+		case isPythonLocation(loc):
+			pythonFramesCount++
+		case isCPythonEvaluationEntryPoint(loc):
+			pyEvalFrameDefaultCount++
+		}
+	}
+
+	// We need to check the second condition because of possible inconsistencies between python and native stacks.
+	// Suppose `PyEval_EvalFrameDefault` has just started executing, we will collect its frame in native stack,
+	// but the corresponding python frame was not pushed on the stack yet.
+	if pyEvalFrameDefaultCount == pythonFramesCount || pyEvalFrameDefaultCount == pythonFramesCount+1 {
+		return OneToOnePythonFrameToPyEval
+	}
+
+	return SubstacksMapping
 }
 
 // TLDR: Extract substack from native stack that corresponds to single python substack
@@ -273,6 +307,54 @@ func (m *NativeAndPythonStackMerger) putPythonBeforeKernelStack() {
 	m.sample.Location = append(m.sample.Location, m.resultStack...)
 }
 
+func (m *NativeAndPythonStackMerger) mergeSubstacksMapping(stats *MergeStackStats) error {
+	err := m.extractPythonAndCSubstacks()
+	if err != nil {
+		return fmt.Errorf("failed to extract python and c substacks: %w", err)
+	}
+
+	m.trimLastCPythonSubstackIfNeeded()
+
+	stats.CSubStacks = append(stats.CSubStacks, m.cPythonInterpreterSegments...)
+	stats.PythonSubStacks = append(stats.PythonSubStacks, m.pythonSegments...)
+
+	if len(stats.PythonSubStacks) != len(stats.CSubStacks) {
+		// Most probably python interpreter C stacks are not extracted correctly
+		//   so do not continue with merge
+		return nil
+	}
+
+	if len(stats.PythonSubStacks) == 0 {
+		return nil
+	}
+
+	m.substituteInterpreterStack()
+
+	stats.PerformedMerge = true
+	return nil
+}
+
+func (m *NativeAndPythonStackMerger) mergeOneToOnePythonFrameToPyEval(stats *MergeStackStats) error {
+	pythonIdx := m.pythonStartStackIndex
+
+	for nativeIdx := len(m.sample.Location) - 1; nativeIdx > m.pythonStartStackIndex; nativeIdx-- {
+		idxToCopyLocationFrom := nativeIdx
+		if isCPythonEvaluationEntryPoint(m.sample.Location[nativeIdx]) && pythonIdx >= 0 {
+			idxToCopyLocationFrom = pythonIdx
+			pythonIdx--
+		}
+
+		m.resultStack = append(m.resultStack, m.sample.Location[idxToCopyLocationFrom])
+	}
+
+	slices.Reverse(m.resultStack)
+	m.sample.Location = m.sample.Location[:0]
+	m.sample.Location = append(m.sample.Location, m.resultStack...)
+
+	stats.PerformedMerge = true
+	return nil
+}
+
 // Merge stacks inplace for this sample.
 // Stack is laid down top to bottom from left to right.
 // We expect that first frames are reverse python frames, then reverse kernel frames, then reversed userspace frames.
@@ -284,37 +366,31 @@ func (m *NativeAndPythonStackMerger) MergeStacks(s *pprof.Sample) (MergeStackSta
 	if m.sample == nil {
 		return MergeStackStats{}, nil
 	}
+	defer m.cleanup()
 
 	stats := MergeStackStats{}
 	stats.CollectedPython = m.setStartPythonStackIndex()
-	defer m.cleanup()
+	if !stats.CollectedPython {
+		return stats, nil
+	}
+	var err error
 
-	err := m.extractPythonAndCSubstacks()
+	switch m.determineMergeAlgorithm() {
+	case OneToOnePythonFrameToPyEval:
+		err = m.mergeOneToOnePythonFrameToPyEval(&stats)
+	case SubstacksMapping:
+		err = m.mergeSubstacksMapping(&stats)
+	default:
+		return MergeStackStats{}, errors.New("unknown merge algorithm")
+	}
 	if err != nil {
-		return stats, fmt.Errorf("failed to extract python and c substacks: %w", err)
+		return stats, err
 	}
 
-	m.trimLastCPythonSubstackIfNeeded()
-
-	stats.CSubStacks = append(stats.CSubStacks, m.cPythonInterpreterSegments...)
-	stats.PythonSubStacks = append(stats.PythonSubStacks, m.pythonSegments...)
-
-	if len(stats.PythonSubStacks) != len(stats.CSubStacks) {
-		if stats.CollectedPython {
-			m.putPythonBeforeKernelStack()
-		}
-		// Most probably python interpreter C stacks are not extracted correctly
-		//   so do not continue with merge
-		return stats, nil
+	if !stats.PerformedMerge {
+		m.putPythonBeforeKernelStack()
 	}
 
-	if len(stats.PythonSubStacks) == 0 {
-		return stats, nil
-	}
-
-	m.substituteInterpreterStack()
-
-	stats.PerformedMerge = true
 	return stats, nil
 }
 
