@@ -44,9 +44,13 @@ size_t CountBits(Range&& range) {
     return count;
 }
 
-bool FilterWellKnownHighCardinalityLabels(const NPerforator::NProfile::TLabel& label) {
-    TStringBuf key = label.GetKey().View();
-    return !key.StartsWith("tls:") && !key.StartsWith("cgroup");
+NPerforator::NProto::NProfile::MergeOptions MakeCommonMergeOptions() {
+    NPerforator::NProto::NProfile::MergeOptions options;
+    options.set_ignore_process_ids(true);
+    options.set_ignore_timestamps(true);
+    options.mutable_label_filter()->add_skipped_key_prefixes("tls:");
+    options.mutable_label_filter()->add_skipped_key_prefixes("cgroup");
+    return options;
 }
 
 int main(int argc, const char* argv[]) {
@@ -234,13 +238,11 @@ int main(int argc, const char* argv[]) {
 
         TVector<NPerforator::NProto::NProfile::Profile> profiles(threadCount);
 
+        NPerforator::NProto::NProfile::MergeOptions options = MakeCommonMergeOptions();
+
         for (int tid = 0; tid < threadCount; ++tid) {
-            tp.SafeAddFunc([tid, argv, argc, &profiles] {
-                NPerforator::NProfile::TProfileMerger merger{&profiles[tid], {
-                    .KeepProcesses = false,
-                    .KeepTimestamps = false,
-                    .LabelFilter = FilterWellKnownHighCardinalityLabels,
-                }};
+            tp.SafeAddFunc([tid, argv, argc, &profiles, &options] {
+                NPerforator::NProfile::TProfileMerger merger{&profiles[tid], options};
 
                 NPerforator::NProto::NProfile::Profile profile;
                 for (int i = 3 + tid; i < argc; i += threadCount) {
@@ -260,11 +262,7 @@ int main(int argc, const char* argv[]) {
         Cerr << "Merging final profile" << Endl;
 
         NPerforator::NProto::NProfile::Profile merged;
-        NPerforator::NProfile::TProfileMerger merger{&merged, {
-            .KeepProcesses = false,
-            .KeepTimestamps = false,
-            .LabelFilter = FilterWellKnownHighCardinalityLabels,
-        }};
+        NPerforator::NProfile::TProfileMerger merger{&merged, options};
         for (auto& profile : profiles) {
             merger.Add(profile);
         }
@@ -282,11 +280,8 @@ int main(int argc, const char* argv[]) {
         auto start = Now();
 
         NPerforator::NProto::NProfile::Profile merged;
-        NPerforator::NProfile::TProfileMerger merger{&merged, {
-            .KeepProcesses = false,
-            .KeepTimestamps = false,
-            .LabelFilter = FilterWellKnownHighCardinalityLabels,
-        }};
+        NPerforator::NProto::NProfile::MergeOptions options = MakeCommonMergeOptions();
+        NPerforator::NProfile::TProfileMerger merger{&merged, options};
 
         int cnt = 0;
 

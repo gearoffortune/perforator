@@ -4,9 +4,11 @@
 #include "profile.h"
 
 #include <library/cpp/containers/absl_flat_hash/flat_hash_map.h>
+#include <library/cpp/containers/absl_flat_hash/flat_hash_set.h>
 
 #include <util/system/mutex.h>
 
+#include <bitset>
 #include <cctype>
 
 
@@ -63,18 +65,205 @@ private:
     TVector<Index> Mapping_;
 };
 
+class TMergePolicy {
+    static constexpr ui64 MaxRequiredLabelCount = 256;
+
+public:
+    TMergePolicy(TProfile profile, const NProto::NProfile::MergeOptions& options)
+        : Profile_{profile}
+        , Options_{options}
+    {
+        PopulateFilters();
+    }
+
+    bool IgnoreThreadIds() const {
+        return Options_.ignore_thread_ids();
+    }
+
+    bool IgnoreProcessIds() const {
+        return Options_.ignore_process_ids();
+    }
+
+    bool IgnoreThreadNames() const {
+        return Options_.ignore_thread_names();
+    }
+
+    bool IgnoreProcessNames() const {
+        return Options_.ignore_process_names();
+    }
+
+    bool MergeBinaries() const {
+        return Options_.merge_by_symbolized_names();
+    }
+
+    bool IgnoreBinaryPaths() const {
+        return Options_.ignore_binary_paths();
+    }
+
+    bool MergeTimestamps() const {
+        return Options_.ignore_timestamps();
+    }
+
+    bool MergeSourceLocations() const {
+        return Options_.ignore_source_locations();
+    }
+
+    bool MergeBinaryAddresses() const {
+        return Options_.ignore_binary_addresses();
+    }
+
+    bool CleanupThreadNames() const {
+        return Options_.cleanup_thread_names();
+    }
+
+    bool AllowSample(TSample sample) const {
+        if (HasTriviallyPositiveSampleFilter_) {
+            return true;
+        }
+        if (HasTriviallyNegativeSampleFilter_) {
+            return false;
+        }
+
+        return true
+            && SampleHasOneOfRequiredBinaries(sample)
+            && SampleHasAllOfRequiredLabels(sample)
+        ;
+    }
+
+    bool AllowLabel(TLabel label) const {
+        return !DroppedLabelKeys_.contains(label.GetKey().GetIndex());
+    }
+
+private:
+    bool SampleHasOneOfRequiredBinaries(TSample sample) const {
+        TSampleKey key = sample.GetKey();
+        for (TStack stack : key.GetStacks()) {
+            for (TStackFrame frame : stack.GetStackFrames()) {
+                TBinaryId binaryId = frame.GetBinary().GetIndex();
+                if (RequiredOneOfBinaries_.contains(binaryId)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    bool SampleHasAllOfRequiredLabels(TSample sample) const {
+        std::bitset<MaxRequiredLabelCount> found;
+        Y_ASSERT(found.size() >= RequiredAllOfLabels_.size());
+
+        TSampleKey key = sample.GetKey();
+        for (TLabel label : key.GetLabels()) {
+            auto it = RequiredAllOfLabels_.find(label.GetIndex());
+            if (it != RequiredAllOfLabels_.end()) {
+                found.set(it->second);
+            }
+        }
+
+        return found.all();
+    }
+
+    void PopulateFilters() {
+        PopulateSampleFilters();
+        PopulateLabelFilters();
+    }
+
+    void PopulateSampleFilters() {
+        HasTriviallyPositiveSampleFilter_ = !Options_.has_sample_filter();
+        if (HasTriviallyPositiveSampleFilter_) {
+            return;
+        }
+
+        NProto::NProfile::SampleFilter filter = Options_.sample_filter();
+
+        // Map binaries to internal ids.
+        absl::flat_hash_set<TStringBuf> buildIds{
+            filter.required_one_of_build_ids().begin(),
+            filter.required_one_of_build_ids().end(),
+        };
+        for (TBinary binary : Profile_.Binaries()) {
+            TStringBuf buildId = binary.GetBuildId().View();
+            if (buildIds.erase(buildId)) {
+                RequiredOneOfBinaries_.insert(binary.GetIndex());
+                if (buildIds.empty()) {
+                    break;
+                }
+            }
+        }
+
+        // Map labels to internal ids.
+        ui64 labelCount = filter.required_all_of_string_labels_size()
+            + filter.required_all_of_numeric_labels_size();
+        Y_ENSURE(
+            labelCount <= MaxRequiredLabelCount,
+            "Too many required labels, only " << MaxRequiredLabelCount
+                << " allowed, got " << labelCount
+        );
+
+        for (TLabel label : Profile_.Labels()) {
+            if (label.IsNumber()) {
+                MatchLabelFilter(label, label.GetNumber(), filter.mutable_required_all_of_numeric_labels());
+            } else {
+                MatchLabelFilter(label, label.GetString(), filter.mutable_required_all_of_string_labels());
+            }
+        }
+
+        // If we cannot find some labels, we will not be able to accept any sample.
+        if (RequiredAllOfLabels_.size() != labelCount) {
+            HasTriviallyNegativeSampleFilter_ = true;
+        }
+    }
+
+    template <typename Value, typename ProtoMap>
+    void MatchLabelFilter(TLabel label, Value value, ProtoMap* map) {
+        auto it = map->find(label.GetKey().View());
+        if (it == map->end()) {
+            return;
+        }
+
+        if (value == it->second) {
+            ui32 id = RequiredAllOfLabels_.size();
+            RequiredAllOfLabels_.try_emplace(label.GetIndex(), id);
+        }
+    }
+
+    void PopulateLabelFilters() {
+        if (Options_.label_filter().skipped_key_prefixes().empty()) {
+            return;
+        }
+
+        for (TLabel label : Profile_.Labels()) {
+            for (TStringBuf prefix : Options_.label_filter().skipped_key_prefixes()) {
+                if (label.GetKey().View().StartsWith(prefix)) {
+                    DroppedLabelKeys_.insert(label.GetKey().GetIndex());
+                }
+            }
+        }
+    }
+
+private:
+    TProfile Profile_;
+    const NProto::NProfile::MergeOptions& Options_;
+
+    bool HasTriviallyPositiveSampleFilter_ = false;
+    bool HasTriviallyNegativeSampleFilter_ = false;
+    absl::flat_hash_map<TLabelId, ui32> RequiredAllOfLabels_;
+    absl::flat_hash_set<TBinaryId> RequiredOneOfBinaries_;
+    absl::flat_hash_set<TStringId> DroppedLabelKeys_;
+};
+
 class TSingleProfileMerger {
 public:
     TSingleProfileMerger(
         TProfileBuilder& builder,
-        TMergeOptions options,
+        const NProto::NProfile::MergeOptions& options,
         TProfile profile,
         ui32 profileIndex
     )
         : Builder_{builder}
-        , Options_{options}
         , Profile_{profile}
         , IsFirstProfile_{profileIndex == 0}
+        , Policy_{profile, options}
         , Strings_{*Profile_.Strings().GetPastTheEndIndex()}
         , ValueTypes_{*Profile_.ValueTypes().GetPastTheEndIndex()}
         , Samples_{*Profile_.Samples().GetPastTheEndIndex()}
@@ -123,14 +312,16 @@ private:
 
     void MergeSamples() {
         for (TSample sample : Profile_.Samples()) {
-            MergeSample(sample);
+            if (Policy_.AllowSample(sample)) {
+                MergeSample(sample);
+            }
         }
     }
 
     void MergeSample(TSample sample) {
         auto builder = Builder_.AddSample();
 
-        if (auto ts = sample.GetTimestamp(); ts && Options_.KeepTimestamps) {
+        if (auto ts = sample.GetTimestamp(); ts && !Policy_.MergeTimestamps()) {
             builder.SetTimestamp(ts->seconds(), ts->nanos());
         }
 
@@ -159,9 +350,7 @@ private:
         return SampleKeys_.TryMap(key.GetIndex(), [&key, this] {
             auto builder = Builder_.AddSampleKey();
 
-            if (Options_.KeepProcesses) {
-                builder.SetThread(MapThread(key.GetThread()));
-            }
+            builder.SetThread(MapThread(key.GetThread()));
 
             for (i32 i = 0; i < key.GetStackCount(); ++i) {
                 builder.AddStack(MapStack(key.GetStack(i)));
@@ -169,7 +358,7 @@ private:
 
             for (i32 i = 0; i < key.GetLabelCount(); ++i) {
                 TLabel label = key.GetLabel(i);
-                if (!Options_.LabelFilter || Options_.LabelFilter(label)) {
+                if (Policy_.AllowLabel(label)) {
                     builder.AddLabel(MapLabel(key.GetLabel(i)));
                 }
             }
@@ -182,17 +371,25 @@ private:
         return Threads_.TryMap(thread.GetIndex(), [&thread, this] {
             auto builder = Builder_.AddThread();
 
-            builder.SetThreadId(thread.GetThreadId());
-            builder.SetProcessId(thread.GetProcessId());
-
-            if (Options_.CleanupThreadNames) {
-                TStringId sanitized = SanitizeThreadName(thread.GetThreadName());
-                builder.SetThreadName(sanitized);
-            } else {
-                builder.SetThreadName(MapString(thread.GetThreadName()));
+            if (!Policy_.IgnoreThreadIds()) {
+                builder.SetThreadId(thread.GetThreadId());
+            }
+            if (!Policy_.IgnoreProcessIds()) {
+                builder.SetProcessId(thread.GetProcessId());
             }
 
-            builder.SetProcessName(MapString(thread.GetProcessName()));
+            if (!Policy_.IgnoreThreadNames()) {
+                if (Policy_.CleanupThreadNames()) {
+                    TStringId sanitized = SanitizeThreadName(thread.GetThreadName());
+                    builder.SetThreadName(sanitized);
+                } else {
+                    builder.SetThreadName(MapString(thread.GetThreadName()));
+                }
+            }
+
+            if (!Policy_.IgnoreProcessNames()) {
+                builder.SetProcessName(MapString(thread.GetProcessName()));
+            }
 
             for (i32 i = 0; i < thread.GetContainerCount(); ++i) {
                 builder.AddContainerName(MapString(thread.GetContainer(i)));
@@ -255,7 +452,7 @@ private:
         return StackFrames_.TryMap(frame.GetIndex(), [&, this] {
             auto builder = Builder_.AddStackFrame();
 
-            if (Options_.KeepBinaries) {
+            if (!Policy_.MergeBinaries()) {
                 builder.SetBinary(MapBinary(frame.GetBinary()));
                 builder.SetBinaryOffset(frame.GetBinaryOffset());
             }
@@ -270,7 +467,9 @@ private:
             auto builder = Builder_.AddBinary();
 
             builder.SetBuildId(MapString(binary.GetBuildId()));
-            builder.SetPath(MapString(binary.GetPath()));
+            if (!Policy_.IgnoreBinaryPaths()) {
+                builder.SetPath(MapString(binary.GetPath()));
+            }
 
             return builder.Finish();
         });
@@ -284,7 +483,7 @@ private:
                 auto line = chain.GetLine(i);
 
                 auto lineBuilder = builder.AddLine();
-                if (Options_.KeepLineNumbers) {
+                if (!Policy_.MergeSourceLocations()) {
                     lineBuilder.SetLine(line.GetLine());
                     lineBuilder.SetColumn(line.GetColumn());
                 }
@@ -321,9 +520,9 @@ private:
 
 private:
     TProfileBuilder& Builder_;
-    const TMergeOptions Options_;
     const TProfile Profile_;
     const bool IsFirstProfile_;
+    const TMergePolicy Policy_;
 
     TIndexRemapping<TStringId> Strings_;
     TIndexRemapping<TValueTypeId> ValueTypes_;
@@ -343,7 +542,7 @@ private:
 
 class TProfileMerger::TImpl {
 public:
-    TImpl(NProto::NProfile::Profile* merged, TMergeOptions options)
+    TImpl(NProto::NProfile::Profile* merged, const NProto::NProfile::MergeOptions& options)
         : Options_{options}
         , Builder_{merged}
     {}
@@ -358,14 +557,14 @@ public:
     }
 
 private:
-    const TMergeOptions Options_;
+    const NProto::NProfile::MergeOptions& Options_;
     TProfileBuilder Builder_;
     ui32 ProfileCount_ = 0;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 
-TProfileMerger::TProfileMerger(NProto::NProfile::Profile* merged, TMergeOptions options)
+TProfileMerger::TProfileMerger(NProto::NProfile::Profile* merged, const NProto::NProfile::MergeOptions& options)
     : Impl_{MakeHolder<TImpl>(merged, options)}
 {}
 
@@ -384,7 +583,7 @@ void TProfileMerger::Finish() && {
 void MergeProfiles(
     TConstArrayRef<NProto::NProfile::Profile> profiles,
     NProto::NProfile::Profile* merged,
-    TMergeOptions options
+    const NProto::NProfile::MergeOptions& options
 ) {
     TProfileMerger merger{merged, options};
     for (auto& profile : profiles) {
