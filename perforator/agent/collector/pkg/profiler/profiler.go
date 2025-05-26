@@ -211,6 +211,9 @@ func (p *Profiler) initialize(r metrics.Registry) (err error) {
 		&p.conf.BPF,
 		p.log,
 		r,
+		machine.Options{
+			EnableJVM: p.conf.FeatureFlagsConfig.JVMEnabled(),
+		},
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize eBPF subsystem: %w", err)
@@ -478,6 +481,9 @@ func (p *Profiler) setupConfig() error {
 		return fmt.Errorf("unsupported cgroup version %v", cgroupVersion)
 	}
 	p.log.Info("Selected cgroup engine", log.String("engine", conf.ActiveCgroupEngine.String()))
+	if p.conf.FeatureFlagsConfig.JVMEnabled() {
+		conf.EnableJvm = true
+	}
 
 	// Record current pidns.
 	pidns, err := procfs.Self().GetNamespaces().GetPidInode()

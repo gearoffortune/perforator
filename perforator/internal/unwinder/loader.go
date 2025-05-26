@@ -1,15 +1,34 @@
 package unwinder
 
-import "github.com/yandex/perforator/library/go/core/resource"
+import (
+	"fmt"
 
-func LoadProg(debug bool) []byte {
+	"github.com/yandex/perforator/library/go/core/resource"
+)
+
+type ProgramRequirements struct {
+	Debug bool
+	JVM   bool
+}
+
+func LoadProg(reqs ProgramRequirements) ([]byte, error) {
 	var name string
 
-	if debug {
-		name = "ebpf/unwinder.debug.elf"
+	if reqs.Debug {
+		name = "debug"
 	} else {
-		name = "ebpf/unwinder.release.elf"
+		name = "release"
+	}
+	if reqs.JVM {
+		name += ".jvm"
 	}
 
-	return resource.MustGet(name)
+	name = fmt.Sprintf("ebpf/unwinder.%s.elf", name)
+
+	data := resource.Get(name)
+	if data == nil {
+		return nil, fmt.Errorf("missing program resource %q for requirements %+v", name, reqs)
+	}
+
+	return data, nil
 }

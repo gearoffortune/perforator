@@ -63,8 +63,13 @@ type Config struct {
 	Uprobes []UprobeConfig `yaml:"uprobes,omitempty"`
 }
 
+type Options struct {
+	EnableJVM bool
+}
+
 type BPF struct {
 	conf *Config
+	opts Options
 	log  log.Logger
 
 	currentPageCount metrics.IntGauge
@@ -89,11 +94,12 @@ type BPF struct {
 	links *bpfLinks
 }
 
-func NewBPF(conf *Config, log log.Logger, metrics metrics.Registry) (*BPF, error) {
+func NewBPF(conf *Config, log log.Logger, metrics metrics.Registry, opts Options) (*BPF, error) {
 	metrics = metrics.WithPrefix("bpf")
 
 	b := &BPF{
 		conf: conf,
+		opts: opts,
 		log:  log.WithName("BPF"),
 
 		currentPageCount: metrics.IntGauge("unwind_page_table.current_pages.count"),
@@ -104,6 +110,8 @@ func NewBPF(conf *Config, log log.Logger, metrics metrics.Registry) (*BPF, error
 
 		metrics: metrics,
 
+		progdebug: conf.Debug,
+
 		unwindTableParts: make(map[uint32]*ebpf.Map),
 	}
 
@@ -113,6 +121,13 @@ func NewBPF(conf *Config, log log.Logger, metrics metrics.Registry) (*BPF, error
 	}
 
 	return b, nil
+}
+
+func (b *BPF) currentProgramRequirements() unwinder.ProgramRequirements {
+	return unwinder.ProgramRequirements{
+		Debug: b.progdebug,
+		JVM:   b.opts.EnableJVM,
+	}
 }
 
 func (b *BPF) initialize() (err error) {
@@ -136,12 +151,12 @@ func (b *BPF) initialize() (err error) {
 	}
 	b.log.Debug("Successfully removed mlock limit")
 
-	err = b.setupMaps(b.conf.Debug)
+	err = b.setupMaps(b.currentProgramRequirements())
 	if err != nil {
 		return err
 	}
 
-	err = b.setupProgramsUnsafe(b.conf.Debug)
+	err = b.setupProgramsUnsafe(b.currentProgramRequirements())
 	if err != nil {
 		return fmt.Errorf("failed to setup programs: %w", err)
 	}
@@ -227,14 +242,19 @@ func (b *BPF) prepareUnwindTableSpec(unwindTableMap *ebpf.MapSpec) error {
 	return nil
 }
 
-func (b *BPF) loadCollectionSpec(debug bool) (*ebpf.CollectionSpec, error) {
+func (b *BPF) loadCollectionSpec(reqs unwinder.ProgramRequirements) (*ebpf.CollectionSpec, error) {
+	b.log.Debug("Loading eBPF program", log.Bool("debug", reqs.Debug), log.Bool("jvm", reqs.JVM))
 	// Load & prepare main program ELF.
-	b.log.Debug("Parsing eBPF program ELF", log.Bool("debug", debug))
-	elf := bytes.NewReader(unwinder.LoadProg(debug))
+	program, err := unwinder.LoadProg(reqs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load eBPF program: %w", err)
+	}
+	b.log.Debug("Parsing eBPF program ELF")
+	elf := bytes.NewReader(program)
 
 	spec, err := ebpf.LoadCollectionSpecFromReader(elf)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load eBPF program: %w", err)
+		return nil, fmt.Errorf("failed to parse eBPF program: %w", err)
 	}
 
 	b.log.Debug("Successfully parsed eBPF program ELF",
@@ -254,8 +274,8 @@ func (b *BPF) loadCollectionSpec(debug bool) (*ebpf.CollectionSpec, error) {
 	return spec, nil
 }
 
-func (b *BPF) setupMaps(debug bool) (err error) {
-	spec, err := b.loadCollectionSpec(debug)
+func (b *BPF) setupMaps(reqs unwinder.ProgramRequirements) (err error) {
+	spec, err := b.loadCollectionSpec(reqs)
 	if err != nil {
 		return err
 	}
@@ -279,9 +299,9 @@ func (b *BPF) setupMaps(debug bool) (err error) {
 }
 
 // setupProgramsUnsafe requires b.progsmu to be locked.
-// Close any existing programs and load the new programs, probably in the debug mode.
+// Close any existing programs and load the new programs, probably with different build flags.
 // This routine can be used for online program debugging without restarts.
-func (b *BPF) setupProgramsUnsafe(debug bool) (err error) {
+func (b *BPF) setupProgramsUnsafe(reqs unwinder.ProgramRequirements) (err error) {
 	if b.progs != nil {
 		err = b.progs.Close()
 		if err != nil {
@@ -295,7 +315,7 @@ func (b *BPF) setupProgramsUnsafe(debug bool) (err error) {
 		return fmt.Errorf("failed to close links: %w", err)
 	}
 
-	spec, err := b.loadCollectionSpec(debug)
+	spec, err := b.loadCollectionSpec(reqs)
 	if err != nil {
 		return err
 	}
@@ -393,7 +413,7 @@ func (b *BPF) ReloadProgram(debug bool) error {
 	}
 	b.progdebug = debug
 
-	err := b.setupProgramsUnsafe(debug)
+	err := b.setupProgramsUnsafe(b.currentProgramRequirements())
 	if err != nil {
 		return fmt.Errorf("failed to reload program: %w", err)
 	}

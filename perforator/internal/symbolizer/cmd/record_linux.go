@@ -78,6 +78,7 @@ type recordOptions struct {
 	enableInterpreterStackMerging bool
 	disablePerfMap                bool
 	disablePerfMapJVM             bool
+	enableJVM                     bool
 }
 
 func (o *recordOptions) Bind(cmd *cobra.Command) {
@@ -100,6 +101,7 @@ func (o *recordOptions) Bind(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&o.enableInterpreterStackMerging, "merge-native-interpreter-stacks", true, "Enable interpreter and native stack merging")
 	cmd.Flags().BoolVar(&o.disablePerfMap, "disable-perf-maps", false, "Disable perf map")
 	cmd.Flags().BoolVar(&o.disablePerfMapJVM, "disable-perf-maps-jvm", false, "Disable perf map for JVM")
+	cmd.Flags().BoolVar(&o.enableJVM, "experimental-enable-jvm", false, "[Experimental feature] Enable JVM profiling")
 
 	cmd.MarkFlagsMutuallyExclusive("freq", "count")
 
@@ -319,6 +321,9 @@ func runProfiler(ctx context.Context, logger xlog.Logger, opts *recordOptions, a
 		PerfEvents:        events.perfEvents,
 		EnablePerfMaps:    ptr.Bool(!opts.disablePerfMap),
 		EnablePerfMapsJVM: ptr.Bool(!opts.disablePerfMapJVM),
+		FeatureFlagsConfig: config.FeatureFlagsConfig{
+			EnableJVM: ptr.Bool(opts.enableJVM),
+		},
 	}, logger.WithContext(ctx), registry, profiler.WithStorage(storage))
 
 	if err != nil {

@@ -95,6 +95,19 @@ type SymbolizerConfig struct {
 	Python symbolizer.SymbolizerConfig `yaml:"python"`
 }
 
+// FeatureFlagsConfig holds agent-side [feature-flags](https://trunkbaseddevelopment.com/feature-flags/)
+// except old ones.
+type FeatureFlagsConfig struct {
+	EnableJVM *bool `yaml:"enable_jvm"`
+}
+
+func (f *FeatureFlagsConfig) JVMEnabled() bool {
+	if f.EnableJVM == nil {
+		return false
+	}
+	return *f.EnableJVM
+}
+
 type Config struct {
 	Debug bool           `yaml:"debug"`
 	BPF   machine.Config `yaml:"bpf"`
@@ -114,9 +127,10 @@ type Config struct {
 	PerfEvents []PerfEventConfig `yaml:"perf_events"`
 	Signals    []string          `yaml:"signals"`
 
-	EnableLBRDeprecated *bool `yaml:"enable_lbr"`
-	EnablePerfMaps      *bool `yaml:"enable_perf_map"`
-	EnablePerfMapsJVM   *bool `yaml:"enable_perf_maps_jvm"`
+	EnableLBRDeprecated *bool              `yaml:"enable_lbr"`
+	EnablePerfMaps      *bool              `yaml:"enable_perf_map"`
+	EnablePerfMapsJVM   *bool              `yaml:"enable_perf_maps_jvm"`
+	FeatureFlagsConfig  FeatureFlagsConfig `yaml:"feature_flags,omitempty"`
 
 	PodsDeploySystemConfig *PodsDeploySystemConfig `yaml:"pods_deploy_system,omitempty"`
 	Cgroups                cgroups.TrackerConfig   `yaml:"cgroups,omitempty"`
