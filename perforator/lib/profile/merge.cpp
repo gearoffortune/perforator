@@ -352,14 +352,13 @@ private:
 
             builder.SetThread(MapThread(key.GetThread()));
 
-            for (i32 i = 0; i < key.GetStackCount(); ++i) {
-                builder.AddStack(MapStack(key.GetStack(i)));
+            for (TStack stack : key.GetStacks()) {
+                builder.AddStack(MapStack(stack));
             }
 
-            for (i32 i = 0; i < key.GetLabelCount(); ++i) {
-                TLabel label = key.GetLabel(i);
+            for (TLabel label : key.GetLabels()) {
                 if (Policy_.AllowLabel(label)) {
-                    builder.AddLabel(MapLabel(key.GetLabel(i)));
+                    builder.AddLabel(MapLabel(label));
                 }
             }
 
@@ -391,8 +390,8 @@ private:
                 builder.SetProcessName(MapString(thread.GetProcessName()));
             }
 
-            for (i32 i = 0; i < thread.GetContainerCount(); ++i) {
-                builder.AddContainerName(MapString(thread.GetContainer(i)));
+            for (TStringRef container : thread.GetContainers()) {
+                builder.AddContainerName(MapString(container));
             }
 
             return builder.Finish();
@@ -440,8 +439,8 @@ private:
 
             builder.SetKind(stack.GetStackKind());
             builder.SetRuntimeName(MapString(stack.GetStackRuntimeName()));
-            for (i32 i = 0; i < stack.GetStackFrameCount(); ++i) {
-                builder.AddStackFrame(MapStackFrame(stack.GetStackFrame(i)));
+            for (TStackFrame frame : stack.GetStackFrames()) {
+                builder.AddStackFrame(MapStackFrame(frame));
             }
 
             return builder.Finish();
@@ -479,9 +478,7 @@ private:
         return InlineChains_.TryMap(chain.GetIndex(), [&, this] {
             auto builder = Builder_.AddInlineChain();
 
-            for (i32 i = 0; i < chain.GetLineCount(); ++i) {
-                auto line = chain.GetLine(i);
-
+            for (TSourceLine line : chain.GetLines()) {
                 auto lineBuilder = builder.AddLine();
                 if (!Policy_.MergeSourceLocations()) {
                     lineBuilder.SetLine(line.GetLine());

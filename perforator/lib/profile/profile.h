@@ -651,8 +651,8 @@ public:
         writer.Write("runtime", GetStackRuntimeName().View());
         writer.WriteKey("frames");
         writer.OpenArray();
-        for (i32 i = 0; i < GetStackFrameCount(); ++i) {
-            GetStackFrame(i).DumpJson(writer);
+        for (TStackFrame frame : GetStackFrames()) {
+            frame.DumpJson(writer);
         }
         writer.CloseArray();
         writer.CloseMap();
