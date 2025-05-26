@@ -14,7 +14,7 @@ PEERDIR(
     contrib/libs/llvm18/lib/DebugInfo/DWARF
     contrib/libs/llvm18/lib/DebugInfo/Symbolize
     contrib/libs/llvm18/lib/Target
-    # contrib/libs/llvm18/lib/Target/AArch64
+
     # contrib/libs/llvm18/lib/Target/ARM
     # contrib/libs/llvm18/lib/Target/BPF
     # contrib/libs/llvm18/lib/Target/LoongArch
@@ -33,6 +33,15 @@ PEERDIR(
     library/cpp/iterator
     library/cpp/streams/zstd
 )
+
+IF (ARCH_AARCH64)
+
+PEERDIR(
+    contrib/libs/llvm18/lib/Target/AArch64
+    contrib/libs/llvm18/lib/Target/AArch64/Disassembler
+)
+
+ENDIF()
 
 END()
 
