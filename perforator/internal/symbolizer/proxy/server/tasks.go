@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/yandex/perforator/library/go/core/log"
 	"github.com/yandex/perforator/perforator/internal/asynctask"
 	"github.com/yandex/perforator/perforator/internal/symbolizer/auth"
+	"github.com/yandex/perforator/perforator/pkg/profile/merge"
 	"github.com/yandex/perforator/perforator/pkg/xlog"
 	"github.com/yandex/perforator/perforator/proto/perforator"
 )
@@ -189,9 +191,11 @@ func (s *PerforatorServer) runTask(ctx context.Context, task *asynctask.Task, st
 
 	res, err := s.runTaskImpl(ctx, task.GetSpec())
 	if err != nil {
-		s.metrics.tasksFailedCount.With(metricTags).Inc()
+		if !errors.Is(err, merge.ErrNoProfilesToMerge) {
+			s.metrics.tasksFailedCount.With(metricTags).Inc()
+			s.l.Error(ctx, "Failed async task", log.Error(err))
+		}
 
-		s.l.Error(ctx, "Failed async task", log.Error(err))
 		if err := s.tasks.FailTask(ctx, task.ID, err.Error()); err != nil {
 			s.l.Error(ctx, "Failed to store task failure", log.Error(err))
 		}
