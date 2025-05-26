@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/google/pprof/profile"
+
+	"github.com/yandex/perforator/perforator/pkg/profile/merge"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -108,7 +110,7 @@ func (b *Builder) Finish() *Profile {
 	b.profile.PeriodType = &profile.ValueType{}
 
 	// Compactify profile.
-	res, err := profile.Merge([]*profile.Profile{b.profile})
+	res, err := merge.Merge([]*profile.Profile{b.profile})
 	if err != nil {
 		panic(err)
 	}

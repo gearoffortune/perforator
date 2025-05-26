@@ -39,6 +39,7 @@ import (
 	"github.com/yandex/perforator/perforator/pkg/debuginfod"
 	"github.com/yandex/perforator/perforator/pkg/linux"
 	"github.com/yandex/perforator/perforator/pkg/linux/perfevent"
+	"github.com/yandex/perforator/perforator/pkg/profile/merge"
 	"github.com/yandex/perforator/perforator/pkg/profile/python"
 	"github.com/yandex/perforator/perforator/pkg/sampletype"
 	"github.com/yandex/perforator/perforator/pkg/xelf"
@@ -453,7 +454,7 @@ func symbolizeProfile(ctx context.Context, logger xlog.Logger, storage *binarySt
 	}
 
 	logger.Debug(ctx, "Merging profiles", log.Int("count", len(profiles)))
-	profile, err := pprof.Merge(profiles)
+	profile, err := merge.Merge(profiles)
 	if err != nil {
 		return nil, fmt.Errorf("failed to merge profiles: %w", err)
 	}

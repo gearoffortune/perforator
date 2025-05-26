@@ -49,6 +49,7 @@ import (
 	"github.com/yandex/perforator/perforator/pkg/grpcutil/grpcmetrics"
 	"github.com/yandex/perforator/perforator/pkg/polyheapprof"
 	"github.com/yandex/perforator/perforator/pkg/profile/flamegraph/render"
+	"github.com/yandex/perforator/perforator/pkg/profile/merge"
 	"github.com/yandex/perforator/perforator/pkg/profile/python"
 	"github.com/yandex/perforator/perforator/pkg/profile/quality"
 	"github.com/yandex/perforator/perforator/pkg/profile/samplefilter"
@@ -1661,7 +1662,7 @@ func (s *PerforatorServer) mergeProfiles(
 		return nil, err
 	}
 
-	return pprof.Merge(profiles)
+	return merge.Merge(profiles)
 }
 
 func cleanupTransientLabels(profile *pprof.Profile) error {

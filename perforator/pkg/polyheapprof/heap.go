@@ -7,6 +7,8 @@ import (
 	"runtime/pprof"
 
 	"github.com/google/pprof/profile"
+
+	"github.com/yandex/perforator/perforator/pkg/profile/merge"
 )
 
 func StartHeapProfileRecording() error {
@@ -35,7 +37,7 @@ func ReadCurrentHeapProfile() (*profile.Profile, error) {
 		}
 	}
 
-	res, err := profile.Merge(profiles)
+	res, err := merge.Merge(profiles)
 	if err != nil {
 		return nil, fmt.Errorf("failed to merge C & Go heap profiles: %w", err)
 	}

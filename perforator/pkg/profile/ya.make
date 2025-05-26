@@ -1,6 +1,7 @@
 RECURSE(
     flamegraph
     labels
+    merge
     parse
     python
     quality
