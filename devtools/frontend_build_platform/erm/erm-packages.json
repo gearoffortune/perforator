@@ -1587,7 +1587,7 @@
     "title": "Next.js",
     "description": "Сборщик-бандлер от проекта Next.js\n\nОчень opinionated, но кому-то подходит.\n\nВ tier-0 используется в модуле/макросе [`TS_NEXT()`](https://docs.yandex-team.ru/frontend-in-arcadia/references/TS_NEXT).",
     "type": "NPM_PACKAGE",
-    "default": "15.3.1",
+    "default": "15.3.2",
     "links": {
       "Home": "https://nextjs.org",
       "Sources": "https://github.com/vercel/next.js",
@@ -1596,6 +1596,10 @@
     },
     "useDirectly": true,
     "versions": {
+      "15.3.2": {
+        "add_date": "2025-05-27T05:31:45",
+        "resources": []
+      },
       "15.3.1": {
         "add_date": "2025-05-06T05:33:21",
         "resources": []
@@ -5261,7 +5265,7 @@
     "title": "webpack",
     "description": "Классический сборщик frontend проектов\n\nВ tier-0 используется в модуле/макросе [`TS_WEBPACK()`](https://docs.yandex-team.ru/frontend-in-arcadia/references/TS_WEBPACK).",
     "type": "NPM_PACKAGE",
-    "default": "5.99.7",
+    "default": "5.99.8",
     "links": {
       "Home": "https://webpack.js.org",
       "Sources": "https://github.com/webpack/webpack",
@@ -5271,6 +5275,10 @@
     },
     "useDirectly": true,
     "versions": {
+      "5.99.8": {
+        "add_date": "2025-05-27T05:35:24",
+        "resources": []
+      },
       "5.99.7": {
         "add_date": "2025-05-13T05:32:48",
         "resources": []
