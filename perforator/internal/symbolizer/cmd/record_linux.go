@@ -64,7 +64,7 @@ type recordOptions struct {
 	freq     uint64
 	interval uint64
 
-	event    string
+	events   []string
 	signals  bool
 	walltime bool
 
@@ -89,7 +89,11 @@ func (o *recordOptions) Bind(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&o.wholeSystem, "whole-system", "a", false, "Profile whole system")
 	cmd.Flags().Uint64VarP(&o.freq, "freq", "F", 99, "Profiling frequency")
 	cmd.Flags().Uint64VarP(&o.interval, "count", "c", 0, "Profiling interval")
-	cmd.Flags().StringVarP(&o.event, "event", "e", "", "Perf event or uprobe (uprobe format is uprobe:/path/to/executable:symbol[+offset])")
+	cmd.Flags().StringSliceVarP(
+		&o.events, "event", "e", nil,
+		`Perf event or uprobes (uprobe format is uprobe:/path/to/executable:symbol[+offset]) to profile. 
+		Currently only multiple uprobes are supported.`,
+	)
 	cmd.Flags().DurationVarP(&o.duration, "duration", "d", 0, "Profiling duration")
 	cmd.Flags().StringVarP(&o.renderFormat, "format", "f", "flamegraph", "Profile visualization format")
 	cmd.Flags().BoolVarP(&o.debug, "debug", "", false, "Run perforator in debug mode")
@@ -242,17 +246,18 @@ func parseUprobeConfigsFromEvent(event string, pids []int) ([]machine.UprobeConf
 	return result, nil
 }
 
-func parsePerfEvents(opts *recordOptions) (perfEvents []config.PerfEventConfig, err error) {
-	if opts.event == "" {
+func parsePerfEvent(event string, opts *recordOptions) (*config.PerfEventConfig, error) {
+	if event == "" {
 		if opts.signals {
 			// Do not setup default perf events in `perforator record --signals` mode.
 			return nil, nil
 		}
-		opts.event = "CPUCycles"
+
+		event = "CPUCycles"
 	}
 
 	cfg := config.PerfEventConfig{
-		Type: perfevent.Type(opts.event),
+		Type: perfevent.Type(event),
 	}
 
 	if opts.interval != 0 {
@@ -261,7 +266,32 @@ func parsePerfEvents(opts *recordOptions) (perfEvents []config.PerfEventConfig, 
 		cfg.Frequency = ptr.T(opts.freq)
 	}
 
-	return []config.PerfEventConfig{cfg}, nil
+	return &cfg, nil
+}
+
+func parseUprobeConfigFromEvent(event string) (machine.UprobeConfig, error) {
+	uprobeStr := strings.TrimPrefix(event, sampletype.UprobeSampleTypePrefix)
+	parts := strings.SplitN(uprobeStr, ":", 2)
+	if len(parts) != 2 {
+		return machine.UprobeConfig{}, ErrInvalidUprobeFormat
+	}
+
+	binaryPath := parts[0]
+	symbolPart := parts[1]
+
+	symbol, offset, err := parseSymbol(symbolPart)
+	if err != nil {
+		return machine.UprobeConfig{}, fmt.Errorf("failed to parse symbol: %w", err)
+	}
+
+	return machine.UprobeConfig{
+		Config: uprobe.Config{
+			Path:        binaryPath,
+			Symbol:      symbol,
+			LocalOffset: offset,
+			SampleType:  event,
+		},
+	}, nil
 }
 
 type events struct {
@@ -270,17 +300,43 @@ type events struct {
 }
 
 func parseEvents(opts *recordOptions) (events events, err error) {
-	switch {
-	case strings.HasPrefix(opts.event, "uprobe:"):
-		uprobeConfigs, err := parseUprobeConfigsFromEvent(opts.event, opts.pids)
-		if err != nil {
-			return events, fmt.Errorf("failed to parse uprobe configs: %w", err)
+	if len(opts.events) == 0 && !opts.signals {
+		opts.events = []string{"CPUCycles"}
+	}
+
+	for _, event := range opts.events {
+		switch {
+		case strings.HasPrefix(event, "uprobe:"):
+			uprobeConfigs, err := parseUprobeConfigsFromEvent(event, opts.pids)
+			if err != nil {
+				return events, fmt.Errorf("failed to parse uprobe configs: %w", err)
+			}
+			events.uprobes = append(events.uprobes, uprobeConfigs...)
+		default:
+			perfEventCfg, err := parsePerfEvent(event, opts)
+			if err != nil {
+				return events, fmt.Errorf("failed to parse perf event %s: %w", event, err)
+			}
+			if perfEventCfg != nil {
+				events.perfEvents = append(events.perfEvents, *perfEventCfg)
+			}
 		}
-		events.uprobes = append(events.uprobes, uprobeConfigs...)
-	default:
-		events.perfEvents, err = parsePerfEvents(opts)
-		if err != nil {
-			return events, fmt.Errorf("failed to parse perf events: %w", err)
+	}
+
+	if len(events.perfEvents) > 1 {
+		err = errors.New("multiple perf events are not supported yet")
+		return
+	}
+
+	if len(events.perfEvents) > 0 && len(events.uprobes) > 0 {
+		err = errors.New("uprobe and perf events are not supported together yet")
+		return
+	}
+
+	if len(events.uprobes) > 1 {
+		// Make single sample type for all uprobes for easier default sample type deduction
+		for i := 0; i < len(events.uprobes); i++ {
+			events.uprobes[i].Config.SampleType = sampletype.SampleTypeUprobe
 		}
 	}
 
@@ -527,8 +583,14 @@ func deduceProfileSampleType(opts *recordOptions) (string, error) {
 	if opts.signals {
 		return sampletype.SampleTypeSignal, nil
 	}
-	if strings.HasPrefix(opts.event, "uprobe:") {
-		return opts.event, nil
+	if strings.HasPrefix(opts.events[0], "uprobe:") {
+		// this condition automatically means that all events are uprobes,
+		// because multiple perf events mixed with uprobes are not supported yet
+		if len(opts.events) == 1 {
+			return opts.events[0], nil
+		}
+
+		return sampletype.SampleTypeUprobe, nil
 	}
 
 	return sampletype.SampleTypeCPU, nil
