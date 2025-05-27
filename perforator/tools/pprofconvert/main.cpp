@@ -1,4 +1,5 @@
 #include <perforator/lib/profile/merge.h>
+#include <perforator/lib/profile/parallel_merge.h>
 #include <perforator/lib/profile/pprof.h>
 #include <perforator/lib/profile/profile.h>
 #include <perforator/lib/profile/validate.h>
@@ -6,6 +7,8 @@
 #include <library/cpp/containers/absl_flat_hash/flat_hash_map.h>
 #include <library/cpp/digest/murmur/murmur.h>
 #include <library/cpp/iterator/enumerate.h>
+#include <library/cpp/threading/future/async.h>
+#include <library/cpp/threading/future/wait/wait_group.h>
 #include <library/cpp/yt/compact_containers/compact_vector.h>
 
 #include <util/datetime/base.h>
@@ -228,7 +231,7 @@ int main(int argc, const char* argv[]) {
         return 0;
     }
 
-    if (argv[1] == "merge-threaded"sv) {
+        if (argv[1] == "merge-threaded-old"sv) {
         Y_ENSURE(argc > 3);
 
         const int threadCount = 10;
@@ -266,6 +269,58 @@ int main(int argc, const char* argv[]) {
         for (auto& profile : profiles) {
             merger.Add(profile);
         }
+        std::move(merger).Finish();
+
+        TFileOutput out{argv[2]};
+        merged.SerializeToArcadiaStream(&out);
+
+        return 0;
+    }
+
+    if (argv[1] == "merge-threaded"sv) {
+        Y_ENSURE(argc > 3);
+
+        const int threadCount = 20;
+
+        TThreadPool tp;
+        tp.Start(threadCount);
+
+        NPerforator::NProto::NProfile::Profile merged;
+        NPerforator::NProto::NProfile::MergeOptions options = MakeCommonMergeOptions();
+
+        NPerforator::NProfile::TParallelProfileMergerOptions mergerOptions;
+        mergerOptions.MergeOptions = options;
+        mergerOptions.ConcurrencyLevel = 10;
+        mergerOptions.BufferSize = 20;
+
+        NPerforator::NProfile::TParallelProfileMerger merger{&merged, mergerOptions, &tp};
+
+        // Parallel parsing and feeding to merger
+        NThreading::TWaitGroup<NThreading::TWaitPolicy::TAll> wg;
+        std::atomic<int> processed = 0;
+        const int total = argc - 3;
+
+        for (int i = 3; i < argc; ++i) {
+            wg.Add(NThreading::Async([&merger, &processed, i, total, argv] {
+                TFileInput in{argv[i]};
+                NPerforator::NProto::NProfile::Profile profile;
+                Y_ENSURE(profile.ParseFromArcadiaStream(&in));
+                merger.Add(std::move(profile));
+
+                int current = processed.fetch_add(1) + 1;
+                if (current % 10 == 0 || current == total) {
+                    Cerr << "Parsed and queued " << current << " / " << total << " profiles" << Endl;
+                }
+            }, tp));
+        }
+
+        Cerr << "Waiting for parsing to complete" << Endl;
+
+        // Wait for all parsing to complete
+        std::move(wg).Finish().GetValueSync();
+
+        Cerr << "All profiles parsed, finishing merge" << Endl;
+
         std::move(merger).Finish();
 
         TFileOutput out{argv[2]};
