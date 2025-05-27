@@ -1,0 +1,144 @@
+service: committeejava
+title: Download new protoc for java
+ci:
+  secret: sec-01hdkn5jk9a2qbx4r18e7nmtjf
+  runtime:
+    sandbox-owner: JAVACOM
+
+  actions:
+    prepare-new-pr:
+      title: Update protoc
+      description: |
+        * Скачиваем новую версию protoc для всех целевых архитектур
+        * кладем в build/platform/java/protoc/resources.json
+
+        В качестве парамтера достаточно указать версию вида `25.1`
+      flow: prepare-pullrequest
+      flow-vars-ui:
+        schema:
+          type: object
+          required:
+            - version
+          properties:
+            version:
+              type: string
+              title: Protobuf version
+              description: |
+                Версия protoc в формате `25.1`
+                Релизы в репозитории: [protobuf github](https://github.com/protocolbuffers/protobuf/releases)
+
+  flows:
+    prepare-pullrequest:
+      jobs:
+        prepare:
+          title: Download protoc
+          task: common/misc/run_command
+          requirements:
+            sandbox:
+              dns: dns64
+          input:
+            config:
+              arc_mount_config:
+                enabled: true
+              cmd_line: |
+                cd $RESULT_RESOURCES_PATH
+                $ARCADIA_PATH/build/platform/java/protoc/run.sh ${flow-vars.version}
+              result_resources:
+                - path: protoc-linux-x86_64.tgz
+                  compression_type: none
+                  type: JAVA_PROTOC_BINARY
+                  attributes:
+                    ttl: inf
+                    platform: linux
+                  attributes_path: version.json
+
+                - path: protoc-linux-aarch_64.tgz
+                  compression_type: none
+                  type: JAVA_PROTOC_BINARY
+                  attributes:
+                    ttl: inf
+                    platform: linux-arm64
+                  attributes_path: version.json
+
+                - path: protoc-win64.tgz
+                  compression_type: none
+                  type: JAVA_PROTOC_BINARY
+                  attributes:
+                    ttl: inf
+                    platform: windows
+                  attributes_path: version.json
+
+                - path: protoc-osx-x86_64.tgz
+                  compression_type: none
+                  type: JAVA_PROTOC_BINARY
+                  attributes:
+                    ttl: inf
+                    platform: darwin
+                  attributes_path: version.json
+
+                - path: protoc-osx-aarch_64.tgz
+                  compression_type: none
+                  type: JAVA_PROTOC_BINARY
+                  attributes:
+                    ttl: inf
+                    platform: darwin-arm64
+                  attributes_path: version.json
+
+        pullrequest:
+          title: Prepare PR in Arcanum
+          task: common/misc/run_command
+          needs: prepare
+          requirements:
+            sandbox:
+              dns: dns64
+          input:
+            config:
+              arc_mount_config:
+                enabled: true
+              cmd_line: |
+                export VERSION="${flow-vars.version}"
+
+                cat << EOF > "$ARCADIA_PATH/build/platform/java/protoc/resources.json"
+                {
+                  "by_platform": {
+                    "darwin-arm64": {
+                      "uri": "sbr:${tasks.prepare.resources[?attributes.platform == 'darwin-arm64'].id | single(@)}"
+                    },
+                    "darwin-x86_64": {
+                      "uri": "sbr:${tasks.prepare.resources[?attributes.platform == 'darwin'].id | single(@)}"
+                    },
+                    "linux-x86_64": {
+                      "uri": "sbr:${tasks.prepare.resources[?attributes.platform == 'linux'].id | single(@)}"
+                    },
+                    "linux-aarch64": {
+                      "uri": "sbr:${tasks.prepare.resources[?attributes.platform == 'linux-arm64'].id | single(@)}"
+                    },
+                    "win32-x86_64": {
+                      "uri": "sbr:${tasks.prepare.resources[?attributes.platform == 'windows'].id | single(@)}"
+                    }
+                  }
+                }
+                EOF
+
+                echo "$VERSION" > "$VERSION_DIR/version.txt"
+
+                arc add build/platform/java/protoc/resources.json
+                arc submit -m "Upload new protoc java $VERSION" >submit.log
+
+                export SUBMIT_URL=$(cat submit.log)
+                echo "{ \"id\": \"arcanum-pr\", \"module\": \"ARCADIA\", \"url\": \"$SUBMIT_URL\", \"text\": \"Pull Request\", \"status\": \"SUCCESSFUL\" }" > "$RESULT_BADGES_PATH/pullrequest"
+
+              result_badges:
+                - path: pullrequest
+
+        # TODO: add reference to pull request
+        # TODO: wait for pull request
+
+        # release:
+        #   title: Mark resources as Released
+        #   task: common/releases/release_to_sandbox
+        #   needs: pullrequest
+        #   manual: true
+        #   input:
+        #     config:
+        #       sandbox_resource_type: JAVA_PROTOC_BINARY

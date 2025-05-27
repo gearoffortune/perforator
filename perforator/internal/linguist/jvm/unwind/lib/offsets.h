@@ -1,5 +1,6 @@
 #include <cstddef>
 #include <cstdlib>
+#include <sys/types.h>
 
 namespace NPerforator::NLinguist::NJvm {
 
