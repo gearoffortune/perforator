@@ -461,6 +461,10 @@ func (a *processAnalyzer) run(ctx context.Context) error {
 		for _, l := range a.reg.listeners {
 			l.OnProcessDiscovery(a.proc)
 		}
+	} else {
+		for _, l := range a.reg.listeners {
+			l.OnProcessRescan(a.proc)
+		}
 	}
 
 	if err := a.loadMaps(ctx); err != nil {

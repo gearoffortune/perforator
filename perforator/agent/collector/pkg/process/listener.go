@@ -10,5 +10,6 @@ type ProcessInfo interface {
 
 type Listener interface {
 	OnProcessDiscovery(info ProcessInfo)
+	OnProcessRescan(info ProcessInfo)
 	OnProcessDeath(pid linux.ProcessID)
 }

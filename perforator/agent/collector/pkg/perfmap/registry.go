@@ -230,6 +230,11 @@ func (r *Registry) OnProcessDiscovery(info process.ProcessInfo) {
 	}
 }
 
+// OnProcessRescan implements process.Listener
+func (r *Registry) OnProcessRescan(info process.ProcessInfo) {
+	// TODO: at least we can check env again
+}
+
 // OnProcessDeath implements process.Listener
 func (r *Registry) OnProcessDeath(pid linux.ProcessID) {
 	r.mu.Lock()
