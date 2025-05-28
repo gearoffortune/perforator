@@ -28,4 +28,15 @@ int main(int argc, const char* argv[]) {
     } else {
         Cout << "Could not parse zend vm kind" << Endl;
     }
+
+    TMaybe<bool> ztsEnabled = analyzer.ParseZts();
+    if (ztsEnabled) {
+        if (*ztsEnabled) {
+            Cout << "ZTS enabled" << Endl;
+        } else {
+            Cout << "ZTS disabled" << Endl;
+        }
+    } else {
+        Cout << "Could not parse ZTS" << Endl;
+    }
 }

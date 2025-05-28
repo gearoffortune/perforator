@@ -46,6 +46,10 @@ TString ToString(const EZendVmKind vmKind) {
     }
 }
 
+std::strong_ordering operator<=>(const TPhpVersion& lhs, const TPhpVersion& rhs) {
+    return operator<=>(std::tie(lhs.MajorVersion, lhs.MinorVersion, lhs.ReleaseVersion), std::tie(rhs.MajorVersion, rhs.MinorVersion, rhs.ReleaseVersion));
+}
+
 TZendPhpAnalyzer::TZendPhpAnalyzer(const llvm::object::ObjectFile& file)
     : File_(file)
 {
@@ -60,7 +64,8 @@ void TZendPhpAnalyzer::ParseSymbolLocations() {
     auto symbols = NELF::RetrieveSymbols(File_,
         kPhpVersionSymbol,
         KZendVmKindSymbol,
-        kZmInfoPhpCoreSymbol
+        kZmInfoPhpCoreSymbol,
+        kPhpTsrmStartupSymbol
     );
 
     auto setSymbolIfFound =
@@ -75,7 +80,18 @@ void TZendPhpAnalyzer::ParseSymbolLocations() {
         setSymbolIfFound(*symbols, kPhpVersionSymbol, Symbols_->PhpVersion);
         setSymbolIfFound(*symbols, KZendVmKindSymbol, Symbols_->ZendVmKind);
         setSymbolIfFound(*symbols, kZmInfoPhpCoreSymbol, Symbols_->ZmInfoPhpCore);
+        setSymbolIfFound(*symbols, kPhpTsrmStartupSymbol, Symbols_->PhpTsrmStartup);
     }
+}
+
+TMaybe<bool> TZendPhpAnalyzer::ParseZts() {
+    static constexpr NPerforator::NLinguist::NPhp::TPhpVersion minZtsSupportVersion{7, 4, 1};;
+    TMaybe<TParsedPhpVersion> version = ParseVersion();
+    if (version && version->Version >= minZtsSupportVersion) {
+        return MakeMaybe(Symbols_ && Symbols_->PhpTsrmStartup);
+    }
+
+    return Nothing();
 }
 
 TMaybe<TPhpVersion> TryScanVersion(TConstArrayRef<char> data) {
@@ -208,16 +224,18 @@ TMaybe<TParsedPhpVersion> ParseVersion(const llvm::object::ObjectFile& file,
 }
 
 TMaybe<TParsedPhpVersion> TZendPhpAnalyzer::ParseVersion() {
+    if (Version_) {
+        return Version_;
+    }
+
     ParseSymbolLocations();
 
     if (!Symbols_ || !NPerforator::NELF::IsElfFile(File_)) {
-        return Nothing();
+        return Version_;
     }
 
-    if (auto res = NPerforator::NLinguist::NPhp::ParseVersion(File_, *Symbols_.Get())) {
-        return res;
-    }
-    return Nothing();
+    Version_ = NPerforator::NLinguist::NPhp::ParseVersion(File_, *Symbols_.Get());
+    return Version_;
 }
 
 TMaybe<EZendVmKind> TZendPhpAnalyzer::ParseZendVmKind() {

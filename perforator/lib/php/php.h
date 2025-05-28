@@ -38,10 +38,13 @@ enum class EZendVmKind {
 
 TString ToString(const EZendVmKind vmKind);
 
+std::strong_ordering operator<=>(const TPhpVersion& lhs, const TPhpVersion& rhs);
 
 constexpr TStringBuf kPhpVersionSymbol = "php_version";
 constexpr TStringBuf kZmInfoPhpCoreSymbol = "zm_info_php_core";
 constexpr TStringBuf KZendVmKindSymbol = "zend_vm_kind";
+constexpr TStringBuf kPhpTsrmStartupSymbol = "php_tsrm_startup";
+
 constexpr TStringBuf kPhpVersionKeyPhrase = "X-Powered-By: PHP/";
 const re2::RE2 kPhpVersionRegex(R"((\d)\.(\d)\.(\d+))");
 
@@ -52,6 +55,7 @@ public:
         TMaybe<NPerforator::NELF::TLocation> ZmInfoPhpCore;
         TMaybe<NPerforator::NELF::TLocation> ExecuteEx;
         TMaybe<NPerforator::NELF::TLocation> ZendVmKind;
+        TMaybe<NPerforator::NELF::TLocation> PhpTsrmStartup;
     };
 
 public:
@@ -61,12 +65,15 @@ public:
 
     TMaybe<EZendVmKind> ParseZendVmKind();
 
+    TMaybe<bool> ParseZts();
+
 private:
     void ParseSymbolLocations();
 
 private:
     const llvm::object::ObjectFile& File_;
     THolder<TSymbols> Symbols_;
+    TMaybe<TParsedPhpVersion> Version_ = Nothing();
 };
 
 } // namespace NPerforator::NLinguist::NPhp
