@@ -24,6 +24,8 @@ func RenderProfile(ctx context.Context, profile *profile.Profile, format *perfor
 		return buildProfileFlamegraph(profile, v.Flamegraph, render.HTMLFormat)
 	case *perforator.RenderFormat_JSONFlamegraph:
 		return buildProfileFlamegraph(profile, v.JSONFlamegraph, render.JSONFormat)
+	case *perforator.RenderFormat_HTMLVisualisation:
+		return buildProfileFlamegraph(profile, v.HTMLVisualisation, render.HTMLFormatV2)
 	}
 
 	return nil, fmt.Errorf("unsupported render format %s", format.String())

@@ -22,6 +22,13 @@ IF (NOT OPENSOURCE)
 ENDIF()
 
 GO_EMBED_PATTERN(tmpl.html)
+GO_EMBED_PATTERN(new_templ.html)
+
+RESOURCE(
+    ${ARCADIA_BUILD_ROOT}/perforator/ui/union/viewer.js viewer.js
+)
+
+PEERDIR(perforator/ui/union)
 
 END()
 

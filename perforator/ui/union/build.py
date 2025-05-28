@@ -20,6 +20,7 @@ def bytes2str(text: bytes) -> str:
 
 
 def run_command(cmd: t.List[str]) -> None:
+    print(f'Running {cmd}:\n')
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = process.communicate()
     if process.returncode:
@@ -55,11 +56,13 @@ def main():
 
     run_command([node, pnpm, 'install'])
     run_command([node, pnpm, '--filter', '../packages/**', 'run', 'build'])
+    run_command([node, pnpm, '--filter', '../viewer', 'run', 'build'])
     run_command([node, pnpm, 'run', 'build'])
 
     with tarfile.open(os.path.join(args.bindir, 'output.tar'), 'w') as tar:
         tar.add(os.path.join(app, 'dist'), arcname='dist')
 
+    shutil.copyfile(os.path.join(ui, 'viewer', 'dist', 'assets', 'index.js'), os.path.join(args.bindir, 'viewer.js'))
 
 if __name__ == '__main__':
     main()

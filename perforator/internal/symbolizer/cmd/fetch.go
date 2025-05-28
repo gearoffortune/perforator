@@ -62,6 +62,19 @@ func makeRenderFormat(format string, options *client.FlamegraphOptions, enableSy
 			},
 		}, nil
 
+	case "visualisation", "vis", "html-v2":
+		return &proto.RenderFormat{
+			Symbolize: &proto.SymbolizeOptions{
+				Symbolize: ptr.Bool(enableSymbolization),
+			},
+			Postprocessing: &proto.PostprocessOptions{
+				MergePythonAndNativeStacks: ptr.Bool(enableStackMerge),
+			},
+			Format: &proto.RenderFormat_HTMLVisualisation{
+				HTMLVisualisation: options,
+			},
+		}, nil
+
 	case "pprof":
 		return &proto.RenderFormat{
 			Symbolize: &proto.SymbolizeOptions{

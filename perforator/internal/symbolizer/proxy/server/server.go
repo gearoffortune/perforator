@@ -1499,7 +1499,7 @@ func (s *PerforatorServer) makeProfileKey(format *perforator.RenderFormat) (stri
 		suffix = ".pb.gz"
 	case *perforator.RenderFormat_JSONFlamegraph:
 		suffix = ".json"
-	case *perforator.RenderFormat_Flamegraph:
+	case *perforator.RenderFormat_Flamegraph, *perforator.RenderFormat_HTMLVisualisation:
 		suffix = ".html"
 	default:
 		return "", fmt.Errorf("unsupported render format: %T", v)

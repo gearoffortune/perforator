@@ -32,6 +32,7 @@ func main() {
 	format := flag.String("format", "collapsed", "Profile format: pprof or collapsed")
 	maxdepth := flag.Int("maxdepth", 128, "Truncate stacks that are taller than the limit")
 	minweight := flag.Float64("minweight", 0.0001, "Truncate stacks that are narrower than the limit")
+	outFormat := flag.String("outformat", "html", "format for the result: html, json or html-v2")
 	flag.Parse()
 
 	go func() {
@@ -48,6 +49,12 @@ func main() {
 		fg := render.NewFlameGraph()
 		fg.SetDepthLimit(*maxdepth)
 		fg.SetMinWeight(*minweight)
+		if *outFormat == "json" {
+			fg.SetFormat(render.JSONFormat)
+		}
+		if *outFormat == "html-v2" {
+			fg.SetFormat(render.HTMLFormatV2)
+		}
 
 		switch *format {
 		case "collapsed":

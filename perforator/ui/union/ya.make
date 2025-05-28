@@ -26,7 +26,7 @@ RUN_PYTHON3(
     STDOUT ${BINDIR}/stdout
     OUT
         ${BINDIR}/output.tar
+        ${BINDIR}/viewer.js
 )
-FROM_ARCHIVE(${BINDIR}/output.tar OUT_NOAUTO index.html RENAME dist/index.html)
 
 END()

@@ -497,6 +497,10 @@ message RenderFormat {
         // Json is parsed faster in the ui.
         // html can be shown without ui.
         FlamegraphOptions JSONFlamegraph = 7;
+        // Build flamegraph.
+        // Is emitted as html.
+        // Uses the same code as ui but can be shown without ui.
+        FlamegraphOptions HTMLVisualisation = 8;
     }
 }
 

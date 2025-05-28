@@ -15,6 +15,7 @@ import (
 
 	pprof "github.com/google/pprof/profile"
 
+	"github.com/yandex/perforator/library/go/core/resource"
 	"github.com/yandex/perforator/perforator/agent/collector/pkg/profile"
 	"github.com/yandex/perforator/perforator/pkg/profile/flamegraph/collapsed"
 	"github.com/yandex/perforator/perforator/pkg/profile/flamegraph/render/format"
@@ -23,6 +24,9 @@ import (
 
 //go:embed tmpl.html
 var htmlTmpl string
+
+//go:embed new_templ.html
+var newHtmlTmpl string
 
 var tmpl *template.Template
 
@@ -49,13 +53,15 @@ func init() {
 	})
 
 	template.Must(tmpl.New("html").Parse(htmlTmpl))
+	template.Must(tmpl.New("html_v2").Parse(newHtmlTmpl))
 }
 
 type Format string
 
 const (
-	HTMLFormat Format = "html"
-	JSONFormat Format = "json"
+	HTMLFormat   Format = "html"
+	HTMLFormatV2 Format = "html_v2"
+	JSONFormat   Format = "json"
 )
 
 const (
@@ -120,7 +126,7 @@ type FlameGraph struct {
 func NewFlameGraph() *FlameGraph {
 	return &FlameGraph{
 		fileNames:           true,
-		format:              HTMLFormat,
+		format:              HTMLFormatV2,
 		title:               "Flame Graph",
 		frameType:           "Function",
 		eventType:           "cycles",
@@ -463,12 +469,35 @@ func (f *FlameGraph) renderBlocksToJSON(blocks []*block, w io.Writer) error {
 	return nil
 }
 
+func (f *FlameGraph) renderBlocksToHTMLV2(blocks []*block, w io.Writer) error {
+	jsonBytes := make([]byte, 0, 1024)
+	buf := bytes.NewBuffer(jsonBytes)
+	err := f.renderBlocksToJSON(blocks, buf)
+	if err != nil {
+		return err
+	}
+	jsCode := template.HTML("<script>" + string(resource.Get("viewer.js")) + "</script>")
+
+	jsonData := template.HTML("<script>window.__data__=" + buf.String() + "</script>")
+
+	return tmpl.ExecuteTemplate(w, string(f.format), &struct {
+		Json   template.HTML
+		Script template.HTML
+	}{
+		Json:   jsonData,
+		Script: jsCode,
+	})
+
+}
+
 func (f *FlameGraph) renderBlocks(blocks []*block, w io.Writer) error {
 	switch f.format {
 	case JSONFormat:
 		return f.renderBlocksToJSON(blocks, w)
 	case HTMLFormat:
 		return f.renderBlocksToHTML(blocks, w)
+	case HTMLFormatV2:
+		return f.renderBlocksToHTMLV2(blocks, w)
 	default:
 		return fmt.Errorf("unsupported format: %s", f.format)
 	}

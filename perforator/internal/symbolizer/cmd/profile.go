@@ -50,7 +50,7 @@ func makeFlamegraphCmd() *cobra.Command {
 
 	flamegraphCmd.PersistentFlags().StringVarP(&inputPath, "input", "i", "stdin", "Path to the input")
 	flamegraphCmd.PersistentFlags().StringVarP(&baselinePath, "baseline", "b", "", "Path to the baseline profile")
-	flamegraphCmd.PersistentFlags().StringVarP((*string)(&format), "format", "f", "html", "Render format (html or svg)")
+	flamegraphCmd.PersistentFlags().StringVarP((*string)(&format), "format", "f", "html", "Render format (html or html_v2)")
 	flamegraphCmd.PersistentFlags().Float64VarP(&minWeight, "min-weight", "w", 0, "Minimum function weight to draw")
 	flamegraphCmd.PersistentFlags().IntVarP(&maxDepth, "max-depth", "d", 0, "Maximum flamegraph height. Use 0 to disable")
 	flamegraphCmd.PersistentFlags().StringVarP(&title, "title", "t", "Flamegraph", "Flamegraph title")
