@@ -1,58 +1,40 @@
 #include "elf.h"
 
-#include <perforator/lib/llvmex/llvm_elf.h>
-#include <perforator/lib/llvmex/llvm_exception.h>
 
 #include <llvm/Object/ELFObjectFile.h>
 
 namespace NPerforator::NELF::NPrivate {
 
-THashMap<TStringBuf, TLocation> ParseSymbolsImpl(
-    const llvm::object::ELFObjectFileBase::elf_symbol_iterator_range& symbols,
-    std::initializer_list<TStringBuf> targetSymbols
-) {
-    THashMap<TStringBuf, TLocation> result;
-
-    for (const auto& symbol : symbols) {
-        TLocation location;
-
-        Y_LLVM_UNWRAP(name, symbol.getName(), { continue; });
-        Y_LLVM_UNWRAP(address, symbol.getAddress(), { continue; });
-
-        location.Address = address;
-        location.Size = symbol.getSize();
-
-        TStringBuf symbolName{name.data(), name.size()};
-        for (const auto& targetSymbol : targetSymbols) {
-            if (symbolName == targetSymbol) {
-                result[symbolName] = location;
-                break;
-            }
-        }
-    }
-
-    return result;
-}
-
-template <typename ELFT>
-THashMap<TStringBuf, TLocation> ParseDynamicSymbols(const llvm::object::ELFObjectFile<ELFT>& elf, std::initializer_list<TStringBuf> symbols) {
-    return ParseSymbolsImpl(elf.getDynamicSymbolIterators(), symbols);
-}
-
-template <typename ELFT>
-THashMap<TStringBuf, TLocation> ParseSymbols(const llvm::object::ELFObjectFile<ELFT>& elf, std::initializer_list<TStringBuf> symbols) {
-    return ParseSymbolsImpl(elf.symbols(), symbols);
-}
-
-TMaybe<THashMap<TStringBuf, TLocation>> RetrieveDynamicSymbols(const llvm::object::ObjectFile& file, std::initializer_list<TStringBuf> symbols) {
+TMaybe<TSymbolMap> RetrieveSymbolsFromDynsym(const llvm::object::ObjectFile& file, std::initializer_list<TStringBuf> symbols) {
     return NLLVM::VisitELF(&file, [&symbols](const auto& elf) {
-        return ParseDynamicSymbols(elf, symbols);
+        return ParseDynsym(elf, symbols);
     });
 }
 
-TMaybe<THashMap<TStringBuf, TLocation>> RetrieveSymbols(const llvm::object::ObjectFile& file, std::initializer_list<TStringBuf> symbols) {
+TMaybe<TSymbolMap> RetrieveSymbolsFromSymtab(const llvm::object::ObjectFile& file, std::initializer_list<TStringBuf> symbols) {
     return NLLVM::VisitELF(&file, [&symbols](const auto& elf) {
-        return ParseSymbols(elf, symbols);
+        return ParseSymtab(elf, symbols);
+    });
+}
+
+TMaybe<TSymbolMap> RetrieveSymbols(const llvm::object::ObjectFile &file, std::initializer_list<TStringBuf> symbols) {
+    return NLLVM::VisitELF(&file, [&symbols](const auto& elf) {
+        TSymbolMap res = ParseDynsym(elf, symbols);
+
+        llvm::SmallVector<TStringBuf> symtabSymbols;
+        symtabSymbols.reserve(symbols.size());
+        for (const TStringBuf& symbol : symbols) {
+            if (!res.contains(symbol)) {
+                symtabSymbols.push_back(symbol);
+            }
+        }
+
+        TSymbolMap symtab = ParseSymtab(elf, symtabSymbols);
+        for (auto& [key, value] : symtab) {
+            res[key] = std::move(value);
+        }
+
+        return res;
     });
 }
 

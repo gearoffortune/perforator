@@ -57,9 +57,11 @@ void TZendPhpAnalyzer::ParseSymbolLocations() {
     }
 
     Symbols_ = MakeHolder<TSymbols>();
-    auto dynamicSymbols = NELF::RetrieveDynamicSymbols(File_,
-                                                       kPhpVersionSymbol,
-                                                       KZendVmKindSymbol);
+    auto symbols = NELF::RetrieveSymbols(File_,
+        kPhpVersionSymbol,
+        KZendVmKindSymbol,
+        kZmInfoPhpCoreSymbol
+    );
 
     auto setSymbolIfFound =
         [&](const THashMap<TStringBuf, NPerforator::NELF::TLocation>& symbols,
@@ -69,13 +71,9 @@ void TZendPhpAnalyzer::ParseSymbolLocations() {
             }
         };
 
-    if (dynamicSymbols) {
-        setSymbolIfFound(*dynamicSymbols, kPhpVersionSymbol, Symbols_->PhpVersion);
-        setSymbolIfFound(*dynamicSymbols, KZendVmKindSymbol, Symbols_->ZendVmKind);
-    }
-
-    auto symbols = NELF::RetrieveSymbols(File_, kZmInfoPhpCoreSymbol);
     if (symbols) {
+        setSymbolIfFound(*symbols, kPhpVersionSymbol, Symbols_->PhpVersion);
+        setSymbolIfFound(*symbols, KZendVmKindSymbol, Symbols_->ZendVmKind);
         setSymbolIfFound(*symbols, kZmInfoPhpCoreSymbol, Symbols_->ZmInfoPhpCore);
     }
 }

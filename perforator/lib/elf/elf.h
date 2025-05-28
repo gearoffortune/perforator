@@ -9,6 +9,9 @@
 #include <llvm/Object/ObjectFile.h>
 #include <llvm/Object/ELFObjectFile.h>
 
+#include <perforator/lib/llvmex/llvm_elf.h>
+#include <perforator/lib/llvmex/llvm_exception.h>
+
 namespace NPerforator::NELF {
 
 struct TLocation {
@@ -25,23 +28,72 @@ constexpr TStringBuf kRoDataSectionName = ".rodata";
 
 } // namespace NPerforator::NELF::NSections
 
+using TSymbolMap = THashMap<TStringBuf, TLocation>;
+
 namespace NPrivate {
 
-TMaybe<THashMap<TStringBuf, TLocation>> RetrieveDynamicSymbols(const llvm::object::ObjectFile& file, std::initializer_list<TStringBuf> symbols);
+template <typename Container>
+TSymbolMap ParseSymbolsImpl(
+    const llvm::object::ELFObjectFileBase::elf_symbol_iterator_range& symbols,
+    const Container& targetSymbols
+) {
+    TSymbolMap result;
 
-TMaybe<THashMap<TStringBuf, TLocation>> RetrieveSymbols(const llvm::object::ObjectFile& file, std::initializer_list<TStringBuf> symbols);
+    for (const auto& symbol : symbols) {
+        TLocation location;
+
+        Y_LLVM_UNWRAP(name, symbol.getName(), { continue; });
+        Y_LLVM_UNWRAP(address, symbol.getAddress(), { continue; });
+
+        location.Address = address;
+        location.Size = symbol.getSize();
+
+        TStringBuf symbolName{name.data(), name.size()};
+        for (const auto& targetSymbol : targetSymbols) {
+            if (symbolName == targetSymbol) {
+                result[symbolName] = location;
+                break;
+            }
+        }
+    }
+
+    return result;
+}
+
+template <typename ELFT, typename Container>
+TSymbolMap ParseDynsym(const llvm::object::ELFObjectFile<ELFT>& elf, const Container& symbols) {
+    return ParseSymbolsImpl(elf.getDynamicSymbolIterators(), symbols);
+}
+
+template <typename ELFT, typename Container>
+TSymbolMap ParseSymtab(const llvm::object::ELFObjectFile<ELFT>& elf, const Container& symbols) {
+    return ParseSymbolsImpl(elf.symbols(), symbols);
+}
+
+TMaybe<TSymbolMap> RetrieveSymbolsFromDynsym(const llvm::object::ObjectFile& file, std::initializer_list<TStringBuf> symbols);
+
+TMaybe<TSymbolMap> RetrieveSymbolsFromSymtab(const llvm::object::ObjectFile& file, std::initializer_list<TStringBuf> symbols);
+
+TMaybe<TSymbolMap> RetrieveSymbols(const llvm::object::ObjectFile& file, std::initializer_list<TStringBuf> symbols);
 
 } // namespace NPerforator::NELF::NPrivate
 
+
 template <typename... Args>
-TMaybe<THashMap<TStringBuf, TLocation>> RetrieveDynamicSymbols(const llvm::object::ObjectFile& file, Args... symbols) {
-    return NPerforator::NELF::NPrivate::RetrieveDynamicSymbols(file, {symbols...});
+TMaybe<TSymbolMap> RetrieveSymbolsFromDynsym(const llvm::object::ObjectFile& file, Args... symbols) {
+    return NPerforator::NELF::NPrivate::RetrieveSymbolsFromDynsym(file, {symbols...});
 }
 
 template <typename... Args>
-TMaybe<THashMap<TStringBuf, TLocation>> RetrieveSymbols(const llvm::object::ObjectFile& file, Args... symbols) {
+TMaybe<TSymbolMap> RetrieveSymbolsFromSymtab(const llvm::object::ObjectFile& file, Args... symbols) {
+    return NPerforator::NELF::NPrivate::RetrieveSymbolsFromSymtab(file, {symbols...});
+}
+
+template <typename... Args>
+TMaybe<TSymbolMap> RetrieveSymbols(const llvm::object::ObjectFile& file, Args... symbols) {
     return NPerforator::NELF::NPrivate::RetrieveSymbols(file, {symbols...});
 }
+
 
 TMaybe<llvm::object::SectionRef> GetSection(const llvm::object::ObjectFile& file, TStringBuf sectionName);
 

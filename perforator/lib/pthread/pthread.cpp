@@ -17,7 +17,7 @@ void TLibPthreadAnalyzer::ParseSymbolLocations() {
     }
 
     Symbols_ = MakeHolder<TSymbols>();
-    auto dynamicSymbols = NELF::RetrieveDynamicSymbols(File_, kPthreadGetspecificSymbol);
+    auto dynamicSymbols = NELF::RetrieveSymbolsFromDynsym(File_, kPthreadGetspecificSymbol);
     if (dynamicSymbols) {
         Symbols_->PthreadGetspecific = (*dynamicSymbols)[kPthreadGetspecificSymbol];
     }
@@ -65,7 +65,7 @@ TMaybe<TAccessTSSInfo> TLibPthreadAnalyzer::ParseAccessTSSInfo() {
 }
 
 bool IsLibPthreadBinary(const llvm::object::ObjectFile& file) {
-    auto dynamicSymbols = NELF::RetrieveDynamicSymbols(file, kPthreadGetspecificSymbol, kPthreadSetspecificSymbol);
+    auto dynamicSymbols = NELF::RetrieveSymbolsFromDynsym(file, kPthreadGetspecificSymbol, kPthreadSetspecificSymbol);
     if (!dynamicSymbols) {
         return false;
     }

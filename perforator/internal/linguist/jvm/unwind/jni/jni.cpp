@@ -240,7 +240,7 @@ struct TJvmInfo {
         Y_ABORT_UNLESS(f);
         llvm::object::ELFObjectFile<llvm::object::ELF64LE>* elf = llvm::dyn_cast<llvm::object::ELFObjectFile<llvm::object::ELF64LE>>(f->getBinary());
         Y_ABORT_UNLESS(elf != nullptr);
-        TMaybe<THashMap<TStringBuf, NPerforator::NELF::TLocation>> symbols = NPerforator::NELF::RetrieveSymbols(
+        TMaybe<THashMap<TStringBuf, NPerforator::NELF::TLocation>> symbols = NPerforator::NELF::RetrieveSymbolsFromSymtab(
             *elf,
             NPerforator::NLinguist::NJvm::TVMStructsAddresses::StructsAddressSym,
             NPerforator::NLinguist::NJvm::TVMStructsAddresses::StructsLengthSym,
@@ -419,4 +419,3 @@ JNIEXPORT void JNICALL Java_tech_perforator_unwind_Native_unwindIfZero0(JNIEnv* 
         Unwind(callerFrameStart, callerIp);
     }
 }
-

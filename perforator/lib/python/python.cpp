@@ -25,8 +25,7 @@ void TPythonAnalyzer::ParseSymbolLocations() {
     }
 
     Symbols_ = MakeHolder<TSymbols>();
-
-    auto dynamicSymbols = NELF::RetrieveDynamicSymbols(File_,
+    auto symbols = NELF::RetrieveSymbols(File_,
         kPyVersionSymbol,
         kPyThreadStateGetCurrentSymbol,
         kPyGetVersionSymbol,
@@ -34,7 +33,8 @@ void TPythonAnalyzer::ParseSymbolLocations() {
         kPyGILStateEnsureSymbol,
         kPyInterpreterStateHeadSymbol,
         kPyUnicodeUCS2FromStringSymbol,
-        kPyUnicodeUCS4FromStringSymbol
+        kPyUnicodeUCS4FromStringSymbol,
+        kCurrentFastGetSymbol
     );
 
     auto setSymbolIfFound = [&](const THashMap<TStringBuf, NPerforator::NELF::TLocation>& symbols, TStringBuf symbolName, TMaybe<NELF::TLocation>& target) {
@@ -43,19 +43,15 @@ void TPythonAnalyzer::ParseSymbolLocations() {
         }
     };
 
-    if (dynamicSymbols) {
-        setSymbolIfFound(*dynamicSymbols, kPyVersionSymbol, Symbols_->PyVersion);
-        setSymbolIfFound(*dynamicSymbols, kPyThreadStateGetCurrentSymbol, Symbols_->GetCurrentThreadState);
-        setSymbolIfFound(*dynamicSymbols, kPyGetVersionSymbol, Symbols_->PyGetVersion);
-        setSymbolIfFound(*dynamicSymbols, kPyRuntimeSymbol, Symbols_->PyRuntime);
-        setSymbolIfFound(*dynamicSymbols, kPyGILStateEnsureSymbol, Symbols_->PyGILStateEnsure);
-        setSymbolIfFound(*dynamicSymbols, kPyInterpreterStateHeadSymbol, Symbols_->PyInterpreterStateHead);
-        setSymbolIfFound(*dynamicSymbols, kPyUnicodeUCS2FromStringSymbol, Symbols_->PyUnicodeUCS2FromString);
-        setSymbolIfFound(*dynamicSymbols, kPyUnicodeUCS4FromStringSymbol, Symbols_->PyUnicodeUCS4FromString);
-    }
-
-    auto symbols = NELF::RetrieveSymbols(File_, kCurrentFastGetSymbol);
     if (symbols) {
+        setSymbolIfFound(*symbols, kPyVersionSymbol, Symbols_->PyVersion);
+        setSymbolIfFound(*symbols, kPyThreadStateGetCurrentSymbol, Symbols_->GetCurrentThreadState);
+        setSymbolIfFound(*symbols, kPyGetVersionSymbol, Symbols_->PyGetVersion);
+        setSymbolIfFound(*symbols, kPyRuntimeSymbol, Symbols_->PyRuntime);
+        setSymbolIfFound(*symbols, kPyGILStateEnsureSymbol, Symbols_->PyGILStateEnsure);
+        setSymbolIfFound(*symbols, kPyInterpreterStateHeadSymbol, Symbols_->PyInterpreterStateHead);
+        setSymbolIfFound(*symbols, kPyUnicodeUCS2FromStringSymbol, Symbols_->PyUnicodeUCS2FromString);
+        setSymbolIfFound(*symbols, kPyUnicodeUCS4FromStringSymbol, Symbols_->PyUnicodeUCS4FromString);
         setSymbolIfFound(*symbols, kCurrentFastGetSymbol, Symbols_->CurrentFastGet);
     }
 
@@ -250,7 +246,7 @@ TMaybe<NAsm::ThreadImageOffsetType> TPythonAnalyzer::ParseTLSPyThreadState() {
 }
 
 bool IsPythonBinary(const llvm::object::ObjectFile& file) {
-    auto dynamicSymbols = NELF::RetrieveDynamicSymbols(file, kPyGetVersionSymbol);
+    auto dynamicSymbols = NELF::RetrieveSymbolsFromDynsym(file, kPyGetVersionSymbol);
     // Also check that the address is not null, because symbols can be imported from dynamic libraries
     return (dynamicSymbols && dynamicSymbols->size() == 1 && (*dynamicSymbols)[kPyGetVersionSymbol].Address != 0);
 }
