@@ -108,7 +108,7 @@ func (p *PodsLister) List(ctx context.Context) ([]deploysystemmodel.Pod, error) 
 
 	res := make([]deploysystemmodel.Pod, 0, len(pods))
 	for _, pod := range pods {
-		// Only running pods have cgoups.
+		// Only running pods have cgroups.
 		if pod.Status.Phase != v1.PodRunning {
 			continue
 		}
