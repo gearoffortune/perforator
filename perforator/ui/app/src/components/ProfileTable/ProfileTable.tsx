@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { AxiosError } from 'axios';
 
 import { ArrowUpRightFromSquare } from '@gravity-ui/icons';
-import type { TableSortState } from '@gravity-ui/uikit';
+import type { PaginationProps, TableSortState } from '@gravity-ui/uikit';
 import {
     Icon,
     Link,
     Loader,
+    Pagination,
     Table,
     withTableCopy,
     withTableSorting,
@@ -39,7 +40,7 @@ interface Profile extends ProfileMeta {
     HumanReadableTimestamp?: string;
 }
 
-const CompactLink: React.FC<{href: string; routerLink?: boolean}> = ({ href, routerLink }) =>{
+const CompactLink: React.FC<{ href: string; routerLink?: boolean }> = ({ href, routerLink }) => {
     const LocalLink = routerLink ? RouterLink : Link;
     return (
         <LocalLink href={href}>
@@ -136,16 +137,31 @@ const prepareProfileColumns = ({ compact }: { compact?: boolean } = {}) => {
 
 const rowDescriptor = (profile: Profile) => ({ id: profile.ProfileID });
 
+const initialPaginationState = { page: 1, pageSize: 100 };
 export function ProfileTable({ query, compact }: ProfileTableProps) {
+    const prevQueryRef = useRef<ProfileTableQuery | null>(null);
     const [data, setData] = useState<Profile[]>([]);
+    const [hasMore, setHasMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [sortState, setSortState] = useState<TableSortState>([{ column: 'HumanReadableTimestamp', order: 'desc' }]);
 
-    const offset = 0;
-    const limit = 100;
+    const [paginationState, setPaginationState] = useState(initialPaginationState);
 
-    const columns = useMemo(() =>(prepareProfileColumns({ compact })), [compact]);
+    useEffect(() => {
+        if (prevQueryRef.current === null) {
+            prevQueryRef.current = query;
+        }
+        const newQuery = prevQueryRef.current !== null && prevQueryRef.current !== query;
+        if (newQuery) {
+            prevQueryRef.current = query;
+            setPaginationState(initialPaginationState);
+        }
+    }, [query]);
+    const handleUpdate: PaginationProps['onUpdate'] = (page, pageSize) =>
+        setPaginationState((prevState) => ({ ...prevState, page, pageSize }));
+
+    const columns = useMemo(() => (prepareProfileColumns({ compact })), [compact]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -161,8 +177,10 @@ export function ProfileTable({ query, compact }: ProfileTableProps) {
                 'Query.Selector': query.selector,
                 'Query.TimeInterval.From': getIsoDate(query.from ?? ''),
                 'Query.TimeInterval.To': getIsoDate(query.to ?? ''),
-                'Paginated.Offset': offset,
-                'Paginated.Limit': limit,
+                'Paginated.Offset': (paginationState.page - 1) * paginationState.pageSize,
+                'Paginated.Limit': paginationState.pageSize,
+                'OrderBy.Direction': 'Descending',
+                'OrderBy.Columns': 'timestamp',
             };
 
             if (sortState.length) {
@@ -181,6 +199,8 @@ export function ProfileTable({ query, compact }: ProfileTableProps) {
                 });
 
                 setData(profiles);
+                const more = Boolean(response?.data?.HasMore);
+                setHasMore(more);
             } catch (e: unknown) {
                 setError(e instanceof AxiosError ? e?.response?.data?.message : String(e));
             } finally {
@@ -190,7 +210,7 @@ export function ProfileTable({ query, compact }: ProfileTableProps) {
         };
 
         fetchData();
-    }, [query, sortState]);
+    }, [query, sortState, paginationState]);
 
     const SortedTable = useMemo(() => compact ? withTableSorting(Table<Profile>) : withTableCopy(withTableSorting(Table<Profile>)), [compact]);
 
@@ -203,13 +223,24 @@ export function ProfileTable({ query, compact }: ProfileTableProps) {
     }
 
     return (
-        <SortedTable
-            columns={columns}
-            data={data}
-            getRowDescriptor={rowDescriptor}
-            className="profiles-table"
-            sortState={sortState}
-            onSortStateChange={setSortState}
-        />
+        <>
+            <SortedTable
+                columns={columns}
+                data={data}
+                getRowDescriptor={rowDescriptor}
+                className="profiles-table"
+                sortState={sortState}
+                onSortStateChange={setSortState}
+            />
+            <Pagination
+                className="profiles-table_pagination"
+                page={paginationState.page}
+                pageSize={paginationState.pageSize}
+                total={(paginationState.page + (hasMore ? 1 : 0)) * paginationState.pageSize}
+                showPages={false}
+                size="s"
+                onUpdate={handleUpdate}
+            />
+        </>
     );
 }

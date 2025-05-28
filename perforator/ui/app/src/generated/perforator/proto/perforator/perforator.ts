@@ -77,6 +77,7 @@ export interface ListProfilesRequest {
 
 export interface ListProfilesResponse {
   Profiles: ProfileMeta[];
+  HasMore: boolean;
 }
 
 export interface ProfileMeta {

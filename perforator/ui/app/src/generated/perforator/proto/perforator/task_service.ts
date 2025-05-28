@@ -50,6 +50,7 @@ export interface ListTasksRequest {
 
 export interface ListTasksResponse {
   Tasks: Task[];
+  TotalCount: string;
 }
 
 export interface TaskQuery {
