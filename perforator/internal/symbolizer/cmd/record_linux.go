@@ -41,6 +41,7 @@ import (
 	"github.com/yandex/perforator/perforator/pkg/linux/perfevent"
 	"github.com/yandex/perforator/perforator/pkg/profile/merge"
 	"github.com/yandex/perforator/perforator/pkg/profile/python"
+	"github.com/yandex/perforator/perforator/pkg/profile/quality"
 	"github.com/yandex/perforator/perforator/pkg/sampletype"
 	"github.com/yandex/perforator/perforator/pkg/xelf"
 	"github.com/yandex/perforator/perforator/pkg/xlog"
@@ -91,7 +92,7 @@ func (o *recordOptions) Bind(cmd *cobra.Command) {
 	cmd.Flags().Uint64VarP(&o.interval, "count", "c", 0, "Profiling interval")
 	cmd.Flags().StringSliceVarP(
 		&o.events, "event", "e", nil,
-		`Perf event or uprobes (uprobe format is uprobe:/path/to/executable:symbol[+offset]) to profile. 
+		`Perf event or uprobes (uprobe format is uprobe:/path/to/executable:symbol[+offset]) to profile.
 		Currently only multiple uprobes are supported.`,
 	)
 	cmd.Flags().DurationVarP(&o.duration, "duration", "d", 0, "Profiling duration")
@@ -175,9 +176,11 @@ func record(opts *recordOptions, args []string) error {
 			return err
 		}
 
-		buf, err := json.Marshal(map[string]string{
-			"taskID":    taskID,
-			"profileID": profileID,
+		statistics := quality.CalculateProfileStatistics(profile)
+		buf, err := json.Marshal(map[string]any{
+			"taskID":     taskID,
+			"profileID":  profileID,
+			"statistics": statistics,
 		})
 		if err != nil {
 			return err
