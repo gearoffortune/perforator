@@ -18,6 +18,10 @@
     "length": 16,
     "str": 24
   },
+  "PyStringObject": {
+    "ob_size": 16,
+    "ob_sval": 36
+  },
   "PyCodeObject": {
     "co_firstlineno": 96,
     "co_filename": 80,
