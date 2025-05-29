@@ -23,10 +23,10 @@ int main(int argc, const char* argv[]) {
     }
     TMaybe<NPerforator::NLinguist::NPhp::EZendVmKind> vmKind = analyzer.ParseZendVmKind();
     if (vmKind) {
-        Cout << "Parsed zend vm kind: "
+        Cout << "Parsed ZEND_VM_KIND: "
              << NPerforator::NLinguist::NPhp::ToString(*vmKind) << Endl;
     } else {
-        Cout << "Could not parse zend vm kind" << Endl;
+        Cout << "Could not parse ZEND_VM_KIND" << Endl;
     }
 
     TMaybe<bool> ztsEnabled = analyzer.ParseZts();
@@ -38,5 +38,13 @@ int main(int argc, const char* argv[]) {
         }
     } else {
         Cout << "Could not parse ZTS" << Endl;
+    }
+
+    TMaybe<ui64> executorGlobalsAddress = analyzer.ParseExecutorGlobals();
+
+    if (executorGlobalsAddress) {
+        Cout << "Found executor_globals address: " << *executorGlobalsAddress << Endl;
+    } else {
+        Cout << "Could not find executor_globals" << Endl;
     }
 }

@@ -42,8 +42,9 @@ std::strong_ordering operator<=>(const TPhpVersion& lhs, const TPhpVersion& rhs)
 
 constexpr TStringBuf kPhpVersionSymbol = "php_version";
 constexpr TStringBuf kZmInfoPhpCoreSymbol = "zm_info_php_core";
-constexpr TStringBuf KZendVmKindSymbol = "zend_vm_kind";
+constexpr TStringBuf kZendVmKindSymbol = "zend_vm_kind";
 constexpr TStringBuf kPhpTsrmStartupSymbol = "php_tsrm_startup";
+constexpr TStringBuf kExecutorGlobalsSymbol = "executor_globals";
 
 constexpr TStringBuf kPhpVersionKeyPhrase = "X-Powered-By: PHP/";
 const re2::RE2 kPhpVersionRegex(R"((\d)\.(\d)\.(\d+))");
@@ -56,6 +57,7 @@ public:
         TMaybe<NPerforator::NELF::TLocation> ExecuteEx;
         TMaybe<NPerforator::NELF::TLocation> ZendVmKind;
         TMaybe<NPerforator::NELF::TLocation> PhpTsrmStartup;
+        TMaybe<NPerforator::NELF::TLocation> ExecutorGlobals;
     };
 
 public:
@@ -66,6 +68,8 @@ public:
     TMaybe<EZendVmKind> ParseZendVmKind();
 
     TMaybe<bool> ParseZts();
+
+    TMaybe<ui64> ParseExecutorGlobals();
 
 private:
     void ParseSymbolLocations();

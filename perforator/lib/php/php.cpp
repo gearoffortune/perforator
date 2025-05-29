@@ -63,9 +63,10 @@ void TZendPhpAnalyzer::ParseSymbolLocations() {
     Symbols_ = MakeHolder<TSymbols>();
     auto symbols = NELF::RetrieveSymbols(File_,
         kPhpVersionSymbol,
-        KZendVmKindSymbol,
+        kZendVmKindSymbol,
         kZmInfoPhpCoreSymbol,
-        kPhpTsrmStartupSymbol
+        kPhpTsrmStartupSymbol,
+        kExecutorGlobalsSymbol
     );
 
     auto setSymbolIfFound =
@@ -78,9 +79,10 @@ void TZendPhpAnalyzer::ParseSymbolLocations() {
 
     if (symbols) {
         setSymbolIfFound(*symbols, kPhpVersionSymbol, Symbols_->PhpVersion);
-        setSymbolIfFound(*symbols, KZendVmKindSymbol, Symbols_->ZendVmKind);
+        setSymbolIfFound(*symbols, kZendVmKindSymbol, Symbols_->ZendVmKind);
         setSymbolIfFound(*symbols, kZmInfoPhpCoreSymbol, Symbols_->ZmInfoPhpCore);
         setSymbolIfFound(*symbols, kPhpTsrmStartupSymbol, Symbols_->PhpTsrmStartup);
+        setSymbolIfFound(*symbols, kExecutorGlobalsSymbol, Symbols_->ExecutorGlobals);
     }
 }
 
@@ -282,6 +284,16 @@ TMaybe<EZendVmKind> TZendPhpAnalyzer::ParseZendVmKind() {
     }
 
     return MakeMaybe(vmKindEnum);
+}
+
+TMaybe<ui64> TZendPhpAnalyzer::ParseExecutorGlobals() {
+    ParseSymbolLocations();
+
+    if (!Symbols_ || !Symbols_->ExecutorGlobals) {
+        return Nothing();
+    }
+
+    return MakeMaybe(Symbols_->ExecutorGlobals->Address);
 }
 
 } // namespace NPerforator::NLinguist::NPhp
