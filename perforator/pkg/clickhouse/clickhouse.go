@@ -13,6 +13,7 @@ import (
 )
 
 type Config struct {
+	Protocol                    string                  `yaml:"protocol"`
 	Replicas                    []string                `yaml:"replicas"`
 	Database                    string                  `yaml:"db"`
 	User                        string                  `yaml:"user"`
@@ -24,6 +25,17 @@ type Config struct {
 	PlaintextDeprecated  bool   `yaml:"plaintext,omitempty"`
 	InsecureSkipVerify   bool   `yaml:"insecure,omitempty"`
 	CACertPathDeprecated string `yaml:"ca_cert_path,omitempty"`
+}
+
+func convertStringToProtocol(protocol string) (clickhouse.Protocol, error) {
+	switch protocol {
+	case clickhouse.Native.String():
+		return clickhouse.Native, nil
+	case clickhouse.HTTP.String():
+		return clickhouse.HTTP, nil
+	default:
+		return 0, fmt.Errorf("invalid clickhouse protocol: %s", protocol)
+	}
 }
 
 func (c *Config) FillDefault() {
@@ -42,6 +54,10 @@ func (c *Config) FillDefault() {
 	if c.PlaintextDeprecated {
 		c.TLS.Enabled = false
 	}
+
+	if c.Protocol == "" {
+		c.Protocol = clickhouse.Native.String()
+	}
 }
 
 func Connect(ctx context.Context, conf *Config) (driver.Conn, error) {
@@ -53,8 +69,14 @@ func Connect(ctx context.Context, conf *Config) (driver.Conn, error) {
 		return nil, fmt.Errorf("failed to configure TLS: %w", err)
 	}
 
+	protocol, err := convertStringToProtocol(conf.Protocol)
+	if err != nil {
+		return nil, err
+	}
+
 	conn, err := clickhouse.Open(&clickhouse.Options{
-		Addr: conf.Replicas,
+		Protocol: protocol,
+		Addr:     conf.Replicas,
 		Auth: clickhouse.Auth{
 			Database: conf.Database,
 			Username: conf.User,
