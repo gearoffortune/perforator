@@ -23,9 +23,9 @@ func PythonInternalsOffsetsByVersion(version *python.PythonVersion) (*unwinder.P
 
 var (
 	minSupportedVersion = encodeVersion(&python.PythonVersion{
-		Major: 3,
-		Minor: 0,
-		Micro: 1,
+		Major: 2,
+		Minor: 4,
+		Micro: 0,
 	})
 )
 

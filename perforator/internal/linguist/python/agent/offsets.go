@@ -38,6 +38,7 @@ type jsonOffsets struct {
 	PyInterpreterFrame map[string]int `json:"_PyInterpreterFrame,omitempty"`
 	PyASCIIObject      map[string]int `json:"PyASCIIObject,omitempty"`
 	PyUnicodeObject    map[string]int `json:"PyUnicodeObject,omitempty"`
+	PyStringObject     map[string]int `json:"PyStringObject,omitempty"`
 	PyTssT             map[string]int `json:"Py_tss_t,omitempty"`
 }
 
@@ -66,10 +67,10 @@ func fillUnspecifiedOffsets(val reflect.Value) {
 	}
 }
 
-// Convert a version string (major.minor.micro) to an encoded uint32
+// Convert a version string (major.minor.micro or major.minor) to an encoded uint32
 func encodeVersionFromString(version string) uint32 {
 	parts := strings.Split(version, ".")
-	if len(parts) < 3 {
+	if len(parts) < 2 {
 		return 0
 	}
 
@@ -83,9 +84,12 @@ func encodeVersionFromString(version string) uint32 {
 		return 0
 	}
 
-	micro, err := strconv.Atoi(parts[2])
-	if err != nil {
-		return 0
+	micro := 0
+	if len(parts) >= 3 {
+		micro, err = strconv.Atoi(parts[2])
+		if err != nil {
+			return 0
+		}
 	}
 
 	// Create a PythonVersion struct and use encodeVersion
@@ -111,8 +115,8 @@ func init() {
 		panic(fmt.Sprintf("Failed to read offsets directory: %v", err))
 	}
 
-	// Compile the regex pattern once
-	versionPattern := regexp.MustCompile(`cpython-(\d+\.\d+\.\d+)-offsets\.json`)
+	// Compile the regex pattern once - support both x.y.z and x.y formats
+	versionPattern := regexp.MustCompile(`cpython-(\d+\.\d+(?:\.\d+)?)-offsets\.json`)
 
 	// Parse each file
 	for _, entry := range entries {
@@ -125,7 +129,7 @@ func init() {
 
 			versionStr := matches[1]
 			versionParts := strings.Split(versionStr, ".")
-			if len(versionParts) < 3 {
+			if len(versionParts) < 2 {
 				continue // Skip invalid versions
 			}
 
@@ -318,6 +322,25 @@ func extractPyUnicodeObjectOffsets(data map[string]int) unwinder.PythonStringObj
 	return offsets
 }
 
+// Extract PyStringObject offsets from JSON data
+func extractPyStringObjectOffsets(data map[string]int) unwinder.PythonStringObjectOffsets {
+	var offsets unwinder.PythonStringObjectOffsets
+
+	if val, ok := data["ob_size"]; ok {
+		offsets.Length = uint32(val)
+	} else {
+		offsets.Length = UnspecifiedOffset
+	}
+
+	if val, ok := data["ob_sval"]; ok {
+		offsets.Data = uint32(val)
+	} else {
+		offsets.Data = UnspecifiedOffset
+	}
+
+	return offsets
+}
+
 // Extract PyASCIIObject offsets from JSON data
 func extractPyASCIIObjectOffsets(data map[string]int) unwinder.PythonStringObjectOffsets {
 	var offsets unwinder.PythonStringObjectOffsets
@@ -415,6 +438,8 @@ func convertToPythonInternalsOffsets(data jsonOffsets) *unwinder.PythonInternals
 
 	if data.PyASCIIObject != nil {
 		offsets.PyStringObjectOffsets = extractPyASCIIObjectOffsets(data.PyASCIIObject)
+	} else if data.PyStringObject != nil {
+		offsets.PyStringObjectOffsets = extractPyStringObjectOffsets(data.PyStringObject)
 	} else if data.PyUnicodeObject != nil {
 		offsets.PyStringObjectOffsets = extractPyUnicodeObjectOffsets(data.PyUnicodeObject)
 	}

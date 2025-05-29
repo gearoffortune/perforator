@@ -2,6 +2,9 @@
 
 #include "binary.h"
 
+#define PYVERSION(major, minor, micro) \
+    (((u32)(major) << 16) | ((u32)(minor) << 8) | ((u32)(micro)))
+
 struct python_interpreter_state_offsets {
     u32 next;
     u32 threads_head;
@@ -54,8 +57,13 @@ enum python_frame_owner : u8 {
     FRAME_OWNED_BY_CSTACK = 3,
 };
 
+// This struct stores offsets for:
+// CPython 3.3+ - PyASCIIObject
+// CPython 3.0-3.2 - PyUnicodeObject
+// CPython 2 - PyStringObject
+// PyStringObject has the same layout as PyASCIIObject (but different field names), PyUnicodeObject is different.
 struct python_string_object_offsets {
-    // These fields are present for both PyUnicodeObject and PyASCIIObject
+    // These fields are present for PyUnicodeObject, PyASCIIObject and PyStringObject
     u32 length;
     u32 data;
 
