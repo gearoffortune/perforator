@@ -324,7 +324,7 @@ TMaybe<ui64> DecodeInterpHeadAddress(
         NPerforator::NAsm::NX86::MakeInitialState(pyInterpreterStateHeadAddress),
         bytecode,
         *instructionEvaluator,
-        NPerforator::NAsm::NX86::MakeStopOnPassControlFlowCondition()
+        NPerforator::NAsm::NX86::MakeStopOnRetCondition()
     );
 
     auto result = evaluator.Evaluate();
