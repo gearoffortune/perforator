@@ -10,6 +10,9 @@
     "stylelint": "stylelint src/**/*.css",
     "preview": "vite preview"
   },
+  "engines": {
+    "node": "20.18.1"
+  },
   "dependencies": {
     "@bem-react/classname": "1.6.0",
     "@gravity-ui/components": "3.12.4",
