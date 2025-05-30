@@ -13,6 +13,7 @@
     "prettier": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
+    "test:e2e": "playwright test",
     "release:preview": "ya tool aws s3 sync dist s3://preview-perforator-ui/$PULL_REQUEST_ID --exclude '**/*.map' --delete",
     "release:testing": "ya tool nots build && ya tool nots run release:s3:testing",
     "release": "ya tool nots build && ya tool nots run release:s3",
@@ -44,6 +45,7 @@
     "@gravity-ui/icons": "2.9.1",
     "@gravity-ui/stylelint-config": "^4.0.1",
     "@jest/globals": "29.7.0",
+    "@playwright/test": "1.51.1",
     "@swc/core": "1.7.21",
     "@swc/jest": "0.2.36",
     "@types/culori": "2.1.1",
@@ -71,6 +73,6 @@
     "vite": "5.0.12"
   },
   "engines": {
-    "node": ">=18.16.0"
+    "node": "20.18.1"
   }
 }
