@@ -11,8 +11,9 @@ import (
 )
 
 type TvmAuth struct {
-	ID            uint32 `yaml:"id"`
-	SecretEnvName string `yaml:"secret_env"`
+	ID            uint32   `yaml:"id"`
+	SecretEnvName string   `yaml:"secret_env"`
+	AllowedIDs    []uint32 `yaml:"allowed_ids"`
 }
 
 type Config struct {

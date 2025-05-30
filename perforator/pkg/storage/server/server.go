@@ -776,6 +776,7 @@ func getInterceptor(conf *Config, logger xlog.Logger) (creds.ServerInterceptor, 
 		return storagetvm.NewTVMServerInterceptor(
 			conf.TvmAuth.ID,
 			os.Getenv(conf.TvmAuth.SecretEnvName),
+			conf.TvmAuth.AllowedIDs,
 			logger,
 		)
 	}
