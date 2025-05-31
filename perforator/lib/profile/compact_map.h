@@ -74,8 +74,10 @@ template <std::unsigned_integral K, size_t DefaultLittleSize = 1024 * 1024>
 class TCompactIntegerSet {
 public:
     explicit TCompactIntegerSet(size_t sizeHint = DefaultLittleSize)
-        : Little_(sizeHint)
-    {}
+        : LittleSize_{sizeHint}
+    {
+        Little_.Reserve(LittleSize_);
+    }
 
     void Insert(K key) {
         if (IsLittle(key)) {
@@ -95,10 +97,11 @@ public:
 
 private:
     bool IsLittle(K key) const {
-        return key < Little_.Size();
+        return key < LittleSize_;
     }
 
 private:
+    const size_t LittleSize_;
     TDynBitMap Little_;
     absl::flat_hash_set<K> Big_;
 };
