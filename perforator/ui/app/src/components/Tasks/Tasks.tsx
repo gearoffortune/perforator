@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -11,6 +11,7 @@ import type {
     TableSettingsData,
 } from '@gravity-ui/uikit';
 import {
+    Button,
     ClipboardButton,
     Flex,
     Label,
@@ -89,9 +90,9 @@ function getSelectorFromSpec(task: Task) {
     return null;
 }
 
-const TaskTable = withTableSelection(
+const TaskTable = React.memo(withTableSelection(
     withTableSettings(withTableCopy(Table<Task>)),
-);
+));
 
 const TaskStates: TaskState[] = [
     TaskState.Created,
@@ -237,10 +238,14 @@ const getColumnsConfig = (): TableColumnConfig<Task>[] => [
     },
 ];
 
-type TasksQuery = {from?: string; to?: string; user?: string}
+type TasksQuery = { from?: string; to?: string; user?: string }
 
+const initialPaginationState = { page: 1, pageSize: 100 };
+
+const taskRowDescriptor = (task: Task) => ({ id: task?.Meta?.ID });
 export const Tasks: React.FC = () => {
     const [tasks, setTasks] = useState<Task[] | null>(null);
+    const [tasksCount, setTasksCount] = useState(0);
     const [error, setError] = useState<any>(null);
     const [selected, setSelected] = useState<string[]>([]);
 
@@ -250,6 +255,15 @@ export const Tasks: React.FC = () => {
         ...Object.fromEntries(stateParams),
     };
 
+    const [paginationState, setPaginationState] = useState(initialPaginationState);
+    const handleUpdate = () => {
+        setPaginationState(prevState => ({ ...prevState, page: error ? prevState.page : prevState.page + 1 }));
+    };
+
+    useEffect(() => {
+        setPaginationState(initialPaginationState);
+        setTasks(null);
+    }, [stateParams]);
     const navigate = useNavigate();
 
     const [selectedProfile, selectedDiffProfile] = useMemo(() => {
@@ -308,6 +322,7 @@ export const Tasks: React.FC = () => {
     const [mine, setMine] = useState<boolean>(
         state.user ? login === state.user : true,
     );
+    const [loading, setLoading] = useState(false);
     const [userFilter, setUserFilter] = useState<string>(
         state.user || login || '',
     );
@@ -342,19 +357,32 @@ export const Tasks: React.FC = () => {
 
     const debounce = useDebounce();
     React.useEffect(() => {
+        let isMounted = true;
         const params = {
             'Query.Author': userFilter,
             'Query.From': getIsoDate(state.from),
             'Query.To': getIsoDate(state.to),
+            'Pagination.Offset': (paginationState.page - 1) * paginationState.pageSize,
+            'Pagination.Limit': paginationState.pageSize,
         };
 
         debounce(() =>
+        {
+            setLoading(true);
             apiClient
                 .getTasks(params)
-                .then((tasksData) => setTasks(tasksData.data?.Tasks))
-                .catch(setError),
+                .then((tasksData) => {
+                    if (!isMounted) {return;}
+                    setTasks(currentTasks => (currentTasks ?? []).concat(tasksData.data?.Tasks));
+                    setTasksCount(Number(tasksData.data?.TotalCount ?? 0));
+                    setError(null);
+                })
+                .catch(setError)
+                .finally(() => setLoading(false));
+        },
         );
-    }, [state.to, state.from, mine, userFilter]);
+        return () => {isMounted = false;};
+    }, [state.to, state.from, mine, userFilter, paginationState, setLoading]);
 
     const errorMessage = useMemo(() => {
         const validators = [
@@ -364,12 +392,12 @@ export const Tasks: React.FC = () => {
                     : 'Diff can be calculated only for two profiles',
             () =>
                 'MergeProfiles' in (selectedProfile?.Spec || {}) &&
-                'MergeProfiles' in (selectedDiffProfile?.Spec || {})
+                    'MergeProfiles' in (selectedDiffProfile?.Spec || {})
                     ? undefined
                     : 'Diff can be calculated only for MergeProfiles',
             () =>
                 selectedProfile?.Status?.State === TaskState.Finished &&
-                selectedDiffProfile?.Status?.State === TaskState.Finished
+                    selectedDiffProfile?.Status?.State === TaskState.Finished
                     ? undefined
                     : 'Diff can be calculated only for finished tasks',
         ];
@@ -426,68 +454,76 @@ export const Tasks: React.FC = () => {
 
     const columnsConfig = React.useMemo(() => getColumnsConfig(), []);
 
-    // eslint-disable-next-line no-nested-ternary
-    return tasks ? (
-        <React.Fragment>
-            <TimeIntervalInput
-                headerControls
-                initInterval={{
-                    start: state.from || DEFAULT_FROM,
-                    end: state.to || 'now',
-                }}
-                onUpdate={updateTimeInterval}
+    return <React.Fragment>
+        <TimeIntervalInput
+            headerControls
+            initInterval={{
+                start: state.from || DEFAULT_FROM,
+                end: state.to || 'now',
+            }}
+            onUpdate={updateTimeInterval}
+        />
+        <Flex gap={4} alignItems={'center'}>
+            <Select
+                placeholder={'Task State'}
+                label={'Task State'}
+                value={statusFilter}
+                multiple
+                hasClear
+                options={taskStateOptions}
+                onUpdate={setStatusFilter}
+                disabled={false}
             />
-            <Flex gap={4} alignItems={'center'}>
-                <Select
-                    placeholder={'Task State'}
-                    label={'Task State'}
-                    value={statusFilter}
-                    multiple
-                    hasClear
-                    options={taskStateOptions}
-                    onUpdate={setStatusFilter}
-                    disabled={false}
-                />
-                <Select
-                    placeholder={'Task Type'}
-                    label="Task Type"
-                    multiple
-                    options={taskTypeOptions}
-                    value={typeFilter}
-                    onUpdate={setTypeFilter}
-                    hasClear
-                />
-                <Select
-                    placeholder={'Task Format'}
-                    label="Task Format"
-                    multiple
-                    options={taskFormatOptions}
-                    value={formatFilter}
-                    onUpdate={setFormatFilter}
-                />
-                {renderUserInput()}
-            </Flex>
-            {selected.length !== 0 ? (
-                <ActionsPanel
-                    className={'tasks-table__actions-panel'}
-                    actions={actions}
-                    renderNote={errorMessage ? () => errorMessage : undefined}
-                />
-            ) : null}
-            <TaskTable
-                data={filteredTasks!}
-                selectedIds={selected}
-                onSelectionChange={setSelected}
-                settings={settings}
-                updateSettings={setSettings}
-                getRowDescriptor={(task) => ({ id: task?.Meta?.ID })}
-                className="tasks-table"
-                columns={columnsConfig}
+            <Select
+                placeholder={'Task Type'}
+                label="Task Type"
+                multiple
+                options={taskTypeOptions}
+                value={typeFilter}
+                onUpdate={setTypeFilter}
+                hasClear
             />
-        </React.Fragment>
-    ) : error ? (
-        <ErrorPanel message={error?.message} />
-    ) : (
-        <Loader />
-    );
+            <Select
+                placeholder={'Task Format'}
+                label="Task Format"
+                multiple
+                options={taskFormatOptions}
+                value={formatFilter}
+                onUpdate={setFormatFilter}
+            />
+            {renderUserInput()}
+        </Flex>
+        {/* eslint-disable-next-line no-nested-ternary */}
+        {tasks ? (
+            <React.Fragment>
+                {selected.length !== 0 ? (
+                    <ActionsPanel
+                        className={'tasks-table__actions-panel'}
+                        actions={actions}
+                        renderNote={errorMessage ? () => errorMessage : undefined}
+                    />
+                ) : null}
+                <TaskTable
+                    data={filteredTasks!}
+                    selectedIds={selected}
+                    onSelectionChange={setSelected}
+                    settings={settings}
+                    updateSettings={setSettings}
+                    getRowDescriptor={taskRowDescriptor}
+                    className="tasks-table"
+                    columns={columnsConfig}
+                />
+                {tasksCount > tasks.length
+                    ? <><Button loading={loading} className='tasks__pagination' onClick={handleUpdate}>Load more</Button>
+                        {error ? <Text className="tasks__pagination-error" color="danger">Error: {error?.message}</Text> : null}
+                    </>
+                    : null}
+            </React.Fragment>
+        ) : error ? (
+            <ErrorPanel message={error?.message} />
+        ) : (
+            <Loader />
+        )
+        }
+    </React.Fragment>;
 };
