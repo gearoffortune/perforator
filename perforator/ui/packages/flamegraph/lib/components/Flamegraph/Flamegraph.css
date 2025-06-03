@@ -88,6 +88,8 @@
     display: none;
     outline: 1px solid #ffc000;
     overflow: hidden;
+    top: 0;
+    left: 0;
     pointer-events: none;
     position: absolute;
     white-space: nowrap;

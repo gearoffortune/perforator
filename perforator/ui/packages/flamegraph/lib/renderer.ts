@@ -835,8 +835,7 @@ export const renderFlamegraph: RenderFlamegraphType = (
         hl.firstChild!.textContent = title;
         //@ts-ignore allowing to use null for reset
         hl.style.backgroundColor = newColor;
-        hl.style.left = left + 'px';
-        hl.style.top = top + 'px';
+        hl.style.transform = `translate(${left}px, ${top}px)`
         hl.style.width = width + 'px';
         hl.style.display = 'block';
         canvas.title = highlightTitle;
