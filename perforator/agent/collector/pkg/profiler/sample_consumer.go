@@ -542,8 +542,7 @@ func (c *SampleConsumer) resolveUprobe(ctx context.Context) *uprobe.UprobeInfo {
 
 	return c.p.bpf.UprobeRegistry().ResolveUprobe(uprobe.Key{
 		Offset:  topStackIP - mapping.BaseAddress - mapping.BuildInfo.FirstPhdr.Vaddr + mapping.BuildInfo.FirstPhdr.Off,
-		InodeID: mapping.Inode.ID,
-		Device:  mapping.Device,
+		BuildID: mapping.BuildInfo.BuildID,
 	})
 }
 
