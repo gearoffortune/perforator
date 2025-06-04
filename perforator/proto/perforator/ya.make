@@ -11,6 +11,7 @@ GRPC()
 SRCS(
     perforator.proto
     microscope_service.proto
+    record_remote.proto
     task_service.proto
 )
 
