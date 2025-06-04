@@ -610,23 +610,21 @@ func (a *processAnalyzer) registerMapping(m *dso.Mapping) {
 	a.exemappings = append(a.exemappings, m)
 }
 
-func (a *processAnalyzer) fillSpecialBinaryInfo(pi *unwinder.ProcessInfo, mappings []*dso.Mapping) {
+func (a *processAnalyzer) fillMappedBinaryInfo(pi *unwinder.ProcessInfo, mappings []*dso.Mapping) {
 	for _, m := range mappings {
 		if m.DSO == nil {
 			continue
 		}
 
-		switch m.DSO.SpecialBinaryType {
-		case unwinder.SpecialBinaryTypePythonInterpreter:
-			pi.InterpreterBinary = unwinder.SpecialBinary{
+		switch m.DSO.BinaryClass {
+		case dso.PythonBinaryClass:
+			pi.PythonBinary = unwinder.MappedBinary{
 				Id:           unwinder.BinaryId(m.DSO.ID),
-				Type:         m.DSO.SpecialBinaryType,
 				StartAddress: m.BaseAddress,
 			}
-		case unwinder.SpecialBinaryTypePthreadGlibc:
-			pi.PthreadBinary = unwinder.SpecialBinary{
+		case dso.PthreadGlibcBinaryClass:
+			pi.PthreadBinary = unwinder.MappedBinary{
 				Id:           unwinder.BinaryId(m.DSO.ID),
-				Type:         m.DSO.SpecialBinaryType,
 				StartAddress: m.BaseAddress,
 			}
 		}
@@ -642,19 +640,13 @@ func (a *processAnalyzer) storeBPFMaps(ctx context.Context) error {
 
 	pi := unwinder.ProcessInfo{
 		UnwindType: unwinder.UnwindTypeDwarf,
-		PthreadBinary: unwinder.SpecialBinary{
-			Type: unwinder.SpecialBinaryTypeNone,
-		},
-		InterpreterBinary: unwinder.SpecialBinary{
-			Type: unwinder.SpecialBinaryTypeNone,
-		},
 	}
 	if len(a.exemappings) > 0 && a.exemappings[0].DSO != nil {
 		pi.MainBinaryId = unwinder.BinaryId(a.exemappings[0].DSO.ID)
 	} else {
 		pi.MainBinaryId = unwinder.BinaryId(math.MaxUint64)
 	}
-	a.fillSpecialBinaryInfo(&pi, a.exemappings)
+	a.fillMappedBinaryInfo(&pi, a.exemappings)
 
 	a.log.Debug(ctx, "Put process info", log.Any("info", pi))
 	err := a.reg.bpf.AddProcess(a.proc.id, &pi)

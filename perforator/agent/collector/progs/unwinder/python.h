@@ -407,23 +407,23 @@ static ALWAYS_INLINE bool python_retrieve_configs(
         return false;
     }
 
-    binary_id id = proc_info->interpreter_binary.id;
+    binary_id id = proc_info->python_binary.id;
     struct python_config* config = bpf_map_lookup_elem(&python_storage, &id);
     if (config == NULL) {
         return false;
     }
     state->config = *config;
     if (config->py_runtime_relative_address != 0) {
-        state->py_runtime_address = proc_info->interpreter_binary.start_address + config->py_runtime_relative_address;
+        state->py_runtime_address = proc_info->python_binary.start_address + config->py_runtime_relative_address;
     }
     if (config->py_interp_head_relative_address != 0) {
-        state->py_interp_head_address = proc_info->interpreter_binary.start_address + config->py_interp_head_relative_address;
+        state->py_interp_head_address = proc_info->python_binary.start_address + config->py_interp_head_relative_address;
     }
     if (config->auto_tss_key_relative_address != 0) {
-        state->auto_tss_key_address = proc_info->interpreter_binary.start_address + config->auto_tss_key_relative_address;
+        state->auto_tss_key_address = proc_info->python_binary.start_address + config->auto_tss_key_relative_address;
     }
 
-    if (proc_info->pthread_binary.type != SPECIAL_BINARY_TYPE_PTHREAD_GLIBC) {
+    if (!is_mapped(proc_info->pthread_binary)) {
         return true;
     }
 
@@ -441,11 +441,7 @@ static ALWAYS_INLINE void python_collect_stack(
     struct process_info* proc_info,
     struct python_state* state
 ) {
-    if (proc_info == NULL || state == NULL) {
-        return;
-    }
-
-    if (proc_info->interpreter_binary.type != SPECIAL_BINARY_TYPE_PYTHON_INTERPRETER) {
+    if (proc_info == NULL || state == NULL || !is_mapped(proc_info->python_binary)) {
         return;
     }
 
