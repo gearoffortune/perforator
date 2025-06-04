@@ -186,6 +186,9 @@ agent:
     storageHostnameOverride: ""
     # Label used to describe nodes topology.
     topologyLableKey: "topology.kubernetes.io/zone"
+    # Specifies a custom Kubernetes API server host, in most cases you do not need override this setting. By default the agent attempts to use
+    # KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT environment variables, if those are unavailable, it falls back to "kubernetes.default.svc.cluster.local".
+    KubernetesAPIServerHost: ""
     # user defined labels
     labels:
       # Labels that are added to all profiles, gathered by agent. 

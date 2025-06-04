@@ -232,6 +232,7 @@ func newPodsCgroupTracker(c *config.PodsDeploySystemConfig, l log.Logger, cgroup
 		kubeletOverrides.CgroupRoot = c.KubernetesConfig.KubeletCgroupRoot
 		kubeletOverrides.CgroupsQOSMode = c.KubernetesConfig.KubeletCgroupQOSMode
 		kubeletOverrides.CgroupContainerPrefix = c.KubernetesConfig.KubeletCgroupContainerPrefix
+		kubeletOverrides.KubernetesAPIServerHost = c.KubernetesConfig.KubernetesAPIServerHost
 
 		podsLister, err = kubelet.NewPodsLister(xlog.New(l), c.KubernetesConfig.TopologyLableKey, kubeletOverrides, cgroupPrefix)
 		if err != nil {
