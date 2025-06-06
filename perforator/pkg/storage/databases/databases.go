@@ -28,7 +28,7 @@ func NewDatabases(ctx context.Context, l xlog.Logger, c *Config, reg metrics.Reg
 	var err error
 
 	if c.S3Config != nil {
-		res.S3Client, err = s3client.NewClient(c.S3Config, reg)
+		res.S3Client, err = s3client.NewClient(ctx, l, c.S3Config, reg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to init s3: %w", err)
 		}
