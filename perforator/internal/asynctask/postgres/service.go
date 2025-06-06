@@ -26,18 +26,24 @@ type TaskService struct {
 	cluster  *hasql.Cluster
 	config   *Config
 	hostname string
+	table    string
 
 	pingPeriod  time.Duration
 	pingTimeout time.Duration
 }
 
 func NewTaskService(
+	namespace asynctask.Namespace,
 	config *Config,
 	cluster *hasql.Cluster,
 	logger xlog.Logger,
 	metrics metrics.Registry,
 ) (*TaskService, error) {
 	config.fillDefault()
+
+	if namespace == "" {
+		namespace = asynctask.NamespaceDefault
+	}
 
 	logger = logger.WithName("TaskService")
 
@@ -47,7 +53,8 @@ func NewTaskService(
 	}
 
 	service := &TaskService{
-		logger:      logger.With(log.String("table", config.Table)),
+		logger:      logger.With(log.String("namespace", string(namespace))),
+		table:       namespaceToTableName(namespace),
 		cluster:     cluster,
 		config:      config,
 		hostname:    hostname,
@@ -69,7 +76,7 @@ func (s *TaskService) GetTask(ctx context.Context, id asynctask.TaskID) (*asynct
 		ctx,
 		&row,
 		`SELECT id, idempotency_key, meta, spec, status, result
-		FROM `+s.config.Table+`
+		FROM `+s.table+`
 		WHERE id = $1`,
 		string(id),
 	)
@@ -108,7 +115,7 @@ func (s *TaskService) CountTasks(ctx context.Context, filter *asynctask.TaskFilt
 	}
 
 	builder := sqlbuilder.Select().
-		From(s.config.Table).
+		From(s.table).
 		Values("count(*)")
 
 	builder = enrichBuilderWithTaskFilter(builder, filter)
@@ -142,7 +149,7 @@ func (s *TaskService) ListTasks(ctx context.Context, filter *asynctask.TaskFilte
 	}
 
 	builder := sqlbuilder.Select().
-		From(s.config.Table).
+		From(s.table).
 		Values("id, idempotency_key, meta, spec, status, result").
 		OrderBy(&sqlbuilder.OrderBy{
 			Columns:    []string{`(meta->>'CreationTime')::bigint`},
@@ -217,7 +224,7 @@ func (s *TaskService) AddTask(
 		&id,
 		// we need DO UPDATE SET for RETURNING to work. It only works for the last inserted row.
 		// If row was not inserted (e.g. DO NOTHING), it will not return any id.
-		`INSERT INTO `+s.config.Table+` (id, idempotency_key, meta, spec, status, result)
+		`INSERT INTO `+s.table+` (id, idempotency_key, meta, spec, status, result)
             VALUES ($1, $2, $3, $4, $5, $6)
             ON CONFLICT (idempotency_key)
 			DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key
@@ -319,7 +326,7 @@ func (s *TaskService) selectNextTask(ctx context.Context, tx *sqlx.Tx) (*asyncta
 	err := tx.QueryRowContext(
 		ctx,
 		`SELECT id, idempotency_key, meta, spec, status, result
-		FROM `+s.config.Table+`
+		FROM `+s.table+`
 		WHERE (status->>'State' = 'Running' AND (status->>'LastPing')::bigint < $1)
 		OR status->>'State' = 'Created'
 		ORDER BY status->>'State', (status->>'LastPing')::bigint
@@ -462,7 +469,7 @@ func (s *TaskService) getTaskForUpdate(ctx context.Context, tx *sqlx.Tx, id asyn
 		ctx,
 		&row,
 		`SELECT id, idempotency_key, meta, spec, status, result
-		FROM `+s.config.Table+`
+		FROM `+s.table+`
 		WHERE id = $1
 		FOR UPDATE`,
 		string(id),
@@ -486,7 +493,7 @@ func (s *TaskService) putTask(ctx context.Context, tx *sqlx.Tx, task *asynctask.
 	}
 
 	_, err = tx.ExecContext(ctx,
-		`INSERT INTO `+s.config.Table+` (id, idempotency_key, meta, spec, status, result)
+		`INSERT INTO `+s.table+` (id, idempotency_key, meta, spec, status, result)
 		VALUES ($1, $2, $3, $4, $5, $6)
 		ON CONFLICT (id) DO UPDATE
 		SET idempotency_key = EXCLUDED.idempotency_key,

@@ -22,7 +22,7 @@ var (
 	ErrPostgresClusterNotSpecified = errors.New("postgres cluster is not specified")
 	ErrMetaStorageIsNotSpecified   = errors.New("no meta storage is specified")
 	ErrS3StorageIsNotSpecified     = errors.New("s3 storage is not specified")
-	ErrTasksStorageIsNotSpecified  = errors.New("no t tasks storage is specified")
+	ErrTasksStorageIsNotSpecified  = errors.New("no tasks storage is specified")
 )
 
 type StorageBundle struct {
@@ -34,6 +34,7 @@ type StorageBundle struct {
 	BinaryStorage     binarystorage.StorageSelector
 	MicroscopeStorage microscope.Storage
 	TaskStorage       asynctask.TaskService
+	AgentTasksStorage asynctask.TaskService
 }
 
 func NewStorageBundleFromConfig(ctx context.Context, l xlog.Logger, reg metrics.Registry, configPath string) (*StorageBundle, error) {
@@ -99,14 +100,28 @@ func NewStorageBundle(ctx context.Context, l xlog.Logger, reg metrics.Registry, 
 	}
 
 	if c.TaskStorage != nil {
-		opts, err := res.createOptsFromTasksStorageType(c.TaskStorage.StorageType)
+		opts, err := res.createStorageSpecificOptionsForTasks(c.TaskStorage.StorageType)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create tasks storage options: %w", err)
 		}
+		opts = append(opts, tasks.WithNamespace(asynctask.NamespaceDefault))
 
 		res.TaskStorage, err = tasks.NewTasksService(l, reg, opts...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to init tasks service: %w", err)
+		}
+	}
+
+	if c.AgentTasksStorage != nil {
+		opts, err := res.createStorageSpecificOptionsForTasks(c.AgentTasksStorage.StorageType)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create agent tasks storage options: %w", err)
+		}
+		opts = append(opts, tasks.WithNamespace(asynctask.NamespaceAgent))
+
+		res.AgentTasksStorage, err = tasks.NewTasksService(l, reg, opts...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to init agent tasks service: %w", err)
 		}
 	}
 
@@ -134,7 +149,7 @@ func (b *StorageBundle) createOptsFromMetaStorageType(metaStorageType binarystor
 	return opts, nil
 }
 
-func (b *StorageBundle) createOptsFromTasksStorageType(tasksStorageType tasks.TasksStorageType) ([]tasks.Option, error) {
+func (b *StorageBundle) createStorageSpecificOptionsForTasks(tasksStorageType tasks.TasksStorageType) ([]tasks.Option, error) {
 	opts := []tasks.Option{}
 	switch tasksStorageType {
 	case tasks.Postgres:
