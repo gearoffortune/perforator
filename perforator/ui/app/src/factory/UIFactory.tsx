@@ -25,6 +25,8 @@ export class UIFactory {
     bugReportLink = (): Optional<string> => undefined;
     ciLink = (): Optional<string> => undefined;
 
+    clientSpeedDebugLink = (): Optional<string> => undefined;
+
     makeTraceUrl = (traceId: string): Optional<string> => undefined;
 
     authorizationSupported = () => false;
