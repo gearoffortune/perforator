@@ -16,7 +16,7 @@ import { useTypedQuery } from '../Flamegraph/query-utils';
 import { Visualisation } from '../Visualisation/Visualisation';
 
 
-const prerenderColors = withMeasureTime(prerenderColorsOriginal);
+const prerenderColors = withMeasureTime(prerenderColorsOriginal, 'prerenderColors', (ms) => uiFactory().rum()?.sendDelta?.('prerenderColors', ms));
 
 
 export type SupportedRenderFormats = 'Flamegraph' | 'JSONFlamegraph'
