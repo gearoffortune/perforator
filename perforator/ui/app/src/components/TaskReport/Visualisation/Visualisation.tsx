@@ -3,18 +3,22 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import type { FlamegraphProps, QueryKeys } from '@perforator/flamegraph';
-import { calculateTopForTable, Flamegraph, TopTable } from '@perforator/flamegraph';
+import { calculateTopForTable as calculateTopForTableOriginal, Flamegraph, TopTable } from '@perforator/flamegraph';
 
 import { Loader, Tabs } from '@gravity-ui/uikit';
 
 import { Link } from 'src/components/Link/Link';
 import { uiFactory } from 'src/factory';
+import { withMeasureTime } from 'src/utils/logging';
 import { createSuccessToast } from 'src/utils/toaster';
 
 import { useTypedQuery } from '../Flamegraph/query-utils';
 import type { Tab } from '../TaskFlamegraph/TaskFlamegraph';
 
 import './Visualisation.css';
+
+
+const calculateTopForTable = withMeasureTime(calculateTopForTableOriginal, 'calculateTopForTable', (ms) => uiFactory().rum()?.sendDelta?.('calculateTopForTable', ms));
 
 
 export interface VisualisationProps extends Pick<FlamegraphProps, 'profileData' | 'isDiff' | 'theme' | 'userSettings'> {
