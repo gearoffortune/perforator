@@ -4,8 +4,8 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'perforator/ui/packages/**'
+    # paths:
+      # - 'perforator/ui/packages/**'
 
 
 jobs:
