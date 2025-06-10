@@ -24,19 +24,19 @@ jobs:
     - name: Install dependencies
       working-directory: perforator/ui/app
       run: pnpm install
-      - name: Set token
-        run: |
+    - name: "Set token"
+      run: |
           npm config set '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
-        env:
+      env:
           NPM_TOKEN: ${{ secrets.NPMJS_TOKEN }}
-      - name: Build
-        run: |
+    - name: Build
+      run: |
           pnpm run build
           pnpm --filter '../packages/*' run build
-      - name: Bump version
-        run: |
+    - name: Bump version
+      run: |
           pnpm --filter '../packages/*' run bump
-      - name: Publish
-        run: |
+    - name: Publish
+      run: |
           pnpm --filter '../packages/*' run delete-engines
           pnpm --filter '../packages/*' publish --no-git-checks --tag test-ci --access public
