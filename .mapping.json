@@ -80,6 +80,7 @@
   "docs/ya.make":"perforator/docs/opensource/ya.make",
   "go.mod":"perforator/opensource/github_toplevel/go.mod",
   "perforator/ui-union/ya.make":"perforator/ui-union/ya.make.external",
+  "perforator/ui/app/.npmrc":"perforator/ui/app/external/.npmrc",
   "perforator/ui/app/package.json":"perforator/ui/app/external/package.json",
   "perforator/ui/app/pnpm-lock.yaml":"perforator/ui/app/external/pnpm-lock.yaml",
   "perforator/ui/app/pnpm-workspace.yaml":"perforator/ui/app/external/pnpm-workspace.yaml",
