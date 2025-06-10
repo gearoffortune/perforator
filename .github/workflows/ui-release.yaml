@@ -30,13 +30,16 @@ jobs:
       env:
           NPM_TOKEN: ${{ secrets.NPMJS_TOKEN }}
     - name: Build
+      working-directory: perforator/ui/app
       run: |
           pnpm run build
           pnpm --filter '../packages/*' run build
     - name: Bump version
+      working-directory: perforator/ui/app
       run: |
           pnpm --filter '../packages/*' run bump
     - name: Publish
+      working-directory: perforator/ui/app
       run: |
           pnpm --filter '../packages/*' run delete-engines
           pnpm --filter '../packages/*' publish --no-git-checks --tag test-ci --access public
