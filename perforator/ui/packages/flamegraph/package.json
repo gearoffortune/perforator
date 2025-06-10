@@ -1,6 +1,6 @@
 {
-  "name": "@perforator/flamegraph",
-  "version": "0.1.0",
+  "name": "@gearoffortune-test/flamegraph",
+  "version": "0.1.2",
   "description": "Yandex perforator flamegraph UI rendering library",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -23,6 +23,8 @@
   },
   "scripts": {
     "test": "jest",
+    "delete-engines": "npm pkg delete engines",
+    "bump": "npm version patch",
     "build": "tsc && node scripts/copy-through.mjs"
   },
   "repository": {
