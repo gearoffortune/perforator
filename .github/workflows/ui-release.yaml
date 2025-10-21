@@ -27,11 +27,6 @@ jobs:
     - name: Install dependencies
       working-directory: perforator/ui/app
       run: pnpm install
-    - name: "Set token"
-      run: |
-          npm config set '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
-      env:
-          NPM_TOKEN: ${{ secrets.NPMJS_TOKEN }}
     - name: Build
       working-directory: perforator/ui/app
       run: |
