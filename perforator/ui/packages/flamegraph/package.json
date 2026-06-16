@@ -1,6 +1,6 @@
 {
-  "name": "@perforator/flamegraph",
-  "version": "0.2.6",
+  "name": "@gearoffortune-test/flamegraph",
+  "version": "0.2.7",
   "description": "Yandex perforator flamegraph UI rendering library",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
