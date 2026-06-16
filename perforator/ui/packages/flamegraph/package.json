@@ -39,16 +39,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yandex/perforator.git"
+    "url": "git+https://github.com/gearoffortune/perforator.git"
   },
   "keywords": [
     "flamegraph"
   ],
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/yandex/perforator/issues"
+    "url": "https://github.com/gearoffortune/perforator/issues"
   },
-  "homepage": "https://github.com/yandex/perforator#readme",
+  "homepage": "https://github.com/gearoffortune/perforator#readme",
   "peerDependencies": {
     "@bem-react/classname": "1.8.0",
     "@gravity-ui/components": "4.19.1",
